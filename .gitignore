@@ -1,0 +1,12 @@
+# Build-Artefakt — nur CI/Build erzeugt es als Release-Asset (PROF-OBS-09)
+main.js
+main.js.map
+# Obsidian saveData — maschinen-/vault-spezifisch, NIE committen
+data.json
+# styles.css bleibt TRACKED (Release-Asset)
+node_modules/
+.claude/
+.remember/
+
+# macOS
+.DS_Store

@@ -1,0 +1,47 @@
+{
+  "name": "yijing-oracle",
+  "version": "0.1.0",
+  "description": "Cast the I Ching in your vault — three-coin oracle with hexagram texts, readings saved as notes. Local-first, no cloud.",
+  "type": "module",
+  "scripts": {
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc --noEmit && node esbuild.config.mjs --production",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "lint": "eslint src",
+    "deploy": "npm run build && cp main.js manifest.json styles.css \"${OBSIDIAN_PLUGIN_DIR:?set OBSIDIAN_PLUGIN_DIR}\"/",
+    "check:pure": "sh -c \"! grep -rl \\\"from 'obsidian'\\\" src/core src/vendor 2>/dev/null\"",
+    "check:bundle": "node esbuild.config.mjs --production && node scripts/check-bundle.mjs",
+    "gate": "npm run lint && npm run typecheck && npm run typecheck:test && npm test && npm run check:pure && npm run check:bundle"
+  },
+  "keywords": [
+    "obsidian",
+    "obsidian-plugin",
+    "i-ching",
+    "yijing",
+    "oracle",
+    "divination",
+    "local-first"
+  ],
+  "author": "Johannes Kaindl",
+  "license": "AGPL-3.0-or-later",
+  "repository": {
+    "type": "git",
+    "url": "git+https://codeberg.org/jkaindl/yijing-oracle.git"
+  },
+  "homepage": "https://codeberg.org/jkaindl/yijing-oracle",
+  "bugs": {
+    "url": "https://codeberg.org/jkaindl/yijing-oracle/issues"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "esbuild": "^0.23",
+    "eslint": "^9",
+    "eslint-plugin-obsidianmd": "latest",
+    "obsidian": "latest",
+    "typescript": "^5.5",
+    "typescript-eslint": "^8",
+    "vitest": "^2"
+  }
+}

@@ -1,0 +1,124 @@
+// Reines Rendering: Reading + Hexagramm-Daten → Frontmatter + Markdown-Body.
+// Berührt NIE eine Datei (das macht reading-writer.ts) und nutzt NICHT die globale
+// UI-i18n — die Sektions-Labels hängen an der SPRACHE DES READINGS (kann von der
+// UI-Sprache abweichen), darum ein eigenes, kleines Label-Set hier.
+import { type Reading } from "./reading";
+import { getHexagram, type HexLine, type Lang, type Register } from "./data";
+
+export interface RenderOptions {
+  lang: Lang;
+  register: Register;
+  /** ISO-nahe Zeitmarke, von der obsidian-Schicht geliefert (render bleibt uhr-frei). */
+  date: string;
+  question?: string;
+}
+
+export interface RenderedReading {
+  /** H1-Text ohne führendes "# " — auch Basis für den Dateinamen. */
+  title: string;
+  /** YAML-Innentext ohne "---"-Zäune. */
+  frontmatter: string;
+  /** Markdown ab "# …" (ohne Frontmatter) — für Note UND Cursor-Einfügung. */
+  body: string;
+}
+
+interface Labels {
+  judgment: string;
+  image: string;
+  changes: string;
+  becomes: string;
+  question: string;
+  changingLines: string;
+}
+
+const LABELS: Record<Lang, Labels> = {
+  de: {
+    judgment: "Das Urteil",
+    image: "Das Bild",
+    changes: "Die Wandlungen",
+    becomes: "Wird zu",
+    question: "Frage",
+    changingLines: "wandelnde Linien",
+  },
+  en: {
+    judgment: "The Judgment",
+    image: "The Image",
+    changes: "The Changing Lines",
+    becomes: "Becomes",
+    question: "Question",
+    changingLines: "changing lines",
+  },
+};
+
+function heading(unicode: string, number: number, nameLocal: string): string {
+  return `${unicode} ${number} · ${nameLocal}`;
+}
+
+function renderLine(line: HexLine): string {
+  const parts = [`**${line.position}**`, line.text.trim()];
+  if (line.interpretation?.trim()) parts.push(line.interpretation.trim());
+  return parts.join("\n\n");
+}
+
+export function renderReading(reading: Reading, opts: RenderOptions): RenderedReading {
+  const L = LABELS[opts.lang];
+  const primary = getHexagram(reading.primaryNumber, opts.lang, opts.register);
+  const title = heading(primary.unicode, primary.number, primary.nameLocal);
+  const question = opts.question?.trim() ?? "";
+
+  // ── Frontmatter ────────────────────────────────────────────────────────
+  const fm: string[] = [
+    "yijing_reading: true",
+    `date: ${opts.date}`,
+    `question: ${JSON.stringify(question)}`,
+    `hexagram: ${reading.primaryNumber}`,
+    `changing_lines: [${reading.changingPositions.join(", ")}]`,
+  ];
+  if (reading.resultingNumber !== null) fm.push(`resulting: ${reading.resultingNumber}`);
+  fm.push(`language: ${opts.lang}`, `register: ${opts.register}`);
+
+  // ── Body ───────────────────────────────────────────────────────────────
+  const body: string[] = [`# ${title}`];
+
+  const subtitle = `> ${[primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ")}`;
+  body.push(subtitle);
+
+  const meta: string[] = [];
+  if (question) meta.push(`**${L.question}:** ${question}`);
+  if (reading.changingPositions.length > 0) {
+    meta.push(`${L.changingLines}: ${reading.changingPositions.join(", ")}`);
+  }
+  if (meta.length > 0) body.push(`> ${meta.join("   ·   ")}`);
+
+  body.push(`## ${L.judgment}`, primary.judgment.trim());
+  body.push(`## ${L.image}`, primary.image.trim());
+
+  if (reading.changingPositions.length > 0) {
+    const headingText =
+      reading.changingPositions.length === 6
+        ? `## ${L.changes}`
+        : `## ${L.changes} (${reading.changingPositions.join(", ")})`;
+    body.push(headingText);
+
+    // Yong-Sonderfall: alle sechs wandeln bei Hex 1/2 → der 7. Text (Index 6).
+    if (reading.allChanging && primary.lines.length > 6) {
+      body.push(renderLine(primary.lines[6]));
+    } else {
+      for (const pos of reading.changingPositions) {
+        body.push(renderLine(primary.lines[pos - 1]));
+      }
+    }
+
+    if (reading.resultingNumber !== null) {
+      const resulting = getHexagram(reading.resultingNumber, opts.lang, opts.register);
+      body.push(`## ${L.becomes} → ${heading(resulting.unicode, resulting.number, resulting.nameLocal)}`);
+      body.push(resulting.judgment.trim());
+    }
+  }
+
+  return {
+    title,
+    frontmatter: fm.join("\n"),
+    body: body.join("\n\n") + "\n",
+  };
+}

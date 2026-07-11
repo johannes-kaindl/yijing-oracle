@@ -1,0 +1,132 @@
+/* Yijing Oracle — nur Obsidian-Theme-Variablen (UI-STANDARD: nativ-first, kein Hardcoded-Farbwert). */
+
+.yijing-oracle {
+  padding: var(--size-4-3);
+}
+
+.yijing-title {
+  margin-top: 0;
+}
+
+.yijing-question {
+  width: 100%;
+  margin-bottom: var(--size-4-2);
+}
+
+.yijing-oracle .yijing-actions {
+  display: flex;
+  gap: var(--size-4-2);
+  flex-wrap: wrap;
+  margin: var(--size-4-2) 0;
+}
+
+/* ── Aktuelles Reading ─────────────────────────────────────────────────── */
+.yijing-reading {
+  margin-top: var(--size-4-3);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: var(--size-4-3);
+}
+
+.yijing-figure-head {
+  display: flex;
+  align-items: center;
+  gap: var(--size-4-4);
+  margin-bottom: var(--size-4-3);
+}
+
+/* Hexagramm-Figur: sechs Linien, oben = Linie 6. */
+.yijing-figure {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-2-3);
+  width: 72px;
+  flex: 0 0 auto;
+}
+
+.yijing-line {
+  height: 8px;
+  border-radius: 2px;
+  color: var(--text-muted);
+}
+
+.yijing-line.is-yang {
+  background: currentColor;
+}
+
+/* Yin: zwei Hälften mit Lücke in der Mitte. */
+.yijing-line.is-yin {
+  background: linear-gradient(
+    to right,
+    currentColor 0 42%,
+    transparent 42% 58%,
+    currentColor 58% 100%
+  );
+}
+
+/* Wandelnde Linie hervorheben. */
+.yijing-line.is-changing {
+  color: var(--interactive-accent);
+}
+
+.yijing-glyph {
+  font-size: 1.4em;
+  font-weight: var(--font-bold);
+}
+
+.yijing-name {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}
+
+.yijing-becomes {
+  color: var(--text-accent);
+  font-size: var(--font-ui-small);
+  margin-top: var(--size-2-2);
+}
+
+.yijing-preview {
+  font-size: var(--font-ui-small);
+  max-height: 44vh;
+  overflow-y: auto;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
+  background: var(--background-secondary);
+}
+
+/* ── History ───────────────────────────────────────────────────────────── */
+.yijing-history {
+  margin-top: var(--size-4-4);
+  border-top: 1px solid var(--background-modifier-border);
+  padding-top: var(--size-4-2);
+}
+
+.yijing-history h3 {
+  margin-bottom: var(--size-4-1);
+}
+
+.yijing-history-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.yijing-history-list li {
+  margin: var(--size-2-2) 0;
+}
+
+.yijing-history-link {
+  cursor: pointer;
+  color: var(--text-normal);
+  text-decoration: none;
+}
+
+.yijing-history-link:hover {
+  color: var(--text-accent);
+  text-decoration: underline;
+}
+
+.yijing-empty {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+}

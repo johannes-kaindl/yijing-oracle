@@ -1,0 +1,90 @@
+[
+  {
+    "symbol": "☰",
+    "binary": "111",
+    "name": "乾",
+    "pinyin": "qián",
+    "family": "Vater",
+    "nature": "Himmel",
+    "season": "Sommer",
+    "direction": "S",
+    "associations": "Ausdehnungsenergie; das wärmende Prinzip der Sonne, durchdringend und befruchtend. Das himmlische erzeugende (=männliche) Prinzip.\nKopf, Führer, Kraft, Stärke, höhere Ordnung; Angriff, Kampf, Konfrontation, feindliches Eindringen."
+  },
+  {
+    "symbol": "☱",
+    "binary": "110",
+    "name": "兌",
+    "pinyin": "duì",
+    "family": "jüngste Tochter",
+    "nature": "See",
+    "season": "Frühling",
+    "direction": "SO",
+    "associations": "Wechsel (aber auch Stillstand), Ausgleich, Ausgeglichenheit, Befriedigung; Freude, Spaß, Vergnügen; Gewicht"
+  },
+  {
+    "symbol": "☲",
+    "binary": "101",
+    "name": "離",
+    "pinyin": "lí",
+    "family": "mittlere Tochter",
+    "nature": "Feuer",
+    "season": "Frühling",
+    "direction": "O",
+    "associations": "Sonne, Strahlung, Licht, Tag, Klarheit; Schnelle Bewegung, Abreise, Trennung; Außerordentliche Wildheit, Fremdartigkeit; Eleganz, Verfeinerung"
+  },
+  {
+    "symbol": "☳",
+    "binary": "100",
+    "name": "震",
+    "pinyin": "zhèn",
+    "family": "ältester Sohn",
+    "nature": "Donner",
+    "season": "Winter",
+    "direction": "NO",
+    "associations": "Aufregung, Umsturz, Spaltung; Erwachen, Aufschrecken, Erschütterung, Bewegung, Zittern, Beben, Erdbeben; Herauskommen"
+  },
+  {
+    "symbol": "☴",
+    "binary": "011",
+    "name": "巽",
+    "pinyin": "xùn",
+    "family": "älteste Tochter",
+    "nature": "Wind",
+    "season": "Sommer",
+    "direction": "SW",
+    "associations": "Sanfte Durchdringung, Beweglichkeit; Milde, Nachgiebigkeit, Fügsamkeit, Anpassung; Holz"
+  },
+  {
+    "symbol": "☵",
+    "binary": "010",
+    "name": "坎",
+    "pinyin": "kăn",
+    "family": "mittlerer Sohn",
+    "nature": "Wasser",
+    "season": "Herbst",
+    "direction": "W",
+    "associations": "Gefahr, Wildwasser, Wolken, Regen; Schlucht, Abgrund, Graben, Grube, Falle, Fangschlinge, Loch; Bloßstellung, Krise; Mond"
+  },
+  {
+    "symbol": "☶",
+    "binary": "001",
+    "name": "艮",
+    "pinyin": "gèn",
+    "family": "jüngster Sohn",
+    "nature": "Berg",
+    "season": "Herbst",
+    "direction": "NW",
+    "associations": "Stille, Ruhe, Innehalten, Beständigkeit; Aufrichtigkeit; Entschlossenheit"
+  },
+  {
+    "symbol": "☷",
+    "binary": "000",
+    "name": "坤",
+    "pinyin": "kūn",
+    "family": "Mutter",
+    "nature": "Erde",
+    "season": "Winter",
+    "direction": "N",
+    "associations": "Empfangende Energie; Ergebnis, Gewinn, Akzeptanz. Das irdische (=weibliche) Prinzip."
+  }
+]
