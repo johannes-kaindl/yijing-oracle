@@ -18,8 +18,11 @@ export interface RenderedReading {
   title: string;
   /** YAML-Innentext ohne "---"-Zäune. */
   frontmatter: string;
-  /** Markdown ab "# …" (ohne Frontmatter) — für Note UND Cursor-Einfügung. */
+  /** Voller Markdown ab "# …" (ohne Frontmatter) — für Note UND Cursor-Einfügung. */
   body: string;
+  /** Wie body, aber OHNE H1-Titel + Untertitel — für die Panel-Vorschau, wo die
+   *  Kopfzeile (Figur + Namen) den Titel bereits trägt (kein Doppel). */
+  previewBody: string;
 }
 
 interface Labels {
@@ -78,47 +81,50 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
   fm.push(`language: ${opts.lang}`, `register: ${opts.register}`);
 
   // ── Body ───────────────────────────────────────────────────────────────
-  const body: string[] = [`# ${title}`];
-
-  const subtitle = `> ${[primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ")}`;
-  body.push(subtitle);
+  const titleLine = `# ${title}`;
+  const subtitleLine = `> ${[primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ")}`;
 
   const meta: string[] = [];
   if (question) meta.push(`**${L.question}:** ${question}`);
   if (reading.changingPositions.length > 0) {
     meta.push(`${L.changingLines}: ${reading.changingPositions.join(", ")}`);
   }
-  if (meta.length > 0) body.push(`> ${meta.join("   ·   ")}`);
 
-  body.push(`## ${L.judgment}`, primary.judgment.trim());
-  body.push(`## ${L.image}`, primary.image.trim());
+  // Inhalt ab dem Frage-/Meta-Block — ohne Titel/Untertitel (die trägt in der Vorschau
+  // die Kopfzeile). Für die Note wird der Titel oben wieder vorangestellt.
+  const content: string[] = [];
+  if (meta.length > 0) content.push(`> ${meta.join("   ·   ")}`);
+
+  content.push(`## ${L.judgment}`, primary.judgment.trim());
+  content.push(`## ${L.image}`, primary.image.trim());
 
   if (reading.changingPositions.length > 0) {
     const headingText =
       reading.changingPositions.length === 6
         ? `## ${L.changes}`
         : `## ${L.changes} (${reading.changingPositions.join(", ")})`;
-    body.push(headingText);
+    content.push(headingText);
 
     // Yong-Sonderfall: alle sechs wandeln bei Hex 1/2 → der 7. Text (Index 6).
     if (reading.allChanging && primary.lines.length > 6) {
-      body.push(renderLine(primary.lines[6]));
+      content.push(renderLine(primary.lines[6]));
     } else {
       for (const pos of reading.changingPositions) {
-        body.push(renderLine(primary.lines[pos - 1]));
+        content.push(renderLine(primary.lines[pos - 1]));
       }
     }
 
     if (reading.resultingNumber !== null) {
       const resulting = getHexagram(reading.resultingNumber, opts.lang, opts.register);
-      body.push(`## ${L.becomes} → ${heading(resulting.unicode, resulting.number, resulting.nameLocal)}`);
-      body.push(resulting.judgment.trim());
+      content.push(`## ${L.becomes} → ${heading(resulting.unicode, resulting.number, resulting.nameLocal)}`);
+      content.push(resulting.judgment.trim());
     }
   }
 
   return {
     title,
     frontmatter: fm.join("\n"),
-    body: body.join("\n\n") + "\n",
+    body: [titleLine, subtitleLine, ...content].join("\n\n") + "\n",
+    previewBody: content.join("\n\n") + "\n",
   };
 }

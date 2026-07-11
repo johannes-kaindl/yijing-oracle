@@ -155,18 +155,23 @@ export class OracleView extends ItemView {
       line.toggleClass("is-changing", row.changing);
     }
     const label = head.createDiv({ cls: "yijing-figure-label" });
-    label.createDiv({ text: `${primary.unicode} ${primary.number}`, cls: "yijing-glyph" });
-    label.createDiv({ text: primary.nameLocal, cls: "yijing-name" });
+    label.createDiv({
+      text: `${primary.unicode} ${primary.number} · ${primary.nameLocal}`,
+      cls: "yijing-glyph",
+    });
+    const sub = [primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ");
+    if (sub) label.createDiv({ text: sub, cls: "yijing-name" });
     if (c.reading.resultingNumber !== null) {
+      const resulting = getHexagram(c.reading.resultingNumber, lang, register);
       label.createDiv({
-        text: t("view.becomes", `${c.reading.resultingNumber}`),
+        text: t("view.becomes", `${resulting.unicode} ${resulting.number} · ${resulting.nameLocal}`),
         cls: "yijing-becomes",
       });
     }
 
-    // Markdown-Vorschau des Reading-Bodys.
+    // Markdown-Vorschau OHNE H1/Untertitel — die Kopfzeile oben trägt den Titel bereits.
     const preview = card.createDiv({ cls: "yijing-preview" });
-    void MarkdownRenderer.render(this.app, c.rendered.body, preview, "", this);
+    void MarkdownRenderer.render(this.app, c.rendered.previewBody, preview, "", this);
 
     // Speicher-Aktionen — beide Ausgabe-Modi als Buttons (Spec: beides wählbar).
     const actions = card.createDiv({ cls: "yijing-actions" });

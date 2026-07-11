@@ -52,6 +52,16 @@ describe("renderReading", () => {
     expect(out.body).toContain("lauter Neunen");
   });
 
+  it("previewBody omits H1 + subtitle but keeps sections (no duplicate title in panel)", () => {
+    const r = buildReading(L(9, 7, 8, 6, 8, 7)); // changing → has resulting
+    const out = renderReading(r, { lang: "de", register: "classic", date: "2026-07-12T14:23" });
+    expect(out.body.startsWith("# ")).toBe(true); // Note behält Titel
+    expect(out.previewBody.startsWith("# ")).toBe(false); // Vorschau nicht
+    expect(out.previewBody).not.toContain("# ䷀");
+    expect(out.previewBody).toContain("## Das Urteil");
+    expect(out.previewBody).toContain("Wird zu →");
+  });
+
   it("title carries glyph, number and name", () => {
     const r = buildReading(L(9, 9, 9, 9, 9, 9));
     const out = renderReading(r, { lang: "de", register: "classic", date: "2026-07-12T14:23" });
