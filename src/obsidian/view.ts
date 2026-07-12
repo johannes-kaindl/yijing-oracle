@@ -16,9 +16,13 @@ import { buildReading, reconstructReading, type Reading } from "../core/reading"
 import { renderReading, type RenderedReading } from "../core/render";
 import { getHexagram, type Lang, type Register } from "../core/data";
 import { type FieldId } from "../core/frontmatter";
+import { buildInterpretationMessages } from "../core/llm/prompt";
+import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
+import { ChatClient } from "./chat-client";
+import { httpGet } from "./http";
 import { nowStamp } from "./clock";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
@@ -28,11 +32,22 @@ export interface OracleHost {
   resolveReadingLang(): Lang;
 }
 
+interface Interpretation {
+  answer: string;
+  reasoning: string;
+  model: string;
+}
+
 interface CurrentCast {
   reading: Reading;
   rendered: RenderedReading;
   question: string;
   date: string;
+  lang: Lang;
+  /** Erzeugte KI-Deutung (oder null). */
+  interpretation: Interpretation | null;
+  /** Bereits gespeicherte Note zu diesem Wurf (null → noch nicht gespeichert). */
+  file: TFile | null;
 }
 
 /** Sechs Linien als Hexagramm-Figur, oben = Linie 6. { solid, changing } je Zeile. */
@@ -49,6 +64,10 @@ function figureRows(reading: Reading): { yang: boolean; changing: boolean }[] {
 export class OracleView extends ItemView {
   private current: CurrentCast | null = null;
   private questionValue = "";
+  private streaming = false;
+  private abortCtrl: AbortController | null = null;
+  private answerEl: HTMLElement | null = null;
+  private reasoningEl: HTMLElement | null = null;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -95,25 +114,31 @@ export class OracleView extends ItemView {
       includeFrontmatter: this.host.settings.includeFrontmatter,
       frontmatterFields: this.host.settings.frontmatterFields,
     });
-    this.current = { reading, rendered, question, date };
+    this.current = { reading, rendered, question, date, lang, interpretation: null, file: null };
   }
 
   private async saveCurrent(mode: OutputMode): Promise<void> {
-    if (!this.current) return;
-    const { rendered, reading, question, date } = this.current;
+    const c = this.current;
+    if (!c) return;
     const result = await writeReading(
       this.app,
       {
-        rendered,
-        date,
-        question,
-        hexNumber: reading.primaryNumber,
-        resultingNumber: reading.resultingNumber,
+        rendered: c.rendered,
+        date: c.date,
+        question: c.question,
+        hexNumber: c.reading.primaryNumber,
+        resultingNumber: c.reading.resultingNumber,
+        lang: c.lang,
+        interpretation: c.interpretation,
+        thinkingInNote: this.host.settings.llm.thinkingInNote,
+        existingFile: c.file,
       },
       mode,
       this.host.settings,
     );
     if (result.file) {
+      // Note merken, damit ein späteres „Deutung speichern" dieselbe Datei aktualisiert.
+      if (result.mode === "note") c.file = result.file;
       new Notice(t("notice.saved", result.file.basename));
       if (result.mode === "note" && this.host.settings.openAfterCreate) {
         await this.app.workspace.getLeaf(false).openFile(result.file);
@@ -188,6 +213,9 @@ export class OracleView extends ItemView {
     const preview = card.createDiv({ cls: "yijing-preview" });
     void MarkdownRenderer.render(this.app, c.rendered.previewBody, preview, "", this);
 
+    // KI-Deutung (Button / Live-Stream / Ergebnis).
+    this.renderInterpretationArea(card, c);
+
     // Speicher-Aktionen — beide Ausgabe-Modi als Buttons (Spec: beides wählbar).
     const actions = card.createDiv({ cls: "yijing-actions" });
     const primaryMode = this.host.settings.defaultOutput;
@@ -198,6 +226,104 @@ export class OracleView extends ItemView {
       .setButtonText(t("view.insertCursor"))
       .onClick(() => void this.saveCurrent("cursor"));
     (primaryMode === "cursor" ? cursorBtn : noteBtn).setCta();
+  }
+
+  /** Deutungs-Bereich: Auslöse-Button, Live-Stream mit Abbrechen, oder fertige Deutung. */
+  private renderInterpretationArea(card: HTMLElement, c: CurrentCast): void {
+    this.answerEl = null;
+    this.reasoningEl = null;
+    const area = card.createDiv({ cls: "yijing-interpretation" });
+
+    if (this.streaming) {
+      const det = area.createEl("details", { cls: "yijing-reasoning" });
+      det.open = true;
+      det.createEl("summary", { text: t("view.reasoningHead") });
+      this.reasoningEl = det.createDiv({ cls: "yijing-reasoning-body" });
+      this.reasoningEl.setText(c.interpretation?.reasoning ?? "");
+      this.answerEl = area.createDiv({ cls: "yijing-interpretation-body" });
+      this.answerEl.setText(c.interpretation?.answer ?? "");
+      const row = area.createDiv({ cls: "yijing-actions" });
+      new ButtonComponent(row).setButtonText(t("view.cancel")).onClick(() => this.abortCtrl?.abort());
+      return;
+    }
+
+    if (c.interpretation) {
+      if (c.interpretation.reasoning.trim()) {
+        const det = area.createEl("details", { cls: "yijing-reasoning" });
+        det.createEl("summary", { text: t("view.reasoningHead") });
+        det.createDiv({ text: c.interpretation.reasoning, cls: "yijing-reasoning-body" });
+      }
+      const body = area.createDiv({ cls: "yijing-interpretation-body" });
+      void MarkdownRenderer.render(this.app, c.interpretation.answer, body, "", this);
+      const row = area.createDiv({ cls: "yijing-actions" });
+      new ButtonComponent(row)
+        .setButtonText(t("view.saveInterpretation"))
+        .setCta()
+        .onClick(() => void this.saveCurrent(this.host.settings.defaultOutput));
+      return;
+    }
+
+    const row = area.createDiv({ cls: "yijing-actions" });
+    new ButtonComponent(row)
+      .setButtonText(t("view.interpret"))
+      .onClick(() => void this.generateInterpretation());
+  }
+
+  /** Startet die Deutung: baut Messages, streamt live, hängt Ergebnis an current an. */
+  private async generateInterpretation(): Promise<void> {
+    const c = this.current;
+    if (!c || this.streaming) return;
+    const llm = this.host.settings.llm;
+    const endpoint = llm.activeEndpoint.trim();
+    if (!endpoint || !llm.model.trim()) {
+      new Notice(t("notice.noEndpoint"));
+      return;
+    }
+
+    const lang = c.lang;
+    const systemPrompt = (lang === "de" ? llm.systemPromptDe : llm.systemPromptEn).trim() || DEFAULT_SYSTEM_PROMPT[lang];
+    const messages = buildInterpretationMessages({ rendered: c.rendered, question: c.question, lang, systemPrompt });
+
+    this.streaming = true;
+    this.abortCtrl = new AbortController();
+    c.interpretation = { answer: "", reasoning: "", model: llm.model };
+    await this.render();
+
+    const client = new ChatClient(endpoint, llm.model, httpGet);
+    try {
+      const res = await client.stream(
+        messages,
+        (tok) => {
+          if (c.interpretation) { c.interpretation.answer += tok; this.updateStreamDom(c); }
+        },
+        (tok) => {
+          if (c.interpretation) { c.interpretation.reasoning += tok; this.updateStreamDom(c); }
+        },
+        this.abortCtrl.signal,
+        { suppressThinking: !llm.requestThinking },
+      );
+      if (!res.content.trim()) {
+        c.interpretation = null;
+        new Notice(t("notice.noInterpretation"));
+      }
+    } catch (e) {
+      const aborted = (e as Error)?.name === "AbortError";
+      c.interpretation = null;
+      if (!aborted) {
+        new Notice(t("notice.llmError"));
+        console.error("[yijing-oracle]", e);
+      }
+    } finally {
+      this.streaming = false;
+      this.abortCtrl = null;
+      await this.render();
+    }
+  }
+
+  /** Leichtes Live-Update der Stream-Container ohne vollständigen Re-Render (kein Flackern). */
+  private updateStreamDom(c: CurrentCast): void {
+    if (this.answerEl) this.answerEl.setText(c.interpretation?.answer ?? "");
+    if (this.reasoningEl) this.reasoningEl.setText(c.interpretation?.reasoning ?? "");
   }
 
   private renderHistory(root: HTMLElement): void {
@@ -285,6 +411,6 @@ export class OracleView extends ItemView {
       includeFrontmatter: this.host.settings.includeFrontmatter,
       frontmatterFields: this.host.settings.frontmatterFields,
     });
-    return { reading, rendered, question, date };
+    return { reading, rendered, question, date, lang, interpretation: null, file: f };
   }
 }

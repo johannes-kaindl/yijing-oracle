@@ -3,6 +3,9 @@
 import { type App, MarkdownView, Notice, type TFile, normalizePath } from "obsidian";
 import { type RenderedReading } from "../core/render";
 import { buildFilename } from "../core/filename";
+import { type Lang } from "../core/data";
+import { renderInterpretationBlock, type InterpretationData, type ThinkingInNote } from "../core/llm/interpretation";
+import { insertInterpretation } from "../core/llm/insert";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 
@@ -47,6 +50,23 @@ export interface WriteInput {
   question: string;
   hexNumber: number;
   resultingNumber: number | null;
+  /** Reading-Sprache — steuert die Labels des Deutungs-Blocks. */
+  lang: Lang;
+  /** Optionale KI-Deutung; null → keine Deutung einbetten. */
+  interpretation?: InterpretationData | null;
+  /** Wie Reasoning in die Note wandert. */
+  thinkingInNote: ThinkingInNote;
+  /** Ist die Note zu diesem Wurf schon vorhanden, wird sie modifiziert statt neu angelegt. */
+  existingFile?: TFile | null;
+}
+
+/** Baut den Deutungs-Markdown-Block, wenn eine Deutung vorliegt — sonst null. */
+function interpretationBlock(input: WriteInput): string | null {
+  if (!input.interpretation) return null;
+  return renderInterpretationBlock(input.interpretation, {
+    lang: input.lang,
+    thinkingInNote: input.thinkingInNote,
+  });
 }
 
 /** Legt die Reading-Note an — mit Frontmatter-Zäunen nur, wenn welches vorhanden ist. */
@@ -62,9 +82,11 @@ async function createReadingNote(app: App, input: WriteInput, settings: PluginSe
     question: input.question,
   });
   const path = uniquePath(app, settings.readingsFolder, base);
+  const block = interpretationBlock(input);
+  const body = block ? insertInterpretation(rendered.body, block) : rendered.body;
   const content = rendered.frontmatter
-    ? `---\n${rendered.frontmatter}\n---\n\n${rendered.body}`
-    : rendered.body;
+    ? `---\n${rendered.frontmatter}\n---\n\n${body}`
+    : body;
   return app.vault.create(path, content);
 }
 
@@ -77,6 +99,16 @@ export async function writeReading(
   mode: OutputMode,
   settings: PluginSettings,
 ): Promise<WriteResult> {
+  // Existiert die Note zu diesem Wurf schon (z.B. „Deutung nachtragen"), idempotent
+  // am Marker aktualisieren statt zu duplizieren.
+  if (input.existingFile) {
+    const block = interpretationBlock(input);
+    if (block) {
+      await app.vault.process(input.existingFile, (cur) => insertInterpretation(cur, block));
+    }
+    return { file: input.existingFile, mode: "note" };
+  }
+
   const file = await createReadingNote(app, input, settings);
 
   if (mode === "cursor") {
