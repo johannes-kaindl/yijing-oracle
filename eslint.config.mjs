@@ -28,6 +28,10 @@ export default tseslint.config(
       // Der Ordner-Placeholder "Yijing/Readings" ist ein Vault-PFAD (Eigenname), kein
       // Satztext — sentence-case wuerde ihn faelschlich kleinschreiben.
       "obsidianmd/ui/sentence-case": "off",
+      // display() ist seit 1.13.0 zugunsten getSettingDefinitions() deprecated, aber unter
+      // minAppVersion 1.8.7 der einzig unterstuetzte Settings-Weg (auch fuer this.display()
+      // zum Re-Render) — die Deprecation-Warnung ist hier ein Versionskonflikt-Fehlalarm.
+      "@typescript-eslint/no-deprecated": "off",
     },
   },
 );

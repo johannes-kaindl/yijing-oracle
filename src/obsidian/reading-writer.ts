@@ -81,7 +81,11 @@ export async function writeReading(
   const file = await createReadingNote(app, input, settings);
 
   if (mode === "cursor") {
-    const view = app.workspace.getActiveViewOfType(MarkdownView);
+    // NICHT getActiveViewOfType: beim Klick auf den Panel-Button ist das Sidebar-Panel
+    // die aktive Ansicht → keine „aktive" Notiz. Stattdessen die zuletzt genutzte Notiz
+    // im Hauptbereich (rootSplit ignoriert die Sidebars).
+    const leaf = app.workspace.getMostRecentLeaf(app.workspace.rootSplit);
+    const view = leaf?.view instanceof MarkdownView ? leaf.view : null;
     if (view?.editor && view.file) {
       const link = app.fileManager.generateMarkdownLink(file, view.file.path);
       view.editor.replaceRange(link, view.editor.getCursor("to"));
