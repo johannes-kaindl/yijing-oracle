@@ -12,6 +12,7 @@ import { renderReading } from "./core/render";
 import { type Lang } from "./core/data";
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_LLM_SETTINGS,
   SettingsTab,
   resolveReadingLang,
   type OutputMode,
@@ -32,6 +33,8 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
     // frontmatterFields sind Objekte — mergeSettings klont nur die Array-Ebene, nicht die
     // Elemente. Tief kopieren, damit die Settings-UI nie DEFAULT_FRONTMATTER_FIELDS mutiert.
     this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
+    // mergeSettings ist shallow — das llm-Objekt separat gegen neue Defaults auffüllen.
+    this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
 
     registerI18n();
     setLang(pickLang(this.readLocale()));

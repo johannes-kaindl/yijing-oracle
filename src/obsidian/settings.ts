@@ -1,8 +1,17 @@
-import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
+import { type App, Notice, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { pickLang, t } from "../vendor/kit/i18n";
 import { type Lang, type Register } from "../core/data";
 import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from "../core/frontmatter";
 import { DEFAULT_FILENAME_TEMPLATE } from "../core/filename";
+import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
+import { type ThinkingInNote } from "../core/llm/interpretation";
+import { type LlmSettings, DEFAULT_LLM_SETTINGS } from "../core/llm/settings-defaults";
+import { parseEndpointList, normalizeEndpoint } from "../vendor/kit/endpoint";
+import { ChatClient } from "./chat-client";
+import { httpGet, probeEndpoint } from "./http";
+
+export type { LlmSettings } from "../core/llm/settings-defaults";
+export { DEFAULT_LLM_SETTINGS } from "../core/llm/settings-defaults";
 
 export type OutputMode = "note" | "cursor";
 
@@ -19,6 +28,8 @@ export interface PluginSettings {
   includeFrontmatter: boolean;
   /** Pro Key: Name + Aktiv-Haken. */
   frontmatterFields: FrontmatterField[];
+  /** LLM-Deutungs-Konfiguration. */
+  llm: LlmSettings;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -30,6 +41,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   openAfterCreate: true,
   includeFrontmatter: true,
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
+  llm: DEFAULT_LLM_SETTINGS,
 };
 
 /** Löst die effektive Reading-Sprache auf: "auto" → aus dem UI-Locale abgeleitet. */
@@ -167,5 +179,138 @@ export class SettingsTab extends PluginSettingTab {
           );
       }
     }
+
+    this.renderLlmSettings(containerEl, s.llm);
+  }
+
+  // ── KI-Deutung ────────────────────────────────────────────────────────────
+  private renderLlmSettings(containerEl: HTMLElement, llm: LlmSettings): void {
+    new Setting(containerEl).setName(t("set.llmHead")).setHeading();
+
+    // Endpunkte (Textarea, eine URL pro Zeile).
+    new Setting(containerEl)
+      .setName(t("set.llmEndpoints"))
+      .setDesc(t("set.llmEndpointsDesc"))
+      .addTextArea((ta) => {
+        ta.setPlaceholder("http://localhost:1234").setValue(llm.endpoints);
+        ta.inputEl.rows = 3;
+        ta.onChange(async (v) => {
+          llm.endpoints = v;
+          const list = parseEndpointList(v);
+          if (list.length && !list.includes(llm.activeEndpoint)) llm.activeEndpoint = list[0];
+          await this.host.saveSettings();
+        });
+      });
+
+    // Aktiver Endpunkt + Test.
+    const endpoints = parseEndpointList(llm.endpoints);
+    new Setting(containerEl)
+      .setName(t("set.llmActive"))
+      .addDropdown((d) => {
+        for (const ep of endpoints) d.addOption(ep, ep);
+        if (endpoints.length) {
+          d.setValue(endpoints.includes(llm.activeEndpoint) ? llm.activeEndpoint : endpoints[0]);
+        }
+        d.onChange(async (v) => {
+          llm.activeEndpoint = v;
+          await this.host.saveSettings();
+          this.display();
+        });
+      })
+      .addButton((b) =>
+        b.setButtonText(t("set.llmTest")).onClick(async () => {
+          const status = await probeEndpoint(normalizeEndpoint(llm.activeEndpoint));
+          new Notice(status.klartext);
+        }),
+      );
+
+    // API-Key (optional).
+    new Setting(containerEl)
+      .setName(t("set.llmApiKey"))
+      .addText((txt) =>
+        txt.setValue(llm.apiKey).onChange(async (v) => {
+          llm.apiKey = v.trim();
+          await this.host.saveSettings();
+        }),
+      );
+
+    // Modell — Dropdown live aus listModels(), Fallback Textfeld.
+    const modelSetting = new Setting(containerEl).setName(t("set.llmModel")).setDesc(t("set.llmModelDesc"));
+    void new ChatClient(llm.activeEndpoint, llm.model, httpGet).listModels().then((models) => {
+      if (models.length) {
+        const list = models.includes(llm.model) || !llm.model ? models : [llm.model, ...models];
+        modelSetting.addDropdown((d) => {
+          for (const m of list) d.addOption(m, m);
+          d.setValue(llm.model || list[0]);
+          d.onChange(async (v) => {
+            llm.model = v;
+            await this.host.saveSettings();
+          });
+        });
+      } else {
+        modelSetting.setDesc(t("set.llmModelOffline"));
+        modelSetting.addText((txt) =>
+          txt.setValue(llm.model).onChange(async (v) => {
+            llm.model = v.trim();
+            await this.host.saveSettings();
+          }),
+        );
+        modelSetting.addButton((b) => b.setButtonText(t("set.llmLoadModels")).onClick(() => this.display()));
+      }
+    });
+
+    // System-Prompts DE/EN (leer = Default) + Reset.
+    const promptRow = (name: string, get: () => string, set: (v: string) => void, placeholder: string): void => {
+      new Setting(containerEl)
+        .setName(name)
+        .addTextArea((ta) => {
+          ta.setPlaceholder(placeholder).setValue(get());
+          ta.inputEl.rows = 4;
+          ta.onChange(async (v) => {
+            set(v);
+            await this.host.saveSettings();
+          });
+        })
+        .addExtraButton((btn) =>
+          btn
+            .setIcon("rotate-ccw")
+            .setTooltip(t("set.llmReset"))
+            .onClick(async () => {
+              set("");
+              await this.host.saveSettings();
+              this.display();
+            }),
+        );
+    };
+    promptRow(t("set.llmSysDe"), () => llm.systemPromptDe, (v) => (llm.systemPromptDe = v), DEFAULT_SYSTEM_PROMPT.de);
+    promptRow(t("set.llmSysEn"), () => llm.systemPromptEn, (v) => (llm.systemPromptEn = v), DEFAULT_SYSTEM_PROMPT.en);
+
+    // Thinking anfordern.
+    new Setting(containerEl)
+      .setName(t("set.llmThinking"))
+      .setDesc(t("set.llmThinkingDesc"))
+      .addToggle((tg) =>
+        tg.setValue(llm.requestThinking).onChange(async (v) => {
+          llm.requestThinking = v;
+          await this.host.saveSettings();
+        }),
+      );
+
+    // Thinking → Note.
+    new Setting(containerEl)
+      .setName(t("set.llmThinkNote"))
+      .setDesc(t("set.llmThinkNoteDesc"))
+      .addDropdown((d) =>
+        d
+          .addOption("closed-callout", t("set.thinkClosed"))
+          .addOption("open-callout", t("set.thinkOpen"))
+          .addOption("text", t("set.thinkText"))
+          .addOption("none", t("set.thinkNone"))
+          .setValue(llm.thinkingInNote)
+          .onChange(async (v) => {
+            llm.thinkingInNote = v as ThinkingInNote;
+            await this.host.saveSettings();
+          }),
+      );
   }
 }
