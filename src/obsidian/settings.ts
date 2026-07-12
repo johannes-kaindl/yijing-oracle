@@ -1,5 +1,6 @@
-import { type App, Notice, type Plugin, PluginSettingTab, Setting } from "obsidian";
+import { type App, Notice, type Plugin, PluginSettingTab, Setting, getLanguage } from "obsidian";
 import { pickLang, t } from "../vendor/kit/i18n";
+import { PROMPT_PRESETS } from "../core/llm/prompt-presets";
 import { type Lang, type Register } from "../core/data";
 import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from "../core/frontmatter";
 import { DEFAULT_FILENAME_TEMPLATE } from "../core/filename";
@@ -297,6 +298,25 @@ export class SettingsTab extends PluginSettingTab {
         modelSetting.addButton((b) => b.setButtonText(t("set.llmLoadModels")).onClick(() => this.display()));
       }
     });
+
+    // Prompt-Vorlage laden (füllt beide System-Prompt-Felder; danach frei editierbar).
+    const uiLang = pickLang(getLanguage());
+    new Setting(containerEl)
+      .setName(t("set.llmPreset"))
+      .setDesc(t("set.llmPresetDesc"))
+      .addDropdown((d) => {
+        d.addOption("", t("set.llmPresetChoose"));
+        for (const p of PROMPT_PRESETS) d.addOption(p.id, p.label[uiLang]);
+        d.setValue("");
+        d.onChange(async (id) => {
+          const preset = PROMPT_PRESETS.find((p) => p.id === id);
+          if (!preset) return;
+          llm.systemPromptDe = preset.body.de;
+          llm.systemPromptEn = preset.body.en;
+          await this.host.saveSettings();
+          this.display();
+        });
+      });
 
     // System-Prompts DE/EN (leer = Default) + Reset.
     const promptRow = (name: string, get: () => string, set: (v: string) => void, placeholder: string): void => {
