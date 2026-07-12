@@ -1,6 +1,7 @@
 import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { pickLang, t } from "../vendor/kit/i18n";
 import { type Lang, type Register } from "../core/data";
+import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from "../core/frontmatter";
 
 export type OutputMode = "note" | "cursor";
 
@@ -11,14 +12,20 @@ export interface PluginSettings {
   defaultOutput: OutputMode;
   readingsFolder: string;
   openAfterCreate: boolean;
+  /** Frontmatter überhaupt anlegen? */
+  includeFrontmatter: boolean;
+  /** Pro Key: Name + Aktiv-Haken. */
+  frontmatterFields: FrontmatterField[];
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
   readingLang: "auto",
-  register: "classic",
+  register: "neutral",
   defaultOutput: "note",
   readingsFolder: "Yijing/Readings",
   openAfterCreate: true,
+  includeFrontmatter: true,
+  frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
 };
 
 /** Löst die effektive Reading-Sprache auf: "auto" → aus dem UI-Locale abgeleitet. */
@@ -110,5 +117,38 @@ export class SettingsTab extends PluginSettingTab {
           await this.host.saveSettings();
         }),
       );
+
+    // ── Frontmatter ─────────────────────────────────────────────────────────
+    new Setting(containerEl).setName(t("set.fmHead")).setHeading();
+
+    new Setting(containerEl)
+      .setName(t("set.fmInclude"))
+      .setDesc(t("set.fmIncludeDesc", MARKER_KEY))
+      .addToggle((tg) =>
+        tg.setValue(s.includeFrontmatter).onChange(async (v) => {
+          s.includeFrontmatter = v;
+          await this.host.saveSettings();
+          this.display(); // Feld-Zeilen ein-/ausblenden
+        }),
+      );
+
+    if (s.includeFrontmatter) {
+      for (const f of s.frontmatterFields) {
+        new Setting(containerEl)
+          .setName(t(`fm.${f.id}`))
+          .addText((txt) =>
+            txt.setValue(f.key).onChange(async (v) => {
+              f.key = v.trim() || f.id;
+              await this.host.saveSettings();
+            }),
+          )
+          .addToggle((tg) =>
+            tg.setValue(f.enabled).onChange(async (v) => {
+              f.enabled = v;
+              await this.host.saveSettings();
+            }),
+          );
+      }
+    }
   }
 }

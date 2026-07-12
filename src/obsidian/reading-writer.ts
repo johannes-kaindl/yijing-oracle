@@ -57,28 +57,38 @@ export interface WriteInput {
   hexNumber: number;
 }
 
+/** Legt die Reading-Note an — mit Frontmatter-Zäunen nur, wenn welches vorhanden ist. */
+async function createReadingNote(app: App, input: WriteInput, settings: PluginSettings): Promise<TFile> {
+  const { rendered } = input;
+  await ensureFolder(app, settings.readingsFolder);
+  const base = fileBase(rendered, input.date, input.question, input.hexNumber);
+  const path = uniquePath(app, settings.readingsFolder, base);
+  const content = rendered.frontmatter
+    ? `---\n${rendered.frontmatter}\n---\n\n${rendered.body}`
+    : rendered.body;
+  return app.vault.create(path, content);
+}
+
+/** Beide Modi legen eine Note an. "cursor" fügt zusätzlich einen Link darauf an der
+ *  Cursor-Position der aktiven Note ein (nicht-destruktiv — ersetzt keine Selektion,
+ *  überschreibt nie die Notiz). Ohne aktive Note bleibt es bei der reinen Note. */
 export async function writeReading(
   app: App,
   input: WriteInput,
   mode: OutputMode,
   settings: PluginSettings,
 ): Promise<WriteResult> {
-  const { rendered } = input;
+  const file = await createReadingNote(app, input, settings);
 
   if (mode === "cursor") {
     const view = app.workspace.getActiveViewOfType(MarkdownView);
-    if (view?.editor) {
-      view.editor.replaceSelection(rendered.body.trimEnd() + "\n");
-      return { file: view.file, mode: "cursor" };
+    if (view?.editor && view.file) {
+      const link = app.fileManager.generateMarkdownLink(file, view.file.path);
+      view.editor.replaceRange(link, view.editor.getCursor("to"));
+      return { file, mode: "cursor" };
     }
     new Notice(t("notice.noEditor"));
-    // Fallthrough auf note-Modus.
   }
 
-  await ensureFolder(app, settings.readingsFolder);
-  const base = fileBase(rendered, input.date, input.question, input.hexNumber);
-  const path = uniquePath(app, settings.readingsFolder, base);
-  const content = `---\n${rendered.frontmatter}\n---\n\n${rendered.body}`;
-  const file = await app.vault.create(path, content);
   return { file, mode: "note" };
 }

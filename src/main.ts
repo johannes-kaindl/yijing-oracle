@@ -29,6 +29,9 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
 
   async onload(): Promise<void> {
     this.settings = mergeSettings(DEFAULT_SETTINGS, await this.loadData());
+    // frontmatterFields sind Objekte — mergeSettings klont nur die Array-Ebene, nicht die
+    // Elemente. Tief kopieren, damit die Settings-UI nie DEFAULT_FRONTMATTER_FIELDS mutiert.
+    this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
 
     registerI18n();
     setLang(pickLang(this.readLocale()));
@@ -95,6 +98,8 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
         register: this.settings.register,
         date,
         question: "",
+        includeFrontmatter: this.settings.includeFrontmatter,
+        frontmatterFields: this.settings.frontmatterFields,
       });
       const result = await writeReading(
         this.app,

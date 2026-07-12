@@ -85,7 +85,14 @@ export class OracleView extends ItemView {
     const question = this.questionValue.trim();
     const date = nowStamp();
     const reading = buildReading(cast());
-    const rendered = renderReading(reading, { lang, register, date, question });
+    const rendered = renderReading(reading, {
+      lang,
+      register,
+      date,
+      question,
+      includeFrontmatter: this.host.settings.includeFrontmatter,
+      frontmatterFields: this.host.settings.frontmatterFields,
+    });
     this.current = { reading, rendered, question, date };
   }
 

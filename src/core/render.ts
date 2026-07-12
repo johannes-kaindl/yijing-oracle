@@ -4,6 +4,7 @@
 // UI-Sprache abweichen), darum ein eigenes, kleines Label-Set hier.
 import { type Reading } from "./reading";
 import { getHexagram, type HexLine, type Lang, type Register } from "./data";
+import { type FrontmatterField, buildFrontmatter } from "./frontmatter";
 
 export interface RenderOptions {
   lang: Lang;
@@ -11,6 +12,10 @@ export interface RenderOptions {
   /** ISO-nahe Zeitmarke, von der obsidian-Schicht geliefert (render bleibt uhr-frei). */
   date: string;
   question?: string;
+  /** false → gar kein Frontmatter (leerer frontmatter-String). */
+  includeFrontmatter: boolean;
+  /** Welche Keys unter welchem Namen ins Frontmatter. */
+  frontmatterFields: FrontmatterField[];
 }
 
 export interface RenderedReading {
@@ -70,15 +75,17 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
   const question = opts.question?.trim() ?? "";
 
   // ── Frontmatter ────────────────────────────────────────────────────────
-  const fm: string[] = [
-    "yijing_reading: true",
-    `date: ${opts.date}`,
-    `question: ${JSON.stringify(question)}`,
-    `hexagram: ${reading.primaryNumber}`,
-    `changing_lines: [${reading.changingPositions.join(", ")}]`,
-  ];
-  if (reading.resultingNumber !== null) fm.push(`resulting: ${reading.resultingNumber}`);
-  fm.push(`language: ${opts.lang}`, `register: ${opts.register}`);
+  const frontmatter = opts.includeFrontmatter
+    ? buildFrontmatter(opts.frontmatterFields, {
+        date: opts.date,
+        question,
+        hexagram: reading.primaryNumber,
+        changingLines: reading.changingPositions,
+        resulting: reading.resultingNumber,
+        language: opts.lang,
+        register: opts.register,
+      })
+    : "";
 
   // ── Body ───────────────────────────────────────────────────────────────
   const titleLine = `# ${title}`;
@@ -123,7 +130,7 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
 
   return {
     title,
-    frontmatter: fm.join("\n"),
+    frontmatter,
     body: [titleLine, subtitleLine, ...content].join("\n\n") + "\n",
     previewBody: content.join("\n\n") + "\n",
   };
