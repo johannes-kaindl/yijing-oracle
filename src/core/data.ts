@@ -25,6 +25,14 @@ interface RawLine {
   interpretation_en_neutral?: string;
 }
 
+interface RawTrigram {
+  symbol: string;
+  name: string;
+  pinyin: string;
+  family: string;
+  nature: string;
+}
+
 interface RawHex {
   number: number;
   binary: string;
@@ -34,6 +42,9 @@ interface RawHex {
   name_chinese: string;
   pinyin: string;
   name_en?: string;
+  trigrams: { above: RawTrigram; below: RawTrigram };
+  meaning: string;
+  meaning_en?: string;
   judgment: string;
   judgment_neutral?: string;
   judgment_en?: string;
@@ -56,6 +67,16 @@ export interface HexLine {
   interpretation: string;
 }
 
+export interface TrigramInfo {
+  symbol: string;
+  name: string;
+  pinyin: string;
+  /** Familien-Rolle (nur deutsch im Datensatz, z.B. „mittlerer Sohn"). */
+  family: string;
+  /** Naturbild (nur deutsch, z.B. „Wasser"). */
+  nature: string;
+}
+
 export interface HexagramData {
   number: number;
   binary: string;
@@ -66,8 +87,15 @@ export interface HexagramData {
   pinyin: string;
   judgment: string;
   image: string;
+  /** Interpretierender Kommentar (Wilhelm); sprachabhängig, kann leer sein. */
+  meaning: string;
+  trigrams: { above: TrigramInfo; below: TrigramInfo };
   /** 6 Linien, bei Hex 1/2 zusätzlich der Yong-Text an Index 6. */
   lines: HexLine[];
+}
+
+function pickTrigram(raw: RawTrigram): TrigramInfo {
+  return { symbol: raw.symbol, name: raw.name, pinyin: raw.pinyin, family: raw.family, nature: raw.nature };
 }
 
 function pickField(raw: RawHex, base: "judgment" | "image", lang: Lang, register: Register): string {
@@ -111,6 +139,8 @@ export function getHexagram(number: number, lang: Lang, register: Register): Hex
     pinyin: raw.pinyin,
     judgment: pickField(raw, "judgment", lang, register),
     image: pickField(raw, "image", lang, register),
+    meaning: (lang === "en" ? raw.meaning_en ?? raw.meaning : raw.meaning) ?? "",
+    trigrams: { above: pickTrigram(raw.trigrams.above), below: pickTrigram(raw.trigrams.below) },
     lines: raw.lines.map((rl) => pickLine(rl, lang, register)),
   };
 }

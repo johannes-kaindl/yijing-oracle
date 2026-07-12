@@ -81,6 +81,13 @@ export function registerI18n(): void {
       "set.thinkOpen": "Open callout",
       "set.thinkText": "As plain text",
       "set.thinkNone": "No",
+      "set.calloutHead": "Note layout (callouts)",
+      "set.calloutDesc": "Per section: wrap in a collapsible callout (toggle) and its callout type (default “quote”). Off → plain ### headings.",
+      "set.callout.hexInfo": "Hexagram header + trigrams",
+      "set.callout.judgment": "The Judgment",
+      "set.callout.image": "The Image",
+      "set.callout.meaning": "Meaning",
+      "set.callout.lines": "Changing lines",
     },
     de: {
       "view.title": "Yijing-Orakel",
@@ -158,6 +165,13 @@ export function registerI18n(): void {
       "set.thinkOpen": "Offener Callout",
       "set.thinkText": "Als reiner Text",
       "set.thinkNone": "Nein",
+      "set.calloutHead": "Notiz-Layout (Callouts)",
+      "set.calloutDesc": "Pro Abschnitt: in einen einklappbaren Callout wickeln (Schalter) und dessen Callout-Typ (Default „quote“). Aus → schlichte ###-Überschriften.",
+      "set.callout.hexInfo": "Hexagramm-Kopf + Trigramme",
+      "set.callout.judgment": "Das Urteil",
+      "set.callout.image": "Das Bild",
+      "set.callout.meaning": "Bedeutung",
+      "set.callout.lines": "Wandelnde Linien",
     },
   });
 }

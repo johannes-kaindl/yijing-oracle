@@ -5,6 +5,7 @@ import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from ".
 import { DEFAULT_FILENAME_TEMPLATE } from "../core/filename";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { type ThinkingInNote } from "../core/llm/interpretation";
+import { type CalloutConfig, CALLOUT_SECTIONS, DEFAULT_CALLOUTS } from "../core/note-callouts";
 import { type LlmSettings, DEFAULT_LLM_SETTINGS, effectiveModel } from "../core/llm/settings-defaults";
 import { parseEndpointList, normalizeEndpoint } from "../vendor/kit/endpoint";
 import { ChatClient } from "./chat-client";
@@ -30,6 +31,8 @@ export interface PluginSettings {
   frontmatterFields: FrontmatterField[];
   /** LLM-Deutungs-Konfiguration. */
   llm: LlmSettings;
+  /** Callout-Wrapping der Wilhelm-Abschnitte in der Note. */
+  callouts: CalloutConfig;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   includeFrontmatter: true,
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
   llm: DEFAULT_LLM_SETTINGS,
+  callouts: DEFAULT_CALLOUTS,
 };
 
 /** Löst die effektive Reading-Sprache auf: "auto" → aus dem UI-Locale abgeleitet. */
@@ -181,6 +185,34 @@ export class SettingsTab extends PluginSettingTab {
     }
 
     this.renderLlmSettings(containerEl, s.llm);
+    this.renderCalloutSettings(containerEl, s.callouts);
+  }
+
+  // ── Notiz-Layout (Callouts) ────────────────────────────────────────────────
+  private renderCalloutSettings(containerEl: HTMLElement, callouts: CalloutConfig): void {
+    new Setting(containerEl).setName(t("set.calloutHead")).setHeading();
+    new Setting(containerEl).setDesc(t("set.calloutDesc"));
+
+    for (const key of CALLOUT_SECTIONS) {
+      const opt = callouts[key];
+      new Setting(containerEl)
+        .setName(t(`set.callout.${key}`))
+        .addText((txt) =>
+          txt
+            .setPlaceholder("quote")
+            .setValue(opt.type)
+            .onChange(async (v) => {
+              opt.type = v.trim() || "quote";
+              await this.host.saveSettings();
+            }),
+        )
+        .addToggle((tg) =>
+          tg.setValue(opt.enabled).onChange(async (v) => {
+            opt.enabled = v;
+            await this.host.saveSettings();
+          }),
+        );
+    }
   }
 
   // ── KI-Deutung ────────────────────────────────────────────────────────────

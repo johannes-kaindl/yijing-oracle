@@ -9,6 +9,7 @@ import { registerI18n } from "./i18n/strings";
 import { cast } from "./core/casting";
 import { buildReading } from "./core/reading";
 import { renderReading } from "./core/render";
+import { mergeCallouts } from "./core/note-callouts";
 import { type Lang } from "./core/data";
 import {
   DEFAULT_SETTINGS,
@@ -35,6 +36,7 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
     this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
     // mergeSettings ist shallow — das llm-Objekt separat gegen neue Defaults auffüllen.
     this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
+    this.settings.callouts = mergeCallouts(this.settings.callouts);
 
     registerI18n();
     setLang(pickLang(this.readLocale()));
@@ -103,6 +105,7 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
         question: "",
         includeFrontmatter: this.settings.includeFrontmatter,
         frontmatterFields: this.settings.frontmatterFields,
+        callouts: this.settings.callouts,
       });
       const result = await writeReading(
         this.app,
