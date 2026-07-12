@@ -91,6 +91,9 @@ export function registerI18n(): void {
       "set.callout.image": "The Image",
       "set.callout.meaning": "Meaning",
       "set.callout.lines": "Changing lines",
+      "set.callout.notes": "Notes (footnotes)",
+      "set.showNotes": "Include footnotes",
+      "set.showNotesDesc": "Append Wilhelm's scholarly footnotes as a “Notes” section (where a hexagram has any).",
     },
     de: {
       "view.title": "Yijing-Orakel",
@@ -178,6 +181,9 @@ export function registerI18n(): void {
       "set.callout.image": "Das Bild",
       "set.callout.meaning": "Bedeutung",
       "set.callout.lines": "Wandelnde Linien",
+      "set.callout.notes": "Anmerkungen (Fußnoten)",
+      "set.showNotes": "Fußnoten einbeziehen",
+      "set.showNotesDesc": "Hängt Wilhelms wissenschaftliche Fußnoten als „Anmerkungen“-Abschnitt an (sofern ein Hexagramm welche hat).",
     },
   });
 }

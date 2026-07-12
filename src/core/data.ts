@@ -33,6 +33,15 @@ interface RawTrigram {
   nature: string;
 }
 
+interface RawNote {
+  anchor: string;
+  marker: string;
+  text: string;
+  text_neutral?: string;
+  text_en?: string;
+  text_en_neutral?: string;
+}
+
 interface RawHex {
   number: number;
   binary: string;
@@ -42,6 +51,7 @@ interface RawHex {
   name_chinese: string;
   pinyin: string;
   name_en?: string;
+  notes?: RawNote[];
   trigrams: { above: RawTrigram; below: RawTrigram };
   meaning: string;
   meaning_neutral?: string;
@@ -79,6 +89,13 @@ export interface TrigramInfo {
   nature: string;
 }
 
+export interface NoteItem {
+  /** Bezugspunkt der Fußnote: "judgment" | "image" | "line:N". */
+  anchor: string;
+  marker: string;
+  text: string;
+}
+
 export interface HexagramData {
   number: number;
   binary: string;
@@ -92,12 +109,26 @@ export interface HexagramData {
   /** Interpretierender Kommentar (Wilhelm); sprachabhängig, kann leer sein. */
   meaning: string;
   trigrams: { above: TrigramInfo; below: TrigramInfo };
+  /** Wilhelms Fußnoten zu diesem Hexagramm (Sprache × Register aufgelöst). */
+  notes: NoteItem[];
   /** 6 Linien, bei Hex 1/2 zusätzlich der Yong-Text an Index 6. */
   lines: HexLine[];
 }
 
 function pickTrigram(raw: RawTrigram): TrigramInfo {
   return { symbol: raw.symbol, name: raw.name, pinyin: raw.pinyin, family: raw.family, nature: raw.nature };
+}
+
+/** Fußnoten mit Sprache × Register auflösen (neutral fällt auf classic zurück). */
+function pickNotes(raw: RawHex, lang: Lang, register: Register): NoteItem[] {
+  const notes = raw.notes ?? [];
+  return notes.map((n) => {
+    const text =
+      lang === "de"
+        ? (register === "neutral" && n.text_neutral) || n.text
+        : (register === "neutral" && n.text_en_neutral) || n.text_en || n.text;
+    return { anchor: n.anchor, marker: n.marker, text: text ?? "" };
+  }).filter((n) => n.text.trim());
 }
 
 /** Bedeutung (meaning) mit Sprache × Register: neutral fällt auf classic zurück. */
@@ -152,6 +183,7 @@ export function getHexagram(number: number, lang: Lang, register: Register): Hex
     image: pickField(raw, "image", lang, register),
     meaning: pickMeaning(raw, lang, register),
     trigrams: { above: pickTrigram(raw.trigrams.above), below: pickTrigram(raw.trigrams.below) },
+    notes: pickNotes(raw, lang, register),
     lines: raw.lines.map((rl) => pickLine(rl, lang, register)),
   };
 }

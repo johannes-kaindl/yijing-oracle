@@ -32,3 +32,25 @@ describe("getHexagram — Trigramme + Bedeutung", () => {
     expect(neutral).toBe(classic); // Hex 17: kein meaning_neutral → Fallback
   });
 });
+
+describe("getHexagram — notes (Fußnoten)", () => {
+  it("liefert Fußnoten mit anchor + text (Hex 1)", () => {
+    const n = getHexagram(1, "de", "classic").notes;
+    expect(n.length).toBeGreaterThan(0);
+    expect(n[0].anchor).toBeTruthy();
+    expect(n[0].text.length).toBeGreaterThan(10);
+  });
+  it("leeres Array, wenn ein Hexagramm keine Fußnoten hat (Hex 3)", () => {
+    expect(getHexagram(3, "de", "classic").notes).toEqual([]);
+  });
+  it("EN nutzt text_en (Hex 1, unterscheidet sich von DE)", () => {
+    const de = getHexagram(1, "de", "classic").notes[0].text;
+    const en = getHexagram(1, "en", "classic").notes[0].text;
+    expect(en).not.toBe(de);
+  });
+  it("neutral-Register nutzt text_neutral, wo vorhanden (Hex 21)", () => {
+    const classic = getHexagram(21, "de", "classic").notes[0].text;
+    const neutral = getHexagram(21, "de", "neutral").notes[0].text;
+    expect(neutral).not.toBe(classic);
+  });
+});

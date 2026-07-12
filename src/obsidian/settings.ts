@@ -34,6 +34,8 @@ export interface PluginSettings {
   llm: LlmSettings;
   /** Callout-Wrapping der Wilhelm-Abschnitte in der Note. */
   callouts: CalloutConfig;
+  /** Wilhelms Fußnoten als Anmerkungen-Abschnitt in die Note schreiben. */
+  showNotes: boolean;
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
@@ -47,6 +49,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
   llm: DEFAULT_LLM_SETTINGS,
   callouts: DEFAULT_CALLOUTS,
+  showNotes: true,
 };
 
 /** Löst die effektive Reading-Sprache auf: "auto" → aus dem UI-Locale abgeleitet. */
@@ -184,6 +187,16 @@ export class SettingsTab extends PluginSettingTab {
           );
       }
     }
+
+    new Setting(containerEl)
+      .setName(t("set.showNotes"))
+      .setDesc(t("set.showNotesDesc"))
+      .addToggle((tg) =>
+        tg.setValue(s.showNotes).onChange(async (v) => {
+          s.showNotes = v;
+          await this.host.saveSettings();
+        }),
+      );
 
     this.renderLlmSettings(containerEl, s.llm);
     this.renderCalloutSettings(containerEl, s.callouts);

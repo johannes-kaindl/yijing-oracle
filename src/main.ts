@@ -106,6 +106,7 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
         includeFrontmatter: this.settings.includeFrontmatter,
         frontmatterFields: this.settings.frontmatterFields,
         callouts: this.settings.callouts,
+        includeNotes: this.settings.showNotes,
       });
       const result = await writeReading(
         this.app,

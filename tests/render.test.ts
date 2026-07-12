@@ -23,6 +23,7 @@ const allOff: CalloutConfig = {
   image: { enabled: false, type: "quote" },
   meaning: { enabled: false, type: "quote" },
   lines: { enabled: false, type: "quote" },
+  notes: { enabled: false, type: "quote" },
 };
 
 describe("renderReading", () => {
@@ -78,6 +79,16 @@ describe("renderReading", () => {
     expect(out.body).toContain("### Das Urteil");
     expect(out.body).toContain("### Das Bild");
     expect(out.body).toContain("- Oberes Trigramm:");
+  });
+
+  it("includeNotes: hängt einen Anmerkungen-Abschnitt an (Hex 1 hat Fußnoten)", () => {
+    const r = buildReading(L(9, 9, 9, 9, 9, 9)); // hex 1
+    const withNotes = renderReading(r, opts({ includeNotes: true }));
+    const without = renderReading(r, opts({ includeNotes: false }));
+    expect(withNotes.body).toContain("## Anmerkungen");
+    expect(without.body).not.toContain("## Anmerkungen");
+    // Anmerkungen stehen vor der Quellenangabe.
+    expect(withNotes.body.indexOf("## Anmerkungen")).toBeLessThan(withNotes.body.indexOf("*Text: Richard Wilhelm"));
   });
 
   it("Yong: all-changing Hex 1 nutzt den Yong-Text", () => {

@@ -21,6 +21,8 @@ export interface RenderOptions {
   frontmatterFields: FrontmatterField[];
   /** Callout-Wrapping pro Abschnitt (Default: alle an, quote). */
   callouts?: CalloutConfig;
+  /** Wilhelms Fußnoten als Anmerkungen-Abschnitt anhängen (Default via caller). */
+  includeNotes?: boolean;
 }
 
 export interface RenderedReading {
@@ -47,6 +49,8 @@ interface Labels {
   no: string;
   upperTrigram: string;
   lowerTrigram: string;
+  notesHead: string;
+  line: string;
   attribution: string;
 }
 
@@ -63,6 +67,8 @@ const LABELS: Record<Lang, Labels> = {
     no: "Nr.",
     upperTrigram: "Oberes Trigramm",
     lowerTrigram: "Unteres Trigramm",
+    notesHead: "Anmerkungen",
+    line: "Linie",
     attribution: "*Text: Richard Wilhelm — I Ging, Das Buch der Wandlungen.*",
   },
   en: {
@@ -77,9 +83,20 @@ const LABELS: Record<Lang, Labels> = {
     no: "No.",
     upperTrigram: "Upper trigram",
     lowerTrigram: "Lower trigram",
+    notesHead: "Notes",
+    line: "Line",
     attribution: "*Text: Richard Wilhelm — I Ching, The Book of Changes.*",
   },
 };
+
+/** Übersetzt einen Fußnoten-Anchor ("judgment"/"image"/"line:N") in ein Label. */
+function anchorLabel(anchor: string, L: Labels): string {
+  if (anchor === "judgment") return L.judgment;
+  if (anchor === "image") return L.image;
+  const m = /^line:(\d+)$/.exec(anchor);
+  if (m) return `${L.line} ${m[1]}`;
+  return anchor;
+}
 
 function heading(unicode: string, number: number, nameLocal: string): string {
   return `${unicode} ${number} · ${nameLocal}`;
@@ -177,6 +194,14 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
       content.push(hexInfoBlock(resulting, L, opts.lang, cal.hexInfo));
       content.push(section(L.judgment, resulting.judgment.trim(), cal.judgment));
       content.push(section(L.image, resulting.image.trim(), cal.image));
+    }
+  }
+
+  // ── Anmerkungen (Wilhelms Fußnoten) ────────────────────────────────────
+  if (opts.includeNotes && primary.notes.length > 0) {
+    content.push(`## ${L.notesHead}`);
+    for (const n of primary.notes) {
+      content.push(section(anchorLabel(n.anchor, L), n.text.trim(), cal.notes));
     }
   }
 

@@ -1,7 +1,7 @@
 // Konfiguration, welche Wilhelm-Abschnitte in der Note als Callout gewickelt werden.
 // Pure (kein obsidian). Genutzt von render.ts (Anwendung) und den Settings (UI).
 
-export type CalloutSection = "hexInfo" | "judgment" | "image" | "meaning" | "lines";
+export type CalloutSection = "hexInfo" | "judgment" | "image" | "meaning" | "lines" | "notes";
 
 export interface CalloutOption {
   enabled: boolean;
@@ -11,7 +11,7 @@ export interface CalloutOption {
 
 export type CalloutConfig = Record<CalloutSection, CalloutOption>;
 
-export const CALLOUT_SECTIONS: CalloutSection[] = ["hexInfo", "judgment", "image", "meaning", "lines"];
+export const CALLOUT_SECTIONS: CalloutSection[] = ["hexInfo", "judgment", "image", "meaning", "lines", "notes"];
 
 export const DEFAULT_CALLOUTS: CalloutConfig = {
   hexInfo: { enabled: true, type: "quote" },
@@ -19,6 +19,7 @@ export const DEFAULT_CALLOUTS: CalloutConfig = {
   image: { enabled: true, type: "quote" },
   meaning: { enabled: true, type: "quote" },
   lines: { enabled: true, type: "quote" },
+  notes: { enabled: true, type: "quote" },
 };
 
 /** Füllt eine (teilweise/veraltete) geladene Config gegen die Defaults auf — pro Sektion

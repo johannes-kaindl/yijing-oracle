@@ -119,6 +119,7 @@ export class OracleView extends ItemView {
       includeFrontmatter: this.host.settings.includeFrontmatter,
       frontmatterFields: this.host.settings.frontmatterFields,
       callouts: this.host.settings.callouts,
+      includeNotes: this.host.settings.showNotes,
     });
     this.current = { reading, rendered, question, date, lang, interpretation: null, file: null };
   }
@@ -439,6 +440,7 @@ export class OracleView extends ItemView {
       includeFrontmatter: this.host.settings.includeFrontmatter,
       frontmatterFields: this.host.settings.frontmatterFields,
       callouts: this.host.settings.callouts,
+      includeNotes: this.host.settings.showNotes,
     });
     return { reading, rendered, question, date, lang, interpretation: null, file: f };
   }
