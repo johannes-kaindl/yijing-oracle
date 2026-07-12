@@ -14,6 +14,7 @@ import {
 import { cast } from "../core/casting";
 import { buildReading, reconstructReading, type Reading } from "../core/reading";
 import { renderReading, type RenderedReading } from "../core/render";
+import { rulingSentence } from "../core/ruling";
 import { getHexagram, type Lang, type Register } from "../core/data";
 import { type FieldId } from "../core/frontmatter";
 import { buildInterpretationMessages } from "../core/llm/prompt";
@@ -215,6 +216,11 @@ export class OracleView extends ItemView {
     }
     const sub = [primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ");
     if (sub) head.createDiv({ text: sub, cls: "yijing-name" });
+
+    // Maßgeblich-nach-Tradition-Hinweis (dieselbe Quelle wie in der Note) — volle
+    // Zeile unter dem Figur-Kopf, vor der Vorschau.
+    const ruling = rulingSentence(c.reading, lang);
+    readingBox.createDiv({ text: `${ruling.label}: ${ruling.text}`, cls: "yijing-ruling" });
 
     // Markdown-Vorschau OHNE H1/Untertitel — die Kopfzeile oben trägt den Titel bereits.
     const preview = readingBox.createDiv({ cls: "yijing-preview" });

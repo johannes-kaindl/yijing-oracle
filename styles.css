@@ -98,6 +98,13 @@
   margin-top: var(--size-2-2);
 }
 
+/* Maßgeblich-nach-Tradition-Hinweis unter der Figur. */
+.yijing-ruling {
+  color: var(--text-muted);
+  font-size: var(--font-ui-small);
+  margin-bottom: var(--size-4-2);
+}
+
 .yijing-preview {
   font-size: var(--font-ui-small);
   max-height: 44vh;
