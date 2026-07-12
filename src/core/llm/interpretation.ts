@@ -15,7 +15,8 @@ export function renderInterpretationBlock(
   opts: { lang: Lang; thinkingInNote: ThinkingInNote },
 ): string {
   const L = LABELS[opts.lang];
-  const parts = [`## ${L.head}`, data.answer.trim()];
+  // Reihenfolge: Überschrift → Reasoning (über der Deutung) → Antwort.
+  const parts = [`## ${L.head}`];
   const reasoning = data.reasoning.trim();
   if (reasoning && opts.thinkingInNote !== "none") {
     if (opts.thinkingInNote === "text") {
@@ -24,5 +25,6 @@ export function renderInterpretationBlock(
       parts.push(wrapCallout(L.reasoning, reasoning, "note", opts.thinkingInNote === "open-callout"));
     }
   }
+  parts.push(data.answer.trim());
   return parts.join("\n\n");
 }

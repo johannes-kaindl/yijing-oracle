@@ -69,6 +69,8 @@ export class OracleView extends ItemView {
   private abortCtrl: AbortController | null = null;
   private answerEl: HTMLElement | null = null;
   private reasoningEl: HTMLElement | null = null;
+  /** Klapp-Zustand des Weissagungs-Kastens (überlebt Re-Render). */
+  private readingOpen = true;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -184,10 +186,22 @@ export class OracleView extends ItemView {
     const register = this.host.settings.register;
     const primary = getHexagram(c.reading.primaryNumber, lang, register);
 
-    const card = root.createDiv({ cls: "yijing-reading" });
+    // ── Weissagung: eigener, einklappbarer Kasten ──────────────────────────
+    const readingBox = root.createEl("details", { cls: "yijing-reading" });
+    readingBox.open = this.readingOpen;
+    readingBox.addEventListener("toggle", () => {
+      this.readingOpen = readingBox.open;
+    });
+    const summary = readingBox.createEl("summary", { cls: "yijing-reading-summary" });
+    let summaryText = `${primary.unicode} ${primary.number} · ${primary.nameLocal}`;
+    if (c.reading.resultingNumber !== null) {
+      const resulting = getHexagram(c.reading.resultingNumber, lang, register);
+      summaryText += ` → ${resulting.unicode} ${resulting.number} · ${resulting.nameLocal}`;
+    }
+    summary.setText(summaryText);
 
-    // Hexagramm-Figur + Kopf.
-    const head = card.createDiv({ cls: "yijing-figure-head" });
+    // Hexagramm-Figur + Untertitel + Vorschau (im Klapp-Körper).
+    const head = readingBox.createDiv({ cls: "yijing-figure-head" });
     const fig = head.createDiv({ cls: "yijing-figure" });
     for (const row of figureRows(c.reading)) {
       const line = fig.createDiv({ cls: "yijing-line" });
@@ -195,30 +209,18 @@ export class OracleView extends ItemView {
       line.toggleClass("is-yin", !row.yang);
       line.toggleClass("is-changing", row.changing);
     }
-    const label = head.createDiv({ cls: "yijing-figure-label" });
-    label.createDiv({
-      text: `${primary.unicode} ${primary.number} · ${primary.nameLocal}`,
-      cls: "yijing-glyph",
-    });
     const sub = [primary.nameLatin, primary.nameChinese, primary.pinyin].filter(Boolean).join(" · ");
-    if (sub) label.createDiv({ text: sub, cls: "yijing-name" });
-    if (c.reading.resultingNumber !== null) {
-      const resulting = getHexagram(c.reading.resultingNumber, lang, register);
-      label.createDiv({
-        text: t("view.becomes", `${resulting.unicode} ${resulting.number} · ${resulting.nameLocal}`),
-        cls: "yijing-becomes",
-      });
-    }
+    if (sub) head.createDiv({ text: sub, cls: "yijing-name" });
 
     // Markdown-Vorschau OHNE H1/Untertitel — die Kopfzeile oben trägt den Titel bereits.
-    const preview = card.createDiv({ cls: "yijing-preview" });
+    const preview = readingBox.createDiv({ cls: "yijing-preview" });
     void MarkdownRenderer.render(this.app, c.rendered.previewBody, preview, "", this);
 
-    // KI-Deutung (Button / Live-Stream / Ergebnis).
-    this.renderInterpretationArea(card, c);
+    // ── KI-Deutung: eigener Kasten ─────────────────────────────────────────
+    this.renderInterpretationArea(root, c);
 
     // Speicher-Aktionen — beide Ausgabe-Modi als Buttons (Spec: beides wählbar).
-    const actions = card.createDiv({ cls: "yijing-actions" });
+    const actions = root.createDiv({ cls: "yijing-actions" });
     const primaryMode = this.host.settings.defaultOutput;
     const noteBtn = new ButtonComponent(actions)
       .setButtonText(t("view.saveNote"))

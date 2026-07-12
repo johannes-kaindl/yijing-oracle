@@ -98,11 +98,11 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
     meta.push(`${L.changingLines}: ${reading.changingPositions.join(", ")}`);
   }
 
-  // Inhalt ab dem Frage-/Meta-Block — ohne Titel/Untertitel (die trägt in der Vorschau
-  // die Kopfzeile). Für die Note wird der Titel oben wieder vorangestellt.
-  const content: string[] = [];
-  if (meta.length > 0) content.push(`> ${meta.join("   ·   ")}`);
+  // Meta-/Frage-Zeile gehört zum Kopf (bleibt über der Deutung); die Wurf-Abschnitte
+  // (## Urteil …) stehen darunter. Der Deutungs-Anker liegt dazwischen.
+  const metaLine = meta.length > 0 ? `> ${meta.join("   ·   ")}` : null;
 
+  const content: string[] = [];
   content.push(`## ${L.judgment}`, primary.judgment.trim());
   content.push(`## ${L.image}`, primary.image.trim());
 
@@ -129,13 +129,16 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
     }
   }
 
-  // Leeres Deutungs-Marker-Paar als Anker VOR dem ersten Wurf-Abschnitt (nur im Note-body,
-  // nicht in der Panel-Vorschau). insertInterpretation ersetzt später idempotent dazwischen.
+  // Leeres Deutungs-Marker-Paar als Anker zwischen Meta-Zeile und erstem Wurf-Abschnitt
+  // (nur im Note-body, nicht in der Panel-Vorschau). insertInterpretation ersetzt später
+  // idempotent dazwischen → Deutung steht über den Wilhelm-Texten, aber unter der Frage.
   const anchor = `${MARKER_START}\n${MARKER_END}`;
+  const head = metaLine ? [titleLine, subtitleLine, metaLine] : [titleLine, subtitleLine];
+  const preview = metaLine ? [metaLine, ...content] : content;
   return {
     title,
     frontmatter,
-    body: [titleLine, subtitleLine, anchor, ...content].join("\n\n") + "\n",
-    previewBody: content.join("\n\n") + "\n",
+    body: [...head, anchor, ...content].join("\n\n") + "\n",
+    previewBody: preview.join("\n\n") + "\n",
   };
 }

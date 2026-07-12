@@ -21,10 +21,24 @@
 }
 
 /* ── Aktuelles Reading ─────────────────────────────────────────────────── */
+/* Weissagung: eigener, einklappbarer Kasten. */
 .yijing-reading {
   margin-top: var(--size-4-3);
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
+}
+
+.yijing-reading-summary {
+  cursor: pointer;
+  font-weight: var(--font-bold);
+  font-size: 1.15em;
+  list-style-position: outside;
+}
+
+/* Etwas Luft zwischen Summary und Klapp-Körper, wenn geöffnet. */
+.yijing-reading[open] .yijing-figure-head {
+  margin-top: var(--size-4-3);
 }
 
 .yijing-figure-head {
@@ -131,11 +145,12 @@
   font-size: var(--font-ui-small);
 }
 
-/* ── KI-Deutung ─────────────────────────────────────────────────────────── */
+/* ── KI-Deutung: eigener Kasten ─────────────────────────────────────────── */
 .yijing-interpretation {
   margin-top: var(--size-4-3);
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: var(--size-4-2);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
 }
 
 .yijing-interpretation-body {

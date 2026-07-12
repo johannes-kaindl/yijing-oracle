@@ -11,6 +11,10 @@ describe("renderInterpretationBlock", () => {
     expect(md).toContain("> [!note]- Denkprozess");
     expect(md).toContain("> Ich prüfe Trigramme.");
   });
+  it("Reasoning steht ÜBER der Antwort", () => {
+    const md = renderInterpretationBlock(data, { lang: "de", thinkingInNote: "closed-callout" });
+    expect(md.indexOf("Denkprozess")).toBeLessThan(md.indexOf("Das Urteil ist günstig."));
+  });
   it("none: kein Reasoning", () => {
     const md = renderInterpretationBlock(data, { lang: "de", thinkingInNote: "none" });
     expect(md).not.toContain("Denkprozess");

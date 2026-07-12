@@ -92,4 +92,15 @@ describe("renderReading", () => {
     expect(mi).toBeLessThan(hi); // Marker vor erstem ##
     expect(out.previewBody).not.toContain(MARKER_START); // Vorschau ohne Marker
   });
+
+  it("Marker (und damit die Deutung) steht UNTER der Frage-Zeile", () => {
+    const r = buildReading(L(6, 8, 7, 8, 9, 8)); // changing lines → Frage + Meta vorhanden
+    const out = renderReading(r, opts({ includeFrontmatter: false, question: "Wohin?" }));
+    const qi = out.body.indexOf("Wohin?");
+    const mi = out.body.indexOf(MARKER_START);
+    const hi = out.body.indexOf("## ");
+    expect(qi).toBeGreaterThan(-1);
+    expect(qi).toBeLessThan(mi); // Frage über dem Marker
+    expect(mi).toBeLessThan(hi); // Marker über dem ersten Wurf-Abschnitt
+  });
 });
