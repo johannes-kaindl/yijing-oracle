@@ -101,7 +101,13 @@ export class OracleView extends ItemView {
     const { rendered, reading, question, date } = this.current;
     const result = await writeReading(
       this.app,
-      { rendered, date, question, hexNumber: reading.primaryNumber },
+      {
+        rendered,
+        date,
+        question,
+        hexNumber: reading.primaryNumber,
+        resultingNumber: reading.resultingNumber,
+      },
       mode,
       this.host.settings,
     );

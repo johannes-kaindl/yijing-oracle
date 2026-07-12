@@ -103,7 +103,13 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
       });
       const result = await writeReading(
         this.app,
-        { rendered, date, question: "", hexNumber: reading.primaryNumber },
+        {
+          rendered,
+          date,
+          question: "",
+          hexNumber: reading.primaryNumber,
+          resultingNumber: reading.resultingNumber,
+        },
         mode,
         this.settings,
       );

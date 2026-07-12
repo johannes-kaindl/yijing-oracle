@@ -2,6 +2,7 @@
 // aktiven Note. Einzige Stelle mit Datei-I/O; render.ts bleibt rein.
 import { type App, MarkdownView, Notice, type TFile, normalizePath } from "obsidian";
 import { type RenderedReading } from "../core/render";
+import { buildFilename } from "../core/filename";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 
@@ -11,20 +12,10 @@ export interface WriteResult {
   mode: OutputMode;
 }
 
-/** Ungültige Datei-Zeichen entfernen, Whitespace normalisieren, auf ~48 Zeichen kürzen. */
-function slugify(raw: string): string {
-  const cleaned = raw
-    .replace(/[\\/:*?"<>|#^[\]]/g, "")
-    .replace(/\s+/g, " ")
-    .trim();
-  return cleaned.length > 48 ? cleaned.slice(0, 48).trim() : cleaned;
-}
-
-/** Dateiname-Basis: "YYYY-MM-DD HHMM slug|hexN" (ohne .md). */
-function fileBase(rendered: RenderedReading, date: string, question: string, hexNumber: number): string {
-  const stamp = date.replace("T", " ").replace(":", "");
-  const tail = slugify(question) || `hex${hexNumber}`;
-  return `${stamp} ${tail}`;
+/** Zerlegt die ISO-nahe Zeitmarke "2026-07-12T10:34" in Datums- und HHMM-Teil. */
+function splitStamp(stamp: string): { date: string; time: string } {
+  const [date, time = ""] = stamp.split("T");
+  return { date, time: time.replace(":", "") };
 }
 
 async function ensureFolder(app: App, folder: string): Promise<void> {
@@ -55,13 +46,21 @@ export interface WriteInput {
   date: string;
   question: string;
   hexNumber: number;
+  resultingNumber: number | null;
 }
 
 /** Legt die Reading-Note an — mit Frontmatter-Zäunen nur, wenn welches vorhanden ist. */
 async function createReadingNote(app: App, input: WriteInput, settings: PluginSettings): Promise<TFile> {
   const { rendered } = input;
   await ensureFolder(app, settings.readingsFolder);
-  const base = fileBase(rendered, input.date, input.question, input.hexNumber);
+  const { date, time } = splitStamp(input.date);
+  const base = buildFilename(settings.filenameTemplate, {
+    date,
+    time,
+    hexagram: input.hexNumber,
+    resulting: input.resultingNumber,
+    question: input.question,
+  });
   const path = uniquePath(app, settings.readingsFolder, base);
   const content = rendered.frontmatter
     ? `---\n${rendered.frontmatter}\n---\n\n${rendered.body}`

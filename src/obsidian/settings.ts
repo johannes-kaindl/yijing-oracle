@@ -2,6 +2,7 @@ import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { pickLang, t } from "../vendor/kit/i18n";
 import { type Lang, type Register } from "../core/data";
 import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from "../core/frontmatter";
+import { DEFAULT_FILENAME_TEMPLATE } from "../core/filename";
 
 export type OutputMode = "note" | "cursor";
 
@@ -11,6 +12,8 @@ export interface PluginSettings {
   register: Register;
   defaultOutput: OutputMode;
   readingsFolder: string;
+  /** Dateiname-Schema mit Platzhaltern ({date} {time} {hex} {resulting} {hexpair} {question}). */
+  filenameTemplate: string;
   openAfterCreate: boolean;
   /** Frontmatter überhaupt anlegen? */
   includeFrontmatter: boolean;
@@ -23,6 +26,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   register: "neutral",
   defaultOutput: "note",
   readingsFolder: "Yijing/Readings",
+  filenameTemplate: DEFAULT_FILENAME_TEMPLATE,
   openAfterCreate: true,
   includeFrontmatter: true,
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
@@ -104,6 +108,19 @@ export class SettingsTab extends PluginSettingTab {
           .setValue(s.readingsFolder)
           .onChange(async (v) => {
             s.readingsFolder = v.trim() || DEFAULT_SETTINGS.readingsFolder;
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("set.filename"))
+      .setDesc(t("set.filenameDesc"))
+      .addText((txt) =>
+        txt
+          .setPlaceholder(DEFAULT_FILENAME_TEMPLATE)
+          .setValue(s.filenameTemplate)
+          .onChange(async (v) => {
+            s.filenameTemplate = v.trim() || DEFAULT_FILENAME_TEMPLATE;
             await this.host.saveSettings();
           }),
       );
