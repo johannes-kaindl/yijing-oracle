@@ -69,8 +69,10 @@ export class OracleView extends ItemView {
   private abortCtrl: AbortController | null = null;
   private answerEl: HTMLElement | null = null;
   private reasoningEl: HTMLElement | null = null;
-  /** Klapp-Zustand des Weissagungs-Kastens (überlebt Re-Render). */
+  /** Klapp-Zustände der Kästen (überleben Re-Render). */
   private readingOpen = true;
+  private interpretationOpen = true;
+  private historyOpen = true;
 
   constructor(
     leaf: WorkspaceLeaf,
@@ -231,11 +233,17 @@ export class OracleView extends ItemView {
     (primaryMode === "cursor" ? cursorBtn : noteBtn).setCta();
   }
 
-  /** Deutungs-Bereich: Auslöse-Button, Live-Stream mit Abbrechen, oder fertige Deutung. */
-  private renderInterpretationArea(card: HTMLElement, c: CurrentCast): void {
+  /** Deutungs-Bereich: eigener Klapp-Kasten mit Auslöse-Button, Live-Stream oder Ergebnis. */
+  private renderInterpretationArea(root: HTMLElement, c: CurrentCast): void {
     this.answerEl = null;
     this.reasoningEl = null;
-    const area = card.createDiv({ cls: "yijing-interpretation" });
+    const box = root.createEl("details", { cls: "yijing-interpretation" });
+    box.open = this.interpretationOpen;
+    box.addEventListener("toggle", () => {
+      this.interpretationOpen = box.open;
+    });
+    box.createEl("summary", { text: t("view.interpretationHead"), cls: "yijing-box-summary" });
+    const area = box.createDiv({ cls: "yijing-interpretation-inner" });
 
     if (this.streaming) {
       const det = area.createEl("details", { cls: "yijing-reasoning" });
@@ -342,8 +350,12 @@ export class OracleView extends ItemView {
   }
 
   private renderHistory(root: HTMLElement): void {
-    const section = root.createDiv({ cls: "yijing-history" });
-    section.createEl("h3", { text: t("view.historyHead") });
+    const section = root.createEl("details", { cls: "yijing-history" });
+    section.open = this.historyOpen;
+    section.addEventListener("toggle", () => {
+      this.historyOpen = section.open;
+    });
+    section.createEl("summary", { text: t("view.historyHead"), cls: "yijing-box-summary" });
 
     const folder = normalizePath(this.host.settings.readingsFolder);
     const prefix = folder + "/";

@@ -108,15 +108,19 @@
   background: var(--background-secondary);
 }
 
-/* ── History ───────────────────────────────────────────────────────────── */
+/* ── History: eigener Klapp-Kasten ─────────────────────────────────────── */
 .yijing-history {
-  margin-top: var(--size-4-4);
-  border-top: 1px solid var(--background-modifier-border);
-  padding-top: var(--size-4-2);
+  margin-top: var(--size-4-3);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  padding: var(--size-4-2) var(--size-4-3);
 }
 
-.yijing-history h3 {
-  margin-bottom: var(--size-4-1);
+/* Gemeinsamer Summary-Stil aller Klapp-Kästen (Deutung, History). */
+.yijing-box-summary {
+  cursor: pointer;
+  font-weight: var(--font-bold);
+  font-size: 1.05em;
 }
 
 .yijing-history-list {
@@ -151,6 +155,10 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: var(--size-4-2) var(--size-4-3);
+}
+
+.yijing-interpretation[open] .yijing-interpretation-inner {
+  margin-top: var(--size-2-3);
 }
 
 .yijing-interpretation-body {
