@@ -5,7 +5,7 @@ import { DEFAULT_FRONTMATTER_FIELDS, MARKER_KEY, type FrontmatterField } from ".
 import { DEFAULT_FILENAME_TEMPLATE } from "../core/filename";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { type ThinkingInNote } from "../core/llm/interpretation";
-import { type LlmSettings, DEFAULT_LLM_SETTINGS } from "../core/llm/settings-defaults";
+import { type LlmSettings, DEFAULT_LLM_SETTINGS, effectiveModel } from "../core/llm/settings-defaults";
 import { parseEndpointList, normalizeEndpoint } from "../vendor/kit/endpoint";
 import { ChatClient } from "./chat-client";
 import { httpGet, probeEndpoint } from "./http";
@@ -236,12 +236,19 @@ export class SettingsTab extends PluginSettingTab {
 
     // Modell — Dropdown live aus listModels(), Fallback Textfeld.
     const modelSetting = new Setting(containerEl).setName(t("set.llmModel")).setDesc(t("set.llmModelDesc"));
-    void new ChatClient(llm.activeEndpoint, llm.model, httpGet).listModels().then((models) => {
+    void new ChatClient(llm.activeEndpoint, llm.model, httpGet).listModels().then(async (models) => {
       if (models.length) {
-        const list = models.includes(llm.model) || !llm.model ? models : [llm.model, ...models];
+        // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
+        // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.
+        const resolved = effectiveModel(llm.model, models);
+        if (resolved !== llm.model) {
+          llm.model = resolved;
+          await this.host.saveSettings();
+        }
+        const list = models.includes(llm.model) ? models : [llm.model, ...models];
         modelSetting.addDropdown((d) => {
           for (const m of list) d.addOption(m, m);
-          d.setValue(llm.model || list[0]);
+          d.setValue(llm.model);
           d.onChange(async (v) => {
             llm.model = v;
             await this.host.saveSettings();

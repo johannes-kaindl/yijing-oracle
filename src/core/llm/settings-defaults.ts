@@ -20,6 +20,15 @@ export interface LlmSettings {
   thinkingInNote: ThinkingInNote;
 }
 
+/** Effektives Modell: das aktuell gewählte, falls gesetzt; sonst das erste verfügbare
+ *  (leer, wenn keine Modelle bekannt). Pure — löst den „Dropdown-Default nicht gespeichert"-
+ *  Fall: ein leeres `model` bei vorhandener Modell-Liste muss zum ersten Modell aufgelöst
+ *  und persistiert werden, sonst zeigt das Dropdown ein Modell an, das nie gespeichert wurde. */
+export function effectiveModel(current: string, available: string[]): string {
+  if (current.trim()) return current;
+  return available[0] ?? "";
+}
+
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   endpoints: "http://localhost:1234",
   activeEndpoint: "http://localhost:1234",

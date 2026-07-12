@@ -18,6 +18,7 @@ import { getHexagram, type Lang, type Register } from "../core/data";
 import { type FieldId } from "../core/frontmatter";
 import { buildInterpretationMessages } from "../core/llm/prompt";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
+import { effectiveModel } from "../core/llm/settings-defaults";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
@@ -275,7 +276,19 @@ export class OracleView extends ItemView {
     if (!c || this.streaming) return;
     const llm = this.host.settings.llm;
     const endpoint = llm.activeEndpoint.trim();
-    if (!endpoint || !llm.model.trim()) {
+    if (!endpoint) {
+      new Notice(t("notice.noEndpoint"));
+      return;
+    }
+
+    // Modell auflösen: gesetztes bevorzugen, sonst live das erste verfügbare (deckt den Fall
+    // ab, dass die Settings noch nie geöffnet und so kein Default persistiert wurde).
+    let model = llm.model.trim();
+    if (!model) {
+      const models = await new ChatClient(endpoint, "", httpGet).listModels();
+      model = effectiveModel("", models);
+    }
+    if (!model) {
       new Notice(t("notice.noEndpoint"));
       return;
     }
@@ -286,10 +299,10 @@ export class OracleView extends ItemView {
 
     this.streaming = true;
     this.abortCtrl = new AbortController();
-    c.interpretation = { answer: "", reasoning: "", model: llm.model };
+    c.interpretation = { answer: "", reasoning: "", model };
     await this.render();
 
-    const client = new ChatClient(endpoint, llm.model, httpGet);
+    const client = new ChatClient(endpoint, model, httpGet);
     try {
       const res = await client.stream(
         messages,
