@@ -6,14 +6,16 @@ import {
   ItemView,
   MarkdownRenderer,
   Notice,
+  type TFile,
   TextComponent,
   type WorkspaceLeaf,
   normalizePath,
 } from "obsidian";
 import { cast } from "../core/casting";
-import { buildReading, type Reading } from "../core/reading";
+import { buildReading, reconstructReading, type Reading } from "../core/reading";
 import { renderReading, type RenderedReading } from "../core/render";
-import { getHexagram, type Lang } from "../core/data";
+import { getHexagram, type Lang, type Register } from "../core/data";
+import { type FieldId } from "../core/frontmatter";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
@@ -224,8 +226,65 @@ export class OracleView extends ItemView {
       const a = li.createEl("a", { text: `${hex}${f.basename}`, cls: "yijing-history-link" });
       a.addEventListener("click", (e) => {
         e.preventDefault();
-        void this.app.workspace.getLeaf(false).openFile(f);
+        void this.openHistoryEntry(f);
       });
     }
+  }
+
+  /** History-Klick: Wurf aus dem Frontmatter ins Panel rekonstruieren UND die Notiz öffnen. */
+  private async openHistoryEntry(f: TFile): Promise<void> {
+    const restored = this.restoreFromNote(f);
+    if (restored) {
+      this.current = restored;
+      this.questionValue = restored.question;
+      await this.render();
+    }
+    await this.app.workspace.getLeaf(false).openFile(f);
+  }
+
+  /** Aktuell konfigurierter YAML-Key für ein Feld (Fallback: der Feld-Default-Name). */
+  private fmKey(id: FieldId): string {
+    return this.host.settings.frontmatterFields.find((field) => field.id === id)?.key ?? id;
+  }
+
+  /** Rekonstruiert einen CurrentCast aus dem Frontmatter — best-effort. null, wenn die
+   *  Kern-Felder (Hexagramm-Nr) fehlen oder das Reading nicht baubar ist. */
+  private restoreFromNote(f: TFile): CurrentCast | null {
+    const fm = this.app.metadataCache.getFileCache(f)?.frontmatter;
+    if (!fm) return null;
+
+    const read = (id: FieldId): unknown => fm[this.fmKey(id)] ?? fm[id];
+
+    const hex = read("hexagram");
+    if (typeof hex !== "number") return null;
+
+    const rawChanging = read("changing_lines");
+    const changing = Array.isArray(rawChanging) ? rawChanging.filter((x): x is number => typeof x === "number") : [];
+
+    let reading: Reading;
+    try {
+      reading = reconstructReading(hex, changing);
+    } catch {
+      return null;
+    }
+
+    const langRaw = read("language");
+    const lang: Lang = langRaw === "de" || langRaw === "en" ? langRaw : this.host.resolveReadingLang();
+    const regRaw = read("register");
+    const register: Register = regRaw === "classic" || regRaw === "neutral" ? regRaw : this.host.settings.register;
+    const qRaw = read("question");
+    const question = typeof qRaw === "string" ? qRaw : "";
+    const dRaw = read("date");
+    const date = typeof dRaw === "string" ? dRaw : "";
+
+    const rendered = renderReading(reading, {
+      lang,
+      register,
+      date,
+      question,
+      includeFrontmatter: this.host.settings.includeFrontmatter,
+      frontmatterFields: this.host.settings.frontmatterFields,
+    });
+    return { reading, rendered, question, date };
   }
 }

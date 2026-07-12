@@ -62,6 +62,11 @@ export function kingWen(bin: string): number | null {
   return BINARY_TO_KING_WEN[bin] ?? null;
 }
 
+/** Umkehrung: King-Wen-Nummer → binary (für die Rekonstruktion aus gespeicherten Readings). */
+export function binaryForKingWen(n: number): string | null {
+  return KING_WEN_TO_BINARY[n] ?? null;
+}
+
 /** binary (unterste Linie = erstes Zeichen) → King-Wen-Nummer. Verbatim aus OracleKit. */
 export const BINARY_TO_KING_WEN: Record<string, number> = {
   "111111": 1, "000000": 2, "100010": 3, "010001": 4, "111010": 5, "010111": 6, "010000": 7, "000010": 8,
@@ -73,3 +78,7 @@ export const BINARY_TO_KING_WEN: Record<string, number> = {
   "101110": 49, "011101": 50, "100100": 51, "001001": 52, "001011": 53, "110100": 54, "101100": 55, "001101": 56,
   "011011": 57, "110110": 58, "010011": 59, "110010": 60, "110011": 61, "001100": 62, "101010": 63, "010101": 64,
 };
+
+const KING_WEN_TO_BINARY: Record<number, string> = Object.fromEntries(
+  Object.entries(BINARY_TO_KING_WEN).map(([bin, num]) => [num, bin]),
+);

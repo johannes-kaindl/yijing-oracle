@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildReading } from "../src/core/reading";
+import { buildReading, reconstructReading } from "../src/core/reading";
 import { type Line } from "../src/core/casting";
 
 const L = (...values: number[]): Line[] => values.map((value) => ({ value }));
@@ -32,5 +32,27 @@ describe("buildReading", () => {
 
   it("throws on wrong line count", () => {
     expect(() => buildReading(L(7, 7, 7))).toThrow(/exactly 6/);
+  });
+});
+
+describe("reconstructReading", () => {
+  it("round-trips a cast reading (primary, resulting, changing positions)", () => {
+    const original = buildReading(L(9, 7, 8, 6, 8, 7));
+    const restored = reconstructReading(original.primaryNumber, original.changingPositions);
+    expect(restored.primaryNumber).toBe(original.primaryNumber);
+    expect(restored.resultingNumber).toBe(original.resultingNumber);
+    expect(restored.changingPositions).toEqual(original.changingPositions);
+    expect(restored.lines).toEqual(original.lines);
+  });
+
+  it("reconstructs a stable reading (no changing lines)", () => {
+    const restored = reconstructReading(63, []);
+    expect(restored.primaryNumber).toBe(63);
+    expect(restored.resultingNumber).toBeNull();
+    expect(restored.changingPositions).toEqual([]);
+  });
+
+  it("throws on an unknown hexagram number", () => {
+    expect(() => reconstructReading(999, [])).toThrow(/Unknown hexagram/);
   });
 });
