@@ -3,6 +3,7 @@ import { buildReading } from "../src/core/reading";
 import { renderReading, type RenderOptions } from "../src/core/render";
 import { DEFAULT_FRONTMATTER_FIELDS } from "../src/core/frontmatter";
 import { type Line } from "../src/core/casting";
+import { MARKER_START, MARKER_END } from "../src/core/llm/insert";
 
 const L = (...values: number[]): Line[] => values.map((value) => ({ value }));
 
@@ -79,5 +80,16 @@ describe("renderReading", () => {
     const out = renderReading(r, opts({ includeFrontmatter: false }));
     expect(out.frontmatter).toBe("");
     expect(out.body).toContain("## Das Urteil"); // Body unberührt
+  });
+
+  it("bettet ein leeres Deutungs-Marker-Paar vor dem ersten ## ein (nur body)", () => {
+    const r = buildReading(L(7, 8, 7, 8, 7, 8));
+    const out = renderReading(r, opts({ includeFrontmatter: false }));
+    const mi = out.body.indexOf(MARKER_START);
+    const hi = out.body.indexOf("## ");
+    expect(mi).toBeGreaterThan(-1);
+    expect(out.body.indexOf(MARKER_END)).toBeGreaterThan(mi);
+    expect(mi).toBeLessThan(hi); // Marker vor erstem ##
+    expect(out.previewBody).not.toContain(MARKER_START); // Vorschau ohne Marker
   });
 });

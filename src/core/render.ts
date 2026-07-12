@@ -5,6 +5,7 @@
 import { type Reading } from "./reading";
 import { getHexagram, type HexLine, type Lang, type Register } from "./data";
 import { type FrontmatterField, buildFrontmatter } from "./frontmatter";
+import { MARKER_START, MARKER_END } from "./llm/insert";
 
 export interface RenderOptions {
   lang: Lang;
@@ -128,10 +129,13 @@ export function renderReading(reading: Reading, opts: RenderOptions): RenderedRe
     }
   }
 
+  // Leeres Deutungs-Marker-Paar als Anker VOR dem ersten Wurf-Abschnitt (nur im Note-body,
+  // nicht in der Panel-Vorschau). insertInterpretation ersetzt später idempotent dazwischen.
+  const anchor = `${MARKER_START}\n${MARKER_END}`;
   return {
     title,
     frontmatter,
-    body: [titleLine, subtitleLine, ...content].join("\n\n") + "\n",
+    body: [titleLine, subtitleLine, anchor, ...content].join("\n\n") + "\n",
     previewBody: content.join("\n\n") + "\n",
   };
 }
