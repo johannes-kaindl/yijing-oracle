@@ -44,7 +44,9 @@ interface RawHex {
   name_en?: string;
   trigrams: { above: RawTrigram; below: RawTrigram };
   meaning: string;
+  meaning_neutral?: string;
   meaning_en?: string;
+  meaning_en_neutral?: string;
   judgment: string;
   judgment_neutral?: string;
   judgment_en?: string;
@@ -98,6 +100,15 @@ function pickTrigram(raw: RawTrigram): TrigramInfo {
   return { symbol: raw.symbol, name: raw.name, pinyin: raw.pinyin, family: raw.family, nature: raw.nature };
 }
 
+/** Bedeutung (meaning) mit Sprache × Register: neutral fällt auf classic zurück. */
+function pickMeaning(raw: RawHex, lang: Lang, register: Register): string {
+  if (lang === "de") {
+    return ((register === "neutral" && raw.meaning_neutral) || raw.meaning) ?? "";
+  }
+  const en = raw.meaning_en ?? raw.meaning;
+  return ((register === "neutral" && raw.meaning_en_neutral) || en) ?? "";
+}
+
 function pickField(raw: RawHex, base: "judgment" | "image", lang: Lang, register: Register): string {
   if (lang === "de") {
     const neutral = raw[`${base}_neutral`];
@@ -139,7 +150,7 @@ export function getHexagram(number: number, lang: Lang, register: Register): Hex
     pinyin: raw.pinyin,
     judgment: pickField(raw, "judgment", lang, register),
     image: pickField(raw, "image", lang, register),
-    meaning: (lang === "en" ? raw.meaning_en ?? raw.meaning : raw.meaning) ?? "",
+    meaning: pickMeaning(raw, lang, register),
     trigrams: { above: pickTrigram(raw.trigrams.above), below: pickTrigram(raw.trigrams.below) },
     lines: raw.lines.map((rl) => pickLine(rl, lang, register)),
   };

@@ -20,4 +20,15 @@ describe("getHexagram — Trigramme + Bedeutung", () => {
     expect(en.meaning.length).toBeGreaterThan(20);
     expect(en.meaning).not.toBe(de.meaning); // englische Variante
   });
+  it("neutral-Register nutzt meaning_neutral, wenn vorhanden (Hex 1)", () => {
+    const classic = getHexagram(1, "de", "classic").meaning;
+    const neutral = getHexagram(1, "de", "neutral").meaning;
+    expect(neutral).not.toBe(classic); // Hex 1 hat eine neutrale Variante
+    expect(neutral).not.toMatch(/\bder Edle\b/);
+  });
+  it("neutral fällt auf classic zurück, wenn keine Variante existiert (Hex 17)", () => {
+    const classic = getHexagram(17, "de", "classic").meaning;
+    const neutral = getHexagram(17, "de", "neutral").meaning;
+    expect(neutral).toBe(classic); // Hex 17: kein meaning_neutral → Fallback
+  });
 });
