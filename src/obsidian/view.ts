@@ -73,7 +73,7 @@ export class OracleView extends ItemView {
   /** Klapp-Zustände der Kästen (überleben Re-Render). */
   private readingOpen = true;
   private interpretationOpen = true;
-  private historyOpen = true;
+  private historyOpen = false;
 
   constructor(
     leaf: WorkspaceLeaf,
