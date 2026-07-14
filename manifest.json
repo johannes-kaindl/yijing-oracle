@@ -1,7 +1,7 @@
 {
   "id": "yijing-oracle",
   "name": "Yijing Oracle",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "minAppVersion": "1.8.7",
   "description": "Cast the I Ching (Yijing) in your vault: three-coin oracle with Wilhelm hexagram texts, readings saved as notes. Local-first, no cloud.",
   "author": "Johannes Kaindl",
