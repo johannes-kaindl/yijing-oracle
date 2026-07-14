@@ -176,6 +176,8 @@ export class OracleView extends ItemView {
       .setCta()
       .onClick(() => {
         this.doCast();
+        // Frage ist im Wurf erfasst → Feld leeren, damit kein alter Text stehen bleibt.
+        this.questionValue = "";
         void this.render();
       });
 

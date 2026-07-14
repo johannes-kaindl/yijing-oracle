@@ -2,11 +2,6 @@
 
 .yijing-oracle {
   padding: var(--size-4-3);
-  /* Volle Panel-Höhe als Flex-Spalte: Weissagung dehnt sich, History bleibt unten. */
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow-y: auto;
 }
 
 .yijing-title {
@@ -32,17 +27,6 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: var(--size-4-2) var(--size-4-3);
-  flex: 0 0 auto;
-}
-
-/* Offen = das dehnbare Element: nimmt den Rest, aber nie unter die Mindesthöhe;
-   die Vorschau darin scrollt statt zu wachsen. */
-.yijing-reading[open] {
-  flex: 1 1 auto;
-  min-height: 160px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
 }
 
 .yijing-reading-summary {
@@ -123,9 +107,9 @@
 
 .yijing-preview {
   font-size: var(--font-ui-small);
-  /* Füllt den dehnbaren Weissagungs-Kasten und scrollt intern (min-height:0 = Flex-Scroll). */
-  flex: 1 1 auto;
-  min-height: 0;
+  /* Definite Deckelung → scrollt intern verlässlich (Desktop + Mobile), unabhängig
+     von der View-Höhenkette. */
+  max-height: 44vh;
   overflow-y: auto;
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
@@ -133,13 +117,12 @@
   background: var(--background-secondary);
 }
 
-/* ── History: eigener Klapp-Kasten (fix, sitzt als letztes Element unten) ─── */
+/* ── History: eigener Klapp-Kasten ─────────────────────────────────────── */
 .yijing-history {
   margin-top: var(--size-4-3);
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: var(--size-4-2) var(--size-4-3);
-  flex: 0 0 auto;
 }
 
 /* Gemeinsamer Summary-Stil aller Klapp-Kästen (Deutung, History). */
@@ -181,7 +164,6 @@
   border: 1px solid var(--background-modifier-border);
   border-radius: var(--radius-m);
   padding: var(--size-4-2) var(--size-4-3);
-  flex: 0 0 auto;
 }
 
 .yijing-interpretation[open] .yijing-interpretation-inner {

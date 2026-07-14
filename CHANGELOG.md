@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Weissagungs-Vorschau scrollt wieder**: das Voll-Höhen-Flex-Layout hing an einer
+  View-Höhenkette, die im Sidebar-DOM nicht bindet — die Vorschau bekam keine obere
+  Schranke und ließ sich weder auf Desktop noch mobil scrollen. Wieder auf eine definite
+  `max-height` umgestellt (der Kasten dehnt sich nicht mehr über die volle Panel-Höhe).
+
+### Changed
+
+- **„Neue Frage" leert das Frage-Feld**: nach einem Wurf bleibt kein alter Fragetext mehr
+  im Eingabefeld stehen.
+
 ## [0.1.0] — 2026-07-13
 
 ### Added
