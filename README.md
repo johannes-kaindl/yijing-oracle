@@ -8,7 +8,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 > [Yijing web/app project](https://codeberg.org/jkaindl/Yijing). Not a port of the
 > whole thing — a focused plugin where the vault is the oracle journal.
 
-## Features (v1)
+## Features
 
 - **Sidebar panel** — ask a question (or don't), cast the coins, see the hexagram
   figure, changing lines and the resulting hexagram, then save.
@@ -20,6 +20,13 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 - **Register** — classic (Wilhelm) or gender-neutral phrasing.
 - **Two direct commands** — *Cast into a new note* and *Cast at the cursor* — plus
   the panel.
+- **AI interpretation (optional, local)** — stream a reading interpretation from a
+  local OpenAI-compatible LLM server (LM Studio, Ollama, …); system prompt,
+  endpoints and reasoning display are configurable. Off until you set an endpoint.
+- **Meditation image (optional, local)** — generate one image per reading from the
+  hexagram's curated motif via a local A1111-compatible image server (Draw Things,
+  A1111, Forge, …). Panel preview + note embed. Off until you set an endpoint —
+  see [docs/image-generation.md](docs/image-generation.md) for setup.
 
 ## How it works
 
