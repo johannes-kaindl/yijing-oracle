@@ -21,10 +21,12 @@ import { buildInterpretationMessages } from "../core/llm/prompt";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { effectiveModel } from "../core/llm/settings-defaults";
 import { t } from "../vendor/kit/i18n";
+import { buildSdPrompt, composeImageRequest, hashString } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
 import { ChatClient } from "./chat-client";
-import { httpGet } from "./http";
+import { Txt2ImgClient } from "./image-client";
+import { httpGet, httpPostJson } from "./http";
 import { nowStamp } from "./clock";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
@@ -48,6 +50,8 @@ interface CurrentCast {
   lang: Lang;
   /** Erzeugte KI-Deutung (oder null). */
   interpretation: Interpretation | null;
+  /** Generiertes Meditationsbild (oder null). saved verhindert Doppel-Attachments. */
+  artwork: { pngBase64: string; scene: string; saved: boolean } | null;
   /** Bereits gespeicherte Note zu diesem Wurf (null → noch nicht gespeichert). */
   file: TFile | null;
 }
@@ -67,6 +71,7 @@ export class OracleView extends ItemView {
   private current: CurrentCast | null = null;
   private questionValue = "";
   private streaming = false;
+  private generatingImage = false;
   private abortCtrl: AbortController | null = null;
   private answerEl: HTMLElement | null = null;
   private reasoningEl: HTMLElement | null = null;
@@ -122,7 +127,7 @@ export class OracleView extends ItemView {
       callouts: this.host.settings.callouts,
       includeNotes: this.host.settings.showNotes,
     });
-    this.current = { reading, rendered, question, date, lang, interpretation: null, file: null };
+    this.current = { reading, rendered, question, date, lang, interpretation: null, artwork: null, file: null };
   }
 
   private async saveCurrent(mode: OutputMode): Promise<void> {
@@ -138,6 +143,7 @@ export class OracleView extends ItemView {
         resultingNumber: c.reading.resultingNumber,
         lang: c.lang,
         interpretation: c.interpretation,
+        artwork: c.artwork && !c.artwork.saved ? c.artwork : null,
         thinkingInNote: this.host.settings.llm.thinkingInNote,
         existingFile: c.file,
       },
@@ -147,6 +153,7 @@ export class OracleView extends ItemView {
     if (result.file) {
       // Note merken, damit ein späteres „Deutung speichern" dieselbe Datei aktualisiert.
       if (result.mode === "note") c.file = result.file;
+      if (c.artwork) c.artwork.saved = true;
       new Notice(t("notice.saved", result.file.basename));
       if (result.mode === "note" && this.host.settings.openAfterCreate) {
         await this.app.workspace.getLeaf(false).openFile(result.file);
@@ -231,6 +238,9 @@ export class OracleView extends ItemView {
     // ── KI-Deutung: eigener Kasten ─────────────────────────────────────────
     this.renderInterpretationArea(root, c);
 
+    // ── Bildmeditation: eigener Kasten ─────────────────────────────────────
+    this.renderArtworkArea(root, c);
+
     // Speicher-Aktionen — beide Ausgabe-Modi als Buttons (Spec: beides wählbar).
     const actions = root.createDiv({ cls: "yijing-actions" });
     const primaryMode = this.host.settings.defaultOutput;
@@ -288,6 +298,37 @@ export class OracleView extends ItemView {
     new ButtonComponent(row)
       .setButtonText(t("view.interpret"))
       .onClick(() => void this.generateInterpretation());
+  }
+
+  /** Bildmeditations-Bereich: Kasten nur bei konfiguriertem Endpoint; Button →
+   *  Vorschau; Klick aufs Bild generiert mit neuem Zufalls-Seed neu. */
+  private renderArtworkArea(root: HTMLElement, c: CurrentCast): void {
+    if (!this.host.settings.image.endpoint.trim()) return;
+    const box = root.createEl("details", { cls: "yijing-artwork" });
+    box.open = true;
+    box.createEl("summary", { text: t("view.artworkHead"), cls: "yijing-box-summary" });
+    const area = box.createDiv({ cls: "yijing-artwork-inner" });
+
+    if (this.generatingImage) {
+      area.createEl("p", { text: t("view.generatingImage"), cls: "yijing-empty" });
+      return;
+    }
+
+    if (c.artwork) {
+      const imgEl = area.createEl("img", { cls: "yijing-artwork-img" });
+      imgEl.src = `data:image/png;base64,${c.artwork.pngBase64}`;
+      imgEl.title = t("view.regenerate");
+      imgEl.addEventListener("click", () => {
+        void this.generateArtwork(Math.floor(Math.random() * 0xffffffff));
+      });
+      area.createDiv({ text: c.artwork.scene, cls: "yijing-artwork-scene" });
+      return;
+    }
+
+    const row = area.createDiv({ cls: "yijing-actions" });
+    new ButtonComponent(row)
+      .setButtonText(t("view.generateImage"))
+      .onClick(() => void this.generateArtwork());
   }
 
   /** Startet die Deutung: baut Messages, streamt live, hängt Ergebnis an current an. */
@@ -349,6 +390,46 @@ export class OracleView extends ItemView {
     } finally {
       this.streaming = false;
       this.abortCtrl = null;
+      await this.render();
+    }
+  }
+
+  /** Baut Szene+Prompt deterministisch aus dem Wurf und holt das Bild vom Server. */
+  private async generateArtwork(seed?: number): Promise<void> {
+    const c = this.current;
+    if (!c || this.generatingImage) return;
+    const img = this.host.settings.image;
+    const endpoint = img.endpoint.trim();
+    if (!endpoint) return;
+
+    const register = this.host.settings.register;
+    const primary = getHexagram(c.reading.primaryNumber, c.lang, register);
+    const resulting = c.reading.resultingNumber !== null ? getHexagram(c.reading.resultingNumber, c.lang, register) : null;
+    const { scene } = composeImageRequest({
+      primaryMotif: primary.imageAssociation,
+      resultingMotif: resulting?.imageAssociation ?? "",
+      question: c.question,
+      primaryNumber: c.reading.primaryNumber,
+    });
+
+    this.generatingImage = true;
+    await this.render();
+    try {
+      const png = await new Txt2ImgClient(endpoint, httpPostJson).generate({
+        prompt: buildSdPrompt(scene, img.styleSuffix),
+        negativePrompt: img.negativePrompt,
+        width: img.size,
+        height: img.size,
+        steps: 28,
+        // Default-Seed = Frage-Hash → gleiche Frage reproduziert dasselbe Bild.
+        seed: seed ?? hashString(c.question),
+      });
+      c.artwork = { pngBase64: png, scene, saved: false };
+    } catch (e) {
+      new Notice(t("notice.imageError", String((e as Error)?.message ?? e)));
+      console.error("[yijing-oracle]", e);
+    } finally {
+      this.generatingImage = false;
       await this.render();
     }
   }
@@ -450,6 +531,6 @@ export class OracleView extends ItemView {
       callouts: this.host.settings.callouts,
       includeNotes: this.host.settings.showNotes,
     });
-    return { reading, rendered, question, date, lang, interpretation: null, file: f };
+    return { reading, rendered, question, date, lang, interpretation: null, artwork: null, file: f };
   }
 }

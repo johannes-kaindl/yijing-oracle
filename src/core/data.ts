@@ -65,6 +65,7 @@ interface RawHex {
   image_neutral?: string;
   image_en?: string;
   image_en_neutral?: string;
+  image_association?: string;
   lines: RawLine[];
 }
 
@@ -106,6 +107,8 @@ export interface HexagramData {
   pinyin: string;
   judgment: string;
   image: string;
+  /** Sprachunabhängiges Bild-Motiv für die Bildmeditation (z.B. "a soaring eagle"). */
+  imageAssociation: string;
   /** Interpretierender Kommentar (Wilhelm); sprachabhängig, kann leer sein. */
   meaning: string;
   trigrams: { above: TrigramInfo; below: TrigramInfo };
@@ -181,6 +184,7 @@ export function getHexagram(number: number, lang: Lang, register: Register): Hex
     pinyin: raw.pinyin,
     judgment: pickField(raw, "judgment", lang, register),
     image: pickField(raw, "image", lang, register),
+    imageAssociation: raw.image_association ?? "",
     meaning: pickMeaning(raw, lang, register),
     trigrams: { above: pickTrigram(raw.trigrams.above), below: pickTrigram(raw.trigrams.below) },
     notes: pickNotes(raw, lang, register),

@@ -12,4 +12,10 @@ describe("mergeCallouts", () => {
     expect(merged.image).toEqual(DEFAULT_CALLOUTS.image); // Sektion ergänzt
     expect(Object.keys(merged).sort()).toEqual([...CALLOUT_SECTIONS].sort());
   });
+  it("ergänzt die neue artwork-Sektion in alten Configs", () => {
+    const legacy = { overview: { enabled: false, type: "note" } };
+    const merged = mergeCallouts(legacy as never);
+    expect(merged.artwork).toEqual({ enabled: true, type: "quote" });
+    expect(merged.overview.enabled).toBe(false);
+  });
 });

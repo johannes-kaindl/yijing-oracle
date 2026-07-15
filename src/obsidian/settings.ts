@@ -8,6 +8,7 @@ import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { type ThinkingInNote } from "../core/llm/interpretation";
 import { type CalloutConfig, CALLOUT_SECTIONS, DEFAULT_CALLOUTS } from "../core/note-callouts";
 import { type LlmSettings, DEFAULT_LLM_SETTINGS, effectiveModel } from "../core/llm/settings-defaults";
+import { type ImageSettings, DEFAULT_IMAGE_SETTINGS } from "../core/image-settings";
 import { parseEndpointList, normalizeEndpoint } from "../vendor/kit/endpoint";
 import { ChatClient } from "./chat-client";
 import { httpGet, probeEndpoint } from "./http";
@@ -32,6 +33,8 @@ export interface PluginSettings {
   frontmatterFields: FrontmatterField[];
   /** LLM-Deutungs-Konfiguration. */
   llm: LlmSettings;
+  /** Bildgenerierung (Bildmeditation). */
+  image: ImageSettings;
   /** Callout-Wrapping der Wilhelm-Abschnitte in der Note. */
   callouts: CalloutConfig;
   /** Wilhelms Fußnoten als Anmerkungen-Abschnitt in die Note schreiben. */
@@ -48,6 +51,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   includeFrontmatter: true,
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
   llm: DEFAULT_LLM_SETTINGS,
+  image: DEFAULT_IMAGE_SETTINGS,
   callouts: DEFAULT_CALLOUTS,
   showNotes: true,
 };
@@ -199,7 +203,62 @@ export class SettingsTab extends PluginSettingTab {
       );
 
     this.renderLlmSettings(containerEl, s.llm);
+    this.renderImageSettings(containerEl, s.image);
     this.renderCalloutSettings(containerEl, s.callouts);
+  }
+
+  // ── Bildgenerierung ───────────────────────────────────────────────────────
+  private renderImageSettings(containerEl: HTMLElement, img: ImageSettings): void {
+    new Setting(containerEl).setName(t("set.imgHead")).setHeading();
+
+    new Setting(containerEl)
+      .setName(t("set.imgEndpoint"))
+      .setDesc(t("set.imgEndpointDesc"))
+      .addText((txt) =>
+        txt
+          .setPlaceholder("http://127.0.0.1:7860")
+          .setValue(img.endpoint)
+          .onChange(async (v) => {
+            img.endpoint = v.trim();
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("set.imgStyle"))
+      .setDesc(t("set.imgStyleDesc"))
+      .addText((txt) =>
+        txt
+          .setPlaceholder(DEFAULT_IMAGE_SETTINGS.styleSuffix)
+          .setValue(img.styleSuffix)
+          .onChange(async (v) => {
+            img.styleSuffix = v;
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("set.imgNegative"))
+      .addText((txt) =>
+        txt
+          .setPlaceholder(DEFAULT_IMAGE_SETTINGS.negativePrompt)
+          .setValue(img.negativePrompt)
+          .onChange(async (v) => {
+            img.negativePrompt = v;
+            await this.host.saveSettings();
+          }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("set.imgSize"))
+      .addDropdown((d) => {
+        for (const px of [512, 768, 1024]) d.addOption(String(px), `${px} × ${px}`);
+        d.setValue(String(img.size));
+        d.onChange(async (v) => {
+          img.size = Number(v);
+          await this.host.saveSettings();
+        });
+      });
   }
 
   // ── Notiz-Layout (Callouts) ────────────────────────────────────────────────

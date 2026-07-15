@@ -24,6 +24,7 @@ const allOff: CalloutConfig = {
   hexInfo: { enabled: false, type: "quote" },
   judgment: { enabled: false, type: "quote" },
   image: { enabled: false, type: "quote" },
+  artwork: { enabled: false, type: "quote" },
   meaning: { enabled: false, type: "quote" },
   lines: { enabled: false, type: "quote" },
   notes: { enabled: false, type: "quote" },

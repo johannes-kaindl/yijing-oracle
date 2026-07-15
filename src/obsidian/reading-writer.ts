@@ -1,11 +1,12 @@
 // Schreibt ein gerendertes Reading in den Vault — als neue Note ODER an den Cursor der
 // aktiven Note. Einzige Stelle mit Datei-I/O; render.ts bleibt rein.
-import { type App, MarkdownView, Notice, type TFile, normalizePath } from "obsidian";
+import { type App, MarkdownView, Notice, type TFile, base64ToArrayBuffer, normalizePath } from "obsidian";
 import { type RenderedReading } from "../core/render";
 import { buildFilename } from "../core/filename";
 import { type Lang } from "../core/data";
 import { renderInterpretationBlock, type InterpretationData, type ThinkingInNote } from "../core/llm/interpretation";
 import { insertInterpretation } from "../core/llm/insert";
+import { insertArtwork, renderArtworkBlock } from "../core/artwork";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
 
@@ -54,6 +55,8 @@ export interface WriteInput {
   lang: Lang;
   /** Optionale KI-Deutung; null → keine Deutung einbetten. */
   interpretation?: InterpretationData | null;
+  /** Generiertes Meditationsbild; null/undefined → kein Bild-Abschnitt. */
+  artwork?: { pngBase64: string; scene: string } | null;
   /** Wie Reasoning in die Note wandert. */
   thinkingInNote: ThinkingInNote;
   /** Ist die Note zu diesem Wurf schon vorhanden, wird sie modifiziert statt neu angelegt. */
@@ -67,6 +70,28 @@ function interpretationBlock(input: WriteInput): string | null {
     lang: input.lang,
     thinkingInNote: input.thinkingInNote,
   });
+}
+
+/** Legt das PNG als Attachment neben die Note und setzt den Bild-Block idempotent
+ *  in die Note ein. Fehler brechen das Speichern der Note NICHT ab (Spec §Fehler). */
+async function attachArtwork(
+  app: App,
+  file: TFile,
+  artwork: { pngBase64: string; scene: string },
+  lang: Lang,
+  settings: PluginSettings,
+): Promise<void> {
+  try {
+    const path = await app.fileManager.getAvailablePathForAttachment(`${file.basename}.png`, file.path);
+    const att = await app.vault.createBinary(path, base64ToArrayBuffer(artwork.pngBase64));
+    const raw = app.fileManager.generateMarkdownLink(att, file.path);
+    const embed = raw.startsWith("!") ? raw : `!${raw}`;
+    const block = renderArtworkBlock({ embed, scene: artwork.scene, lang, callout: settings.callouts.artwork });
+    await app.vault.process(file, (cur) => insertArtwork(cur, block));
+  } catch (e) {
+    new Notice(t("notice.imageSaveError"));
+    console.error("[yijing-oracle]", e);
+  }
 }
 
 /** Legt die Reading-Note an — mit Frontmatter-Zäunen nur, wenn welches vorhanden ist. */
@@ -106,10 +131,12 @@ export async function writeReading(
     if (block) {
       await app.vault.process(input.existingFile, (cur) => insertInterpretation(cur, block));
     }
+    if (input.artwork) await attachArtwork(app, input.existingFile, input.artwork, input.lang, settings);
     return { file: input.existingFile, mode: "note" };
   }
 
   const file = await createReadingNote(app, input, settings);
+  if (input.artwork) await attachArtwork(app, file, input.artwork, input.lang, settings);
 
   if (mode === "cursor") {
     // NICHT getActiveViewOfType: beim Klick auf den Panel-Button ist das Sidebar-Panel

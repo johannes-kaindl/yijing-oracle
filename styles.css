@@ -195,3 +195,20 @@
   max-height: 30vh;
   overflow-y: auto;
 }
+
+/* ── Bildmeditation ─────────────────────────────────────────────── */
+.yijing-artwork-inner {
+  padding: 0.25em 0;
+}
+.yijing-artwork-img {
+  max-width: 100%;
+  border-radius: var(--radius-m);
+  cursor: pointer;
+  display: block;
+}
+.yijing-artwork-scene {
+  color: var(--text-muted);
+  font-style: italic;
+  font-size: var(--font-ui-smaller);
+  margin-top: 0.35em;
+}
