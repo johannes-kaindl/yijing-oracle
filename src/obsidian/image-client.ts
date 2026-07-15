@@ -37,7 +37,7 @@ export class Txt2ImgClient implements ImageBackend {
     });
     if (status !== 200) throw new Error(`txt2img HTTP ${status}`);
     const images = (json as { images?: unknown })?.images;
-    const first = Array.isArray(images) ? images[0] : undefined;
+    const first: unknown = Array.isArray(images) ? images[0] : undefined;
     if (typeof first !== "string" || !first) throw new Error("txt2img: empty result");
     return first;
   }
