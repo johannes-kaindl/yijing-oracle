@@ -44,7 +44,8 @@ Anything that speaks the A1111 (AUTOMATIC1111) web-UI API:
   that matches the motif's mood (dark motifs never get "warm golden light").
 - The atmosphere and the seed are derived **deterministically from your question**
   (djb2 hash): the same cast with the same question reproduces the same image.
-- Clicking the generated image regenerates with a **random seed**.
+- The **Regenerate** button below the image generates a new take with a
+  **random seed**.
 - Your configurable **style suffix** (default: *ink wash painting, soft light,
   muted colors*) and **negative prompt** are appended from the settings.
 
