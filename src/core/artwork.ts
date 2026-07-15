@@ -24,7 +24,8 @@ export interface ArtworkBlockInput {
 export function renderArtworkBlock(i: ArtworkBlockInput): string {
   const label = ARTWORK_LABELS[i.lang];
   const body = `${i.embed}\n\n*${i.scene}*`;
-  return i.callout.enabled ? wrapCallout(label, body, i.callout.type, false) : `### ${label}\n\n${body}`;
+  // Ausgeklappt ("+"), aber einklappbar — das Bild soll beim Öffnen der Note sichtbar sein.
+  return i.callout.enabled ? wrapCallout(label, body, i.callout.type, true) : `### ${label}\n\n${body}`;
 }
 
 /** Setzt/ersetzt den Bild-Block. Reihenfolge:

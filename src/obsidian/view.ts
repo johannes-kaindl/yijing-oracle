@@ -301,7 +301,7 @@ export class OracleView extends ItemView {
   }
 
   /** Bildmeditations-Bereich: Kasten nur bei konfiguriertem Endpoint; Button →
-   *  Vorschau; Klick aufs Bild generiert mit neuem Zufalls-Seed neu. */
+   *  Vorschau; eigener Regenerate-Button (neuer Zufalls-Seed) unter dem Bild. */
   private renderArtworkArea(root: HTMLElement, c: CurrentCast): void {
     if (!this.host.settings.image.endpoint.trim()) return;
     const box = root.createEl("details", { cls: "yijing-artwork" });
@@ -317,11 +317,11 @@ export class OracleView extends ItemView {
     if (c.artwork) {
       const imgEl = area.createEl("img", { cls: "yijing-artwork-img" });
       imgEl.src = `data:image/png;base64,${c.artwork.pngBase64}`;
-      imgEl.title = t("view.regenerate");
-      imgEl.addEventListener("click", () => {
-        void this.generateArtwork(Math.floor(Math.random() * 0xffffffff));
-      });
       area.createDiv({ text: c.artwork.scene, cls: "yijing-artwork-scene" });
+      const row = area.createDiv({ cls: "yijing-actions" });
+      new ButtonComponent(row)
+        .setButtonText(t("view.regenerate"))
+        .onClick(() => void this.generateArtwork(Math.floor(Math.random() * 0xffffffff)));
       return;
     }
 

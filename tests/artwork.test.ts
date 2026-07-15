@@ -7,7 +7,7 @@ const CAL = { enabled: true, type: "quote" };
 describe("renderArtworkBlock", () => {
   it("wickelt Embed + Szene in ein Callout", () => {
     const b = renderArtworkBlock({ embed: "![[bild.png]]", scene: "a lake, at dusk", lang: "de", callout: CAL });
-    expect(b).toContain("[!quote]");
+    expect(b).toContain("[!quote]+");
     expect(b).toContain("Bildmeditation");
     expect(b).toContain("![[bild.png]]");
     expect(b).toContain("*a lake, at dusk*");
