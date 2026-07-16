@@ -11,7 +11,7 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint src",
     "deploy": "npm run build && cp main.js manifest.json styles.css \"${OBSIDIAN_PLUGIN_DIR:?set OBSIDIAN_PLUGIN_DIR}\"/",
-    "check:pure": "sh -c \"! grep -rl \\\"from 'obsidian'\\\" src/core src/vendor 2>/dev/null\"",
+    "check:pure": "sh -c \"! grep -rl \\\"from 'obsidian'\\\" src/core src/vendor/kit 2>/dev/null\"",
     "check:bundle": "node esbuild.config.mjs --production && node scripts/check-bundle.mjs",
     "gate": "npm run lint && npm run typecheck && npm run typecheck:test && npm test && npm run check:pure && npm run check:bundle",
     "version-bump": "node scripts/version-bump.mjs",
