@@ -211,3 +211,37 @@
   font-size: var(--font-ui-smaller);
   margin-top: 0.35em;
 }
+
+/* ── Einklappbare Settings-Sektionen (obsidian-kit#0.13.0, COLLAPSIBLE_CSS) ────── */
+.okit-collapsible-header {
+  display: flex; align-items: center; gap: var(--size-4-2);
+  cursor: pointer; padding: var(--size-4-2) 0;
+  font-weight: var(--font-semibold); color: var(--text-normal);
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+.okit-collapsible-header:hover { color: var(--text-accent); }
+.okit-collapsible-header:focus-visible {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-s);
+}
+.okit-collapsible-chevron { display: inline-flex; color: var(--text-muted); }
+.okit-collapsible-body { padding-top: var(--size-4-2); }
+.okit-collapsible-body.is-collapsed { display: none; }
+
+/* ── Endpunkt-Status + Eingabe-Warnungen ──────────────────────────────────────── */
+.yijing-ep-status {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--size-4-2);
+  color: var(--text-muted);
+}
+.yijing-ep-status.is-ok { color: var(--text-success); }
+.yijing-ep-status.is-error { color: var(--text-error); }
+.yijing-ep-status.is-active { color: var(--text-accent); }
+.yijing-ep-warn {
+  display: inline-flex;
+  align-items: center;
+  margin-right: var(--size-4-2);
+  color: var(--text-warning);
+}

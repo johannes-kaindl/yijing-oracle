@@ -2,10 +2,10 @@ import { type ThinkingInNote } from "./interpretation";
 
 /** LLM-Deutungs-Konfiguration. Pure (kein obsidian) — von settings.ts re-exportiert. */
 export interface LlmSettings {
-  /** Textarea, eine Endpunkt-URL pro Zeile. */
-  endpoints: string;
-  /** Aktive Endpunkt-URL (eine der Zeilen; wird beim Aufruf normalisiert). */
-  activeEndpoint: string;
+  /** Geordnete Endpunkt-Liste. Die Reihenfolge IST die Priorität: der erste erreichbare
+   *  gewinnt (resolveActiveEndpoint). Ein separates activeEndpoint-Feld gibt es bewusst
+   *  nicht mehr — der Nutzer sortiert um, statt auszuwählen. */
+  endpoints: string[];
   /** Optionaler API-Key (leer für lokale Server). */
   apiKey: string;
   /** Zuletzt gewähltes Modell. */
@@ -30,8 +30,7 @@ export function effectiveModel(current: string, available: string[]): string {
 }
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
-  endpoints: "http://localhost:1234",
-  activeEndpoint: "http://localhost:1234",
+  endpoints: ["http://localhost:1234"],
   apiKey: "",
   model: "",
   systemPromptDe: "",

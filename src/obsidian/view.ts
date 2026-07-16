@@ -26,7 +26,8 @@ import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
 import { ChatClient } from "./chat-client";
 import { Txt2ImgClient } from "./image-client";
-import { httpGet, httpPostJson } from "./http";
+import { httpGet, httpPostJson, probeEndpoint } from "./http";
+import { resolveActiveEndpoint } from "../vendor/kit/endpoint";
 import { nowStamp } from "./clock";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
@@ -336,7 +337,14 @@ export class OracleView extends ItemView {
     const c = this.current;
     if (!c || this.streaming) return;
     const llm = this.host.settings.llm;
-    const endpoint = llm.activeEndpoint.trim();
+    // „Aktiv" ist abgeleitet, nicht gespeichert: der erste erreichbare aus der geordneten Liste
+    // gewinnt. Die Probe kostet einen Roundtrip (bzw. bis zu 5 s Timeout je totem Eintrag) —
+    // gegenüber der Generierung selbst vernachlässigbar, und sie deckt den Netzwechsel ab
+    // (localhost am Host vs. LAN-IP unterwegs) ohne Umkonfiguration.
+    const endpoint = await resolveActiveEndpoint(
+      llm.endpoints,
+      async (ep) => (await probeEndpoint(ep)).reachable,
+    );
     if (!endpoint) {
       new Notice(t("notice.noEndpoint"));
       return;

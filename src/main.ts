@@ -10,6 +10,7 @@ import { cast } from "./core/casting";
 import { buildReading } from "./core/reading";
 import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
+import { migrateEndpointList, stripLegacyLlmFields } from "./core/settings/migrate";
 import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {
@@ -24,6 +25,9 @@ import {
 import { OracleView, VIEW_TYPE_YIJING, type OracleHost } from "./obsidian/view";
 import { writeReading } from "./obsidian/reading-writer";
 import { nowStamp } from "./obsidian/clock";
+import { probeEndpoint } from "./obsidian/http";
+import { normalizeEndpoint } from "./vendor/kit/endpoint";
+import { type EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 
 export default class YijingOraclePlugin extends Plugin implements SettingsHost, OracleHost {
   // Basisklasse deklariert `settings?: unknown` (Obsidian ≥1.13) — hier auf den
@@ -37,6 +41,12 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
     this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
     // mergeSettings ist shallow — das llm-Objekt separat gegen neue Defaults auffüllen.
     this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
+    // Nach dem Spread steht in `endpoints` entweder noch der alte Textarea-String
+    // (Bestands-data.json bis 0.2.0) oder bereits string[]. migrateEndpointList nimmt beides.
+    this.settings.llm.endpoints = migrateEndpointList(this.settings.llm.endpoints);
+    // mergeSettings erhält unbekannte raw-Felder (Forward-Compat) → das alte `activeEndpoint`
+    // überlebt den Spread und würde als Leiche zurückgeschrieben. Explizit entfernen.
+    stripLegacyLlmFields(this.settings.llm);
     // mergeSettings ist shallow — auch das image-Objekt gegen neue Defaults auffüllen.
     this.settings.image = { ...DEFAULT_IMAGE_SETTINGS, ...(this.settings.image ?? {}) };
     this.settings.callouts = mergeCallouts(this.settings.callouts);
@@ -75,6 +85,12 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  /** SettingsHost: Per-Zeile-Probe für den Endpunkt-Editor. Injiziert, damit die
+   *  Settings-Schicht die Netz-Anbindung nicht selbst kennt. */
+  probeEndpoint(endpoint: string): Promise<EndpointStatus> {
+    return probeEndpoint(normalizeEndpoint(endpoint));
   }
 
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */
