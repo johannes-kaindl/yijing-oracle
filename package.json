@@ -1,6 +1,6 @@
 {
   "name": "yijing-oracle",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cast the I Ching in your vault — three-coin oracle with hexagram texts, readings saved as notes. Local-first, no cloud.",
   "type": "module",
   "scripts": {
