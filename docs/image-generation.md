@@ -28,8 +28,10 @@ Anything that speaks the A1111 (AUTOMATIC1111) web-UI API:
 3. **Enable the API server**: in Draw Things, open the settings and enable
    **API Server** (HTTP). Default is `127.0.0.1:7860` — keep that unless it
    collides with something else.
-4. **Configure the plugin**: Obsidian → Settings → Yijing Oracle →
-   *Image generation* → set **Image endpoint** to `http://127.0.0.1:7860`.
+4. **Configure the plugin**: Obsidian → Settings → Yijing Oracle → expand the
+   *Image generation* section → set **Image endpoint** to `http://127.0.0.1:7860`.
+   Hit **Test connection** — a green check means Draw Things is reachable; a red
+   cross explains what went wrong (server not running, wrong port, …).
 5. Cast a reading in the panel → a **Generate image** button appears below the
    AI-interpretation box.
 
@@ -78,7 +80,9 @@ not duplicate the attachment; regenerating and saving again attaches the new ima
 - **"Image generation failed: timeout after 180000 ms"** — generation took longer
   than 3 minutes; use a smaller size or a faster model.
 - **Failed instantly** — no server is listening on the endpoint. Start Draw Things
-  and check the API server toggle. Quick test in a terminal:
+  and check the API server toggle. Quickest check: **Test connection** in the
+  *Image generation* settings — it names the cause (refused, unknown host,
+  timeout). Equivalent in a terminal, if you prefer:
 
   ```bash
   curl -s http://127.0.0.1:7860/sdapi/v1/options >/dev/null && echo up || echo down
