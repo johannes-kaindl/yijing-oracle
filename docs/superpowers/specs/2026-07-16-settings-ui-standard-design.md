@@ -43,7 +43,8 @@ Entscheidungslogik wandert in pure, getestete Module; die Render-Schicht wird d�
 
 - `applyEndpointEdit(list, index, value) → string[]` — Zeile ändern / bei leerem Wert löschen /
   Add-Zeile anhängen.
-- `activeIndexFromStatuses(statuses) → number | null` — erster erreichbarer gewinnt.
+- `activeIndexFromStatuses(statuses) → number` — erster erreichbarer gewinnt; `-1` wenn keiner
+  erreichbar ist (`findIndex`-Semantik). `null` **in** der Eingabeliste heißt „noch nicht geprobt".
 - `statusKindKey(kind) → string` / `warnRuleKey(rule) → string` — Status bzw. Warn-Regel auf einen
   i18n-Key abbilden. `t()` selbst bleibt in der Render-Schicht (die Key-Ableitung ist pure).
 
