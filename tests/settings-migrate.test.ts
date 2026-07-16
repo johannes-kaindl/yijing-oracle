@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { migrateEndpointList } from "../src/core/settings/migrate";
+import { migrateEndpointList, stripLegacyLlmFields } from "../src/core/settings/migrate";
 
 describe("migrateEndpointList", () => {
   it("parst den alten Textarea-String zeilenweise (Bestands-data.json)", () => {
@@ -38,5 +38,33 @@ describe("migrateEndpointList", () => {
 
   it("liefert [] für eine leere Liste", () => {
     expect(migrateEndpointList([])).toEqual([]);
+  });
+});
+
+describe("stripLegacyLlmFields", () => {
+  it("entfernt das alte activeEndpoint-Feld", () => {
+    const llm = { endpoints: ["http://a:1"], activeEndpoint: "http://a:1", model: "m" };
+    stripLegacyLlmFields(llm);
+    expect(llm).toEqual({ endpoints: ["http://a:1"], model: "m" });
+  });
+
+  it("ist ein No-Op, wenn das Feld gar nicht da ist", () => {
+    const llm = { endpoints: ["http://a:1"] };
+    expect(stripLegacyLlmFields(llm)).toEqual({ endpoints: ["http://a:1"] });
+  });
+});
+
+describe("onload-Migrationskette (Bestands-data.json bis 0.2.0)", () => {
+  it("macht aus dem Textarea-String eine Liste und laesst keine Leiche zurueck", () => {
+    // Form einer echten 0.2.0-data.json (verifiziert gegen den yijing-oracle-smoke-Vault):
+    const raw = { llm: { endpoints: "http://localhost:1234", activeEndpoint: "http://localhost:1234", model: "qwen3" } };
+    // exakt die Kette aus main.ts onload:
+    const llm = { ...raw.llm } as Record<string, unknown>;
+    llm.endpoints = migrateEndpointList(llm.endpoints as string);
+    stripLegacyLlmFields(llm);
+
+    expect(llm.endpoints).toEqual(["http://localhost:1234"]);
+    expect(llm.activeEndpoint).toBeUndefined();
+    expect(llm.model).toBe("qwen3"); // uebrige Bestandswerte ueberleben
   });
 });

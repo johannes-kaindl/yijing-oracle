@@ -19,3 +19,17 @@ export function migrateEndpointList(raw: string | string[] | undefined): string[
   if (typeof raw === "string") return parseEndpointList(raw);
   return [];
 }
+
+/** Felder entfernen, die das aktuelle Schema nicht mehr kennt. **Mutiert** `llm` (es ist das
+ *  frisch gemergte Settings-Objekt, kein geteilter Zustand).
+ *
+ *  Nötig, weil `mergeSettings` unbekannte raw-Felder bewusst erhält (Forward-Compat) und der
+ *  `{...DEFAULT, ...raw}`-Spread in main.ts sie mitzieht: `activeEndpoint` überlebt die
+ *  Migration also und würde bei jedem `saveData` als Leiche zurückgeschrieben. Der TS-Typ
+ *  kennt es nicht mehr — es läge nur da und verwirrte beim nächsten Blick in die data.json.
+ *
+ *  @example stripLegacyLlmFields({ endpoints: [], activeEndpoint: "x" }) // → { endpoints: [] } */
+export function stripLegacyLlmFields<T extends object>(llm: T): T {
+  delete (llm as Record<string, unknown>).activeEndpoint;
+  return llm;
+}

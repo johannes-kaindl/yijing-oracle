@@ -139,9 +139,14 @@ this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
 this.settings.llm.endpoints = migrateEndpointList(this.settings.llm.endpoints);
 ```
 
-Der alte `endpoints`-String wird zeilenweise zur Liste; `activeEndpoint` wird ignoriert und
-verschwindet beim nächsten `saveData`. Bestehende `data.json` überleben lautlos, ohne Nutzeraktion.
-`DEFAULT_LLM_SETTINGS.endpoints` wird `["http://localhost:1234"]`.
+Der alte `endpoints`-String wird zeilenweise zur Liste. Bestehende `data.json` überleben lautlos,
+ohne Nutzeraktion. `DEFAULT_LLM_SETTINGS.endpoints` wird `["http://localhost:1234"]`.
+
+**`activeEndpoint` verschwindet nicht von selbst** (verifiziert gegen die echte `data.json` im
+`yijing-oracle-smoke`-Vault): `mergeSettings` erhält unbekannte raw-Felder bewusst
+(Forward-Compat), und der `{...DEFAULT_LLM_SETTINGS, ...raw.llm}`-Spread zieht sie mit. Das Feld
+überlebt die Migration also und würde bei jedem `saveData` als Leiche zurückgeschrieben — vom
+TS-Typ ungesehen. Deshalb entfernt `stripLegacyLlmFields(llm)` es explizit.
 
 ## KI-Sektion — Verhalten im Detail
 
