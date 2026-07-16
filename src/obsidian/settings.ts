@@ -292,39 +292,26 @@ export class SettingsTab extends PluginSettingTab {
   private renderLlmSettings(containerEl: HTMLElement, llm: LlmSettings): void {
     new Setting(containerEl).setName(t("set.llmHead")).setHeading();
 
-    // Endpunkte (Textarea, eine URL pro Zeile).
+    // Endpunkte (Textarea, eine URL pro Zeile). ZWISCHENSTAND: wird in Task 6 durch den
+    // Zeilen-Editor ersetzt; hier nur auf das neue string[]-Modell angepasst.
     new Setting(containerEl)
       .setName(t("set.llmEndpoints"))
       .setDesc(t("set.llmEndpointsDesc"))
       .addTextArea((ta) => {
-        ta.setPlaceholder("http://localhost:1234").setValue(llm.endpoints);
+        ta.setPlaceholder("http://localhost:1234").setValue(llm.endpoints.join("\n"));
         ta.inputEl.rows = 3;
         ta.onChange(async (v) => {
-          llm.endpoints = v;
-          const list = parseEndpointList(v);
-          if (list.length && !list.includes(llm.activeEndpoint)) llm.activeEndpoint = list[0];
+          llm.endpoints = parseEndpointList(v);
           await this.host.saveSettings();
         });
       });
 
-    // Aktiver Endpunkt + Test.
-    const endpoints = parseEndpointList(llm.endpoints);
+    const endpoints = llm.endpoints;
     new Setting(containerEl)
       .setName(t("set.llmActive"))
-      .addDropdown((d) => {
-        for (const ep of endpoints) d.addOption(ep, ep);
-        if (endpoints.length) {
-          d.setValue(endpoints.includes(llm.activeEndpoint) ? llm.activeEndpoint : endpoints[0]);
-        }
-        d.onChange(async (v) => {
-          llm.activeEndpoint = v;
-          await this.host.saveSettings();
-          this.display();
-        });
-      })
       .addButton((b) =>
         b.setButtonText(t("set.llmTest")).onClick(async () => {
-          const status = await probeEndpoint(normalizeEndpoint(llm.activeEndpoint));
+          const status = await probeEndpoint(normalizeEndpoint(endpoints[0] ?? ""));
           new Notice(status.klartext);
         }),
       );
@@ -341,7 +328,7 @@ export class SettingsTab extends PluginSettingTab {
 
     // Modell — Dropdown live aus listModels(), Fallback Textfeld.
     const modelSetting = new Setting(containerEl).setName(t("set.llmModel")).setDesc(t("set.llmModelDesc"));
-    void new ChatClient(llm.activeEndpoint, llm.model, httpGet).listModels().then(async (models) => {
+    void new ChatClient(llm.endpoints[0] ?? "", llm.model, httpGet).listModels().then(async (models) => {
       if (models.length) {
         // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
         // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.

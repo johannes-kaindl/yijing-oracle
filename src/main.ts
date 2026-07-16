@@ -10,6 +10,7 @@ import { cast } from "./core/casting";
 import { buildReading } from "./core/reading";
 import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
+import { migrateEndpointList } from "./core/settings/migrate";
 import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {
@@ -37,6 +38,10 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
     this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
     // mergeSettings ist shallow — das llm-Objekt separat gegen neue Defaults auffüllen.
     this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
+    // Nach dem Spread steht in `endpoints` entweder noch der alte Textarea-String
+    // (Bestands-data.json bis 0.2.0) oder bereits string[]. migrateEndpointList nimmt beides.
+    // Das alte `activeEndpoint` wird ignoriert und verschwindet beim nächsten saveData.
+    this.settings.llm.endpoints = migrateEndpointList(this.settings.llm.endpoints);
     // mergeSettings ist shallow — auch das image-Objekt gegen neue Defaults auffüllen.
     this.settings.image = { ...DEFAULT_IMAGE_SETTINGS, ...(this.settings.image ?? {}) };
     this.settings.callouts = mergeCallouts(this.settings.callouts);
