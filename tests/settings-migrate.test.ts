@@ -56,7 +56,7 @@ describe("stripLegacyLlmFields", () => {
 
 describe("onload-Migrationskette (Bestands-data.json bis 0.2.0)", () => {
   it("macht aus dem Textarea-String eine Liste und laesst keine Leiche zurueck", () => {
-    // Form einer echten 0.2.0-data.json (verifiziert gegen den yijing-oracle-smoke-Vault):
+    // Form einer echten 0.2.0-data.json (verifiziert gegen eine echte Bestands-data.json, 2026-07-16):
     const raw = { llm: { endpoints: "http://localhost:1234", activeEndpoint: "http://localhost:1234", model: "qwen3" } };
     // exakt die Kette aus main.ts onload:
     const llm = { ...raw.llm } as Record<string, unknown>;

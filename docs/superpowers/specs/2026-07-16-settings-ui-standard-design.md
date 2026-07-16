@@ -142,8 +142,7 @@ this.settings.llm.endpoints = migrateEndpointList(this.settings.llm.endpoints);
 Der alte `endpoints`-String wird zeilenweise zur Liste. Bestehende `data.json` überleben lautlos,
 ohne Nutzeraktion. `DEFAULT_LLM_SETTINGS.endpoints` wird `["http://localhost:1234"]`.
 
-**`activeEndpoint` verschwindet nicht von selbst** (verifiziert gegen die echte `data.json` im
-`yijing-oracle-smoke`-Vault): `mergeSettings` erhält unbekannte raw-Felder bewusst
+**`activeEndpoint` verschwindet nicht von selbst** (verifiziert gegen eine echte Bestands-`data.json`): `mergeSettings` erhält unbekannte raw-Felder bewusst
 (Forward-Compat), und der `{...DEFAULT_LLM_SETTINGS, ...raw.llm}`-Spread zieht sie mit. Das Feld
 überlebt die Migration also und würde bei jedem `saveData` als Leiche zurückgeschrieben — vom
 TS-Typ ungesehen. Deshalb entfernt `stripLegacyLlmFields(llm)` es explizit.
@@ -206,7 +205,7 @@ Klartext-Diagnose. Alles Weitere (Stil, Negativ-Prompt, Größe) bleibt unverän
 - Die Render-Schicht bleibt dünn genug, dass sie keinen DOM-Test braucht (`UI-STANDARD.md` §6).
 - Gate bleibt grün: `lint`, `typecheck`, `typecheck:test`, `test` (131 Tests + neue),
   `check:pure` (Pfad angepasst), `check:bundle`.
-- **GUI-Smoke im `yijing-oracle-smoke`-Vault ist Pflicht.** Begründung aus der eigenen Historie: der
+- **GUI-Smoke in Pallas ist Pflicht.** Begründung aus der eigenen Historie: der
   `effectiveModel`-Bug wurde von den Unit-Tests nicht gefangen, sondern vom Smoke (REGISTRY-Gotcha).
   Smoke-Punkte: Sektionen auf/zu + Zustand überlebt Tab-Neuöffnen · Zeile hinzufügen/löschen ·
   Preset-Klick · Status-Icons nach Probe · Warnung bei `0.0.0.0` · Modell-Dropdown + Kontextlänge ·

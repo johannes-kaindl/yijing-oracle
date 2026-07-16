@@ -1347,7 +1347,7 @@ Expected: alles grün, Testzahl ≥ 151 (131 vorher + 12 Editor-Modell + 8 Migra
 - [ ] **Step 2: Ins Smoke-Vault deployen**
 
 ```bash
-OBSIDIAN_PLUGIN_DIR="/Users/Shared/10_ObsidianVaults/yijing-oracle-smoke/.obsidian/plugins/yijing-oracle" npm run deploy
+OBSIDIAN_PLUGIN_DIR="/Users/Shared/10_ObsidianVaults/10_Pallas/.obsidian/plugins/yijing-oracle" npm run deploy
 ```
 
 - [ ] **Step 3: GUI-Smoke — Pflicht, nicht optional**
