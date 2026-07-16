@@ -6,6 +6,38 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Einklappbare Einstellungs-Sektionen**: die Einstellungen sind jetzt in fünf Bereiche
+  gegliedert (Allgemein · Notiz & Ablage · Notiz-Inhalt · KI-Deutung · Bildmeditation)
+  statt einer langen flachen Liste. „Allgemein" ist offen, der Rest eingeklappt; der
+  Auf-/Zu-Zustand wird gemerkt. Bedienbar auch per Tastatur (Enter/Leertaste).
+- **Endpunkt-Editor für die KI-Deutung**: eine Zeile je Endpunkt statt eines Textfelds —
+  mit Verbindungstest **pro Zeile** (grüner Haken / rotes X samt Klartext-Erklärung),
+  Ein-Klick-Buttons für LM Studio und Ollama, Papierkorb pro Zeile und nicht-blockierenden
+  Hinweisen bei zweifelhaften Adressen (fehlendes `http://`, Platzhalter-IP, fehlender Port).
+- **Kontextlänge des Modells** wird am Modell-Feld angezeigt, sofern der Server sie liefert
+  (LM Studio). Andernfalls entfällt die Anzeige stillschweigend.
+- **Verbindungstest für die Bildmeditation**: der Bild-Endpunkt ließ sich bisher gar nicht
+  prüfen.
+
+### Changed
+
+- **Der aktive KI-Endpunkt wird jetzt ermittelt statt ausgewählt**: das Dropdown „Aktiver
+  Endpunkt" entfällt — der erste erreichbare Endpunkt aus der Liste gewinnt, die
+  Reihenfolge ist damit die Priorität. Wer zwischen Netzen wechselt (localhost am Rechner,
+  LAN-IP unterwegs), muss nichts mehr umstellen. Bestehende Einstellungen werden beim
+  Update automatisch übernommen.
+- **„Wilhelms Fußnoten"** steht jetzt unter „Notiz-Inhalt" statt unter „Frontmatter".
+
+### Fixed
+
+- **Thinking-Schalter bei Modellen, die immer denken** (DeepSeek-R1 & Co.): der Schalter
+  zeigte „aus", obwohl die Einstellung dort wirkungslos ist. Er ist jetzt ausgegraut und
+  benennt den Grund.
+- **Endpunkt-Meldungen erscheinen in der eingestellten Sprache**: der Verbindungstest
+  antwortete bisher auch bei englischer Oberfläche auf Deutsch.
+
 ## [0.2.0] — 2026-07-15
 
 ## [0.1.1] — 2026-07-14
