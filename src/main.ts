@@ -25,6 +25,9 @@ import {
 import { OracleView, VIEW_TYPE_YIJING, type OracleHost } from "./obsidian/view";
 import { writeReading } from "./obsidian/reading-writer";
 import { nowStamp } from "./obsidian/clock";
+import { probeEndpoint } from "./obsidian/http";
+import { normalizeEndpoint } from "./vendor/kit/endpoint";
+import { type EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 
 export default class YijingOraclePlugin extends Plugin implements SettingsHost, OracleHost {
   // Basisklasse deklariert `settings?: unknown` (Obsidian ≥1.13) — hier auf den
@@ -80,6 +83,12 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+  }
+
+  /** SettingsHost: Per-Zeile-Probe für den Endpunkt-Editor. Injiziert, damit die
+   *  Settings-Schicht die Netz-Anbindung nicht selbst kennt. */
+  probeEndpoint(endpoint: string): Promise<EndpointStatus> {
+    return probeEndpoint(normalizeEndpoint(endpoint));
   }
 
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */
