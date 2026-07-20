@@ -33,7 +33,9 @@ export interface PluginSettings {
   callouts: CalloutConfig;
   /** Wilhelms Fußnoten als Anmerkungen-Abschnitt in die Note schreiben. */
   showNotes: boolean;
-  /** Auf-/Zu-Zustand der einklappbaren Settings-Sektionen, pro Sektions-Key. */
+  /** Legacy: Auf-/Zu-Zustand der früher einklappbaren Settings-Sektionen. Seit dem
+   *  Wegfall der Collapsibles (2026-07-20) liest den Wert kein Codepfad mehr; das Feld
+   *  bleibt, damit gespeicherte Konfigurationen ohne Migration laden. */
   uiCollapsed: Record<string, boolean>;
 }
 

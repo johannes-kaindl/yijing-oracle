@@ -1,8 +1,14 @@
-// Settings-Tab: fünf einklappbare Sektionen. Dünn — jede Sektion rendert in ihrer eigenen
+// Settings-Tab: fünf Sektionen. Dünn — jede Sektion rendert in ihrer eigenen
 // Datei, die Entscheidungslogik liegt pure in core/settings/.
-import { type App, type Plugin, PluginSettingTab } from "obsidian";
+//
+// Die Sektionen waren bis 2026-07-20 einklappbar (vendored kit-obsidian/collapsible).
+// Aufgegeben, weil einklappbare Sektionen und die deklarative Settings-API
+// (getSettingDefinitions, Obsidian 1.13+) sich ausschließen: SettingDefinitionGroup
+// kennt kein Collapse. Ohne Migration erscheinen die Einstellungen ab 1.13 nicht in
+// Obsidians Settings-Suche — die das Auffinden besser löst als Zuklappen. Sektionen
+// jetzt über setHeading() (PROF-OBS-06).
+import { type App, type Plugin, PluginSettingTab, Setting } from "obsidian";
 import { t } from "../../vendor/kit/i18n";
-import { collapsibleSection, type CollapsibleStorage } from "../../vendor/kit-obsidian/collapsible";
 import { type SettingsHost } from "../../core/settings";
 import {
   renderGeneralSection,
@@ -37,40 +43,18 @@ export class SettingsTab extends PluginSettingTab {
       },
     };
 
-    // Auf-/Zu-Zustand überlebt das Schließen des Tabs (das Kit ist storage-agnostisch —
-    // der Consumer verdrahtet die Persistenz selbst).
-    const storage: CollapsibleStorage = {
-      getCollapsed: (key) => this.host.settings.uiCollapsed[key],
-      setCollapsed: (key, collapsed) => {
-        this.host.settings.uiCollapsed[key] = collapsed;
-        void this.host.saveSettings();
-      },
+    /* Sektions-Überschrift; die Sektion rendert danach flach in denselben Container.
+       Vorher lieferte collapsibleSection() einen eigenen Body — die Render-Funktionen
+       nehmen unverändert ein HTMLElement entgegen, deshalb bleibt ihre Signatur gleich. */
+    const section = (title: string): HTMLElement => {
+      new Setting(containerEl).setName(title).setHeading();
+      return containerEl;
     };
 
-    renderGeneralSection(
-      collapsibleSection(containerEl, {
-        title: t("set.secGeneral"),
-        key: "general",
-        storage,
-        defaultCollapsed: false,
-      }),
-      ctx,
-    );
-    renderNoteStorageSection(
-      collapsibleSection(containerEl, { title: t("set.secNoteStorage"), key: "note-storage", storage }),
-      ctx,
-    );
-    renderNoteContentSection(
-      collapsibleSection(containerEl, { title: t("set.secNoteContent"), key: "note-content", storage }),
-      ctx,
-    );
-    renderLlmSection(
-      collapsibleSection(containerEl, { title: t("set.llmHead"), key: "llm", storage }),
-      ctx,
-    );
-    renderImageSection(
-      collapsibleSection(containerEl, { title: t("set.imgHead"), key: "image", storage }),
-      ctx,
-    );
+    renderGeneralSection(section(t("set.secGeneral")), ctx);
+    renderNoteStorageSection(section(t("set.secNoteStorage")), ctx);
+    renderNoteContentSection(section(t("set.secNoteContent")), ctx);
+    renderLlmSection(section(t("set.llmHead")), ctx);
+    renderImageSection(section(t("set.imgHead")), ctx);
   }
 }
