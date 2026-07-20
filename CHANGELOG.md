@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- **Settings sections no longer collapse.** They are all open now, separated by headings.
+  This is a trade: collapsible sections and Obsidian's settings **search** (1.13+) are
+  mutually exclusive, and search solves the underlying problem of a long page better — you
+  no longer need to know which section holds a setting, you type its name. Your stored
+  open/closed state is kept in the configuration and simply ignored.
+
 ## [0.3.0] — 2026-07-16
 
 ### Added
