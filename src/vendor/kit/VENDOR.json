@@ -1,0 +1,7 @@
+{
+  "source": "obsidian-kit",
+  "version": "0.16.0",
+  "sha": "92c60d5",
+  "vendored": "reasoning.ts, settings.ts, endpoint.ts, sse.ts, think.ts (als think-splitter.ts), model-context.ts",
+  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update. endpoint_diagnostics.ts und i18n.ts sind NICHT von dieser VENDOR.json abgedeckt — pin_find findet für beide keinen passenden Kit-Tag (echter Content-Drift über die Kommentar-Normalisierung hinaus), unverändert gelassen, siehe Task-10-Report."
+}
