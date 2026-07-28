@@ -2,6 +2,6 @@
   "source": "obsidian-kit",
   "version": "0.16.0",
   "sha": "92c60d5",
-  "vendored": "reasoning.ts, settings.ts, endpoint.ts, sse.ts, think.ts (als think-splitter.ts), model-context.ts",
-  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update. endpoint_diagnostics.ts und i18n.ts sind NICHT von dieser VENDOR.json abgedeckt — pin_find findet für beide keinen passenden Kit-Tag (echter Content-Drift über die Kommentar-Normalisierung hinaus), unverändert gelassen, siehe Task-10-Report."
+  "vendored": "reasoning.ts, settings.ts, endpoint.ts, sse.ts, think.ts (als think-splitter.ts), model-context.ts, endpoint_diagnostics.ts, i18n.ts",
+  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update. endpoint_diagnostics.ts und i18n.ts 2026-07-28 re-vendored (drift-audit): der Task-10-Content-Drift war rein kosmetisch (Formatter-Reformat + ein fehlender Inline-Kommentar), jetzt wieder byte-identisch zu 0.16.0."
 }

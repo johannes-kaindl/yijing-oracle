@@ -27,7 +27,10 @@ function hasModelListForm(body: unknown): boolean {
   return Array.isArray((body as { data?: unknown } | null | undefined)?.data);
 }
 
-/** Übersetzt ein Probe-Rohsignal in einen benannten Status + Klartext. */
+/** Übersetzt ein Probe-Rohsignal in einen benannten Status + Klartext.
+ *  Lesson (vault-crews): bei einer Response ERST die valide API-Form prüfen → "ok";
+ *  die Fehler-Klassifikation läuft nur auf dem Nicht-verwertbar-Pfad, nie über eine
+ *  legitime Antwort. */
 export function classifyEndpointStatus(input: ProbeInput): EndpointStatus {
   if (input.kind === "timeout") {
     return { reachable: false, kind: "timeout", klartext: KLARTEXT["timeout"] };
@@ -64,14 +67,16 @@ export interface EndpointWarning { rule: string; message: string; }
 
 const PLACEHOLDER_IP = [/^192\.0\.2\./, /^198\.51\.100\./, /^203\.0\.113\./];
 
-/** Nicht-blockierende Eingabe-Prüfung: gibt Hinweise, blockiert nie. */
+/** Nicht-blockierende Eingabe-Prüfung: gibt Hinweise, blockiert nie.
+ *  Bewusst OHNE Reachability-Raten und OHNE "falsches Subnetz" (das ist der legitime
+ *  LAN-Fallback-Fall). */
 export function validateEndpointInput(url: string): EndpointWarning[] {
   const warnings: EndpointWarning[] = [];
   const v = url.trim();
   if (!v) return warnings;
   if (!/^https?:\/\//i.test(v)) {
     warnings.push({ rule: "scheme", message: "Adresse braucht http:// oder https://" });
-    return warnings;
+    return warnings;   // ohne Schema lässt sich Host/Port nicht sinnvoll parsen
   }
   let host = "";
   let port = "";
