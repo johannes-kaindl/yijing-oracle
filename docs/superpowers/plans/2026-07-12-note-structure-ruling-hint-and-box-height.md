@@ -14,7 +14,7 @@
 - Nur Obsidian-Theme-CSS-Variablen, keine Hardcoded-Farbwerte (UI-STANDARD).
 - Ruling-Texte + Sektions-Labels hängen an der **Reading-Sprache**, nicht an der UI-Sprache (wie `render.ts`-`LABELS`).
 - Gate muss grün bleiben: `npm run gate` (= lint + typecheck + typecheck:test + test + check:pure + check:bundle).
-- `ruling.ts` ist ein Port: Regel-Ergebnisse müssen mit `/Users/Shared/code/yijing/web/ruling.js` übereinstimmen (Parity-Referenz).
+- `ruling.ts` ist ein Port: Regel-Ergebnisse müssen mit `web/ruling.js` im Schwester-Repo `yijing` (`../../yijing` relativ zu diesem Repo) übereinstimmen (Parity-Referenz).
 - Commit-Trailer: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`.
 
 ---
@@ -109,7 +109,7 @@ Expected: FAIL — `Cannot find module '../src/core/ruling'`.
 ```typescript
 // src/core/ruling.ts
 // Zhu-Xi-Linienregeln (Wilhelm/Baynes „Über die Befragung des Orakels").
-// Port von /Users/Shared/code/yijing/web/ruling.js — pure, KEIN obsidian-Import.
+// Port von web/ruling.js aus dem Schwester-Repo yijing — pure, KEIN obsidian-Import.
 // changingIndices: 0-basiert, Index 0 = unterste Linie. primaryNumber = King-Wen-Nr.
 import { type Lang } from "./data";
 import { type Reading } from "./reading";

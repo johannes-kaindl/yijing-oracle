@@ -27,7 +27,7 @@
 - Test: `tests/image-scene.test.ts`
 
 **Interfaces:**
-- Consumes: — (reiner Port von `/Users/Shared/code/yijing/web/image-scene.js`, dort NICHT ändern)
+- Consumes: — (reiner Port von `web/image-scene.js` aus dem Schwester-Repo `yijing`, dort NICHT ändern)
 - Produces: `hashString(s: string): number`, `moodFor(primaryNumber?: number): "dark"|"bright"|"neutral"`, `composeImageRequest(input: {primaryMotif: string; resultingMotif: string; question: string; primaryNumber?: number}): {scene: string; motif: string; motif2: string; modifier: string; mood: string}`, `buildSdPrompt(scene: string, styleSuffix: string): string`
 
 - [ ] **Step 1: Failing Test schreiben**
@@ -1150,7 +1150,7 @@ git commit -m "feat(panel): Bildmeditation — Button, Vorschau, Regenerate, Sav
 ### Task 8: Gate, Smoke-Verifikation, REGISTRY
 
 **Files:**
-- Modify: `/Users/Shared/code/obsidian-plugins/REGISTRY.md` (Dach-Repo, eigener Commit dort)
+- Modify: `../REGISTRY.md` (Dach-Repo, eigener Commit dort)
 - Smoke: Vault `yijing-oracle-smoke` (`.obsidian/plugins/yijing-oracle/`)
 
 - [ ] **Step 1: Volles Gate**
@@ -1172,7 +1172,7 @@ Build nach `yijing-oracle-smoke/.obsidian/plugins/yijing-oracle/` kopieren (main
 
 - [ ] **Step 3: REGISTRY-Einträge (Dach-Repo)**
 
-In `/Users/Shared/code/obsidian-plugins/REGISTRY.md`, Rubrik nach Katalog-Muster ergänzen:
+In `../REGISTRY.md` (Dach-Repo), Rubrik nach Katalog-Muster ergänzen:
 
 - „Bildgenerierung via A1111-kompatible API (txt2img, Base64-PNG, injizierter POST) → `yijing-oracle/src/obsidian/image-client.ts` → `Txt2ImgClient` (Kit-Kandidat, 1. Exemplar)"
 - „Deterministische Bild-Szenen-Komposition (Motiv+Mood+Frage-Hash) → `yijing-oracle/src/core/image-scene.ts` → `composeImageRequest`/`buildSdPrompt` (1. Exemplar; Quelle: yijing-Web-App)"
@@ -1180,13 +1180,13 @@ In `/Users/Shared/code/obsidian-plugins/REGISTRY.md`, Rubrik nach Katalog-Muster
 Commit im Dach-Repo:
 
 ```bash
-cd /Users/Shared/code/obsidian-plugins && git add REGISTRY.md && git commit -m "docs(registry): Txt2ImgClient + Bild-Szenen-Komposition (yijing-oracle)"
+cd .. && git add REGISTRY.md && git commit -m "docs(registry): Txt2ImgClient + Bild-Szenen-Komposition (yijing-oracle)"  # vom Repo-Root ins Dach-Repo
 ```
 
 - [ ] **Step 4: Plugin-Repo-Abschluss-Commit** (falls nach Smoke noch Fixes anfielen, sonst entfällt)
 
 ```bash
-cd /Users/Shared/code/obsidian-plugins/yijing-oracle && git status --short
+git status --short  # vom Repo-Root des Plugins
 ```
 
 Release (0.2.0) erst auf User-Zuruf: `npm run release 0.2.0`.

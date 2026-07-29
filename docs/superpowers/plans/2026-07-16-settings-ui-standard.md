@@ -18,7 +18,7 @@ einer 447-Zeilen-Klasse zum Verzeichnis `src/obsidian/settings/` mit dünnen, `c
 
 ## Global Constraints
 
-- **UI-STANDARD.md ist verbindlich** (Dach-Repo, `/Users/Shared/code/obsidian-plugins/UI-STANDARD.md`).
+- **UI-STANDARD.md ist verbindlich** (Dach-Repo, `../UI-STANDARD.md` relativ zum Repo-Root).
   Insbesondere: Sektionen via `setHeading()` (nie manuelles `<h2>`/`<h3>`), Sentence case für alle
   UI-Texte, DOM nur via `createEl`/`createDiv`/`createSpan` (nie `innerHTML`), nur
   Obsidian-Theme-Variablen (keine `#…`/`rgb()`), kein `!important`, Klassen-Präfix `yijing-`.
@@ -88,7 +88,7 @@ brechen. Das Kit trennt intern `src/pure/` von `src/obsidian/`; die Vendor-Ablag
 - [ ] **Step 1: Kit-Module kopieren**
 
 ```bash
-cd /Users/Shared/code/obsidian-plugins/yijing-oracle
+# vom Repo-Root (yijing-oracle) aus:
 mkdir -p src/vendor/kit-obsidian
 cp ../obsidian-kit/src/obsidian/collapsible.ts src/vendor/kit-obsidian/collapsible.ts
 cp ../obsidian-kit/src/pure/model-context.ts src/vendor/kit/model-context.ts
@@ -1337,7 +1337,7 @@ LLM-Server, fuer :7860 falsch."
 
 **Files:**
 - Modify: `docs/image-generation.md` (falls der Settings-Pfad dort beschrieben ist)
-- Modify: `/Users/Shared/code/obsidian-plugins/REGISTRY.md`
+- Modify: `../REGISTRY.md` (Dach-Repo)
 
 - [ ] **Step 1: Volles Gate**
 
@@ -1347,7 +1347,7 @@ Expected: alles grün, Testzahl ≥ 151 (131 vorher + 12 Editor-Modell + 8 Migra
 - [ ] **Step 2: Ins Smoke-Vault deployen**
 
 ```bash
-OBSIDIAN_PLUGIN_DIR="/Users/Shared/10_ObsidianVaults/10_Pallas/.obsidian/plugins/yijing-oracle" npm run deploy
+OBSIDIAN_PLUGIN_DIR="$VAULT/.obsidian/plugins/yijing-oracle" npm run deploy
 ```
 
 - [ ] **Step 3: GUI-Smoke — Pflicht, nicht optional**
@@ -1371,7 +1371,7 @@ Abzuhaken:
 
 - [ ] **Step 4: REGISTRY-Nachträge im Dach-Repo**
 
-In `/Users/Shared/code/obsidian-plugins/REGISTRY.md`:
+In `../REGISTRY.md` (Dach-Repo):
 - Zeilen-Editor-Zeile: yijing als 2. Exemplar des crews-Schnitts ergänzen; „n=3 byte-nah" auf den
   differenzierten Befund korrigieren (vault-rag/image-to-markdown sind Copy-Paste voneinander,
   vault-crews ist ein eigener Schnitt) und die neun Generalisierungsfragen als Vorbedingung der

@@ -16,7 +16,7 @@ Drei zusammenhängende Beobachtungen aus dem Smoke-Test:
    Bildschirmrand hinaus.
 
 2. **Der klassische „maßgeblich"-Hinweis fehlt.** Die Web-App
-   (`/Users/Shared/code/yijing`) besitzt in `web/ruling.js` die reine
+   (Schwester-Repo `yijing`, `../../yijing`) besitzt in `web/ruling.js` die reine
    Zhu-Xi-Linienregel-Logik (`rulingText`) plus fertige DE/EN-Texte in
    `web/i18n.js` (`ruling.*`). Sie sagt je nach Anzahl wandelnder Linien, welcher
    Text maßgeblich ist (Ursprungs-Urteil / eine bestimmte Linie / Zielbild-Urteil

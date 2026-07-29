@@ -5,7 +5,7 @@
 ## 1. Kontext & Zielbild
 
 Das Plugin bringt das I-Ching-/Yijing-Orakel aus dem bestehenden Web-Projekt
-(`/Users/Shared/code/yijing` — Vanilla-JS-Static-Site + native Apps) **nativ nach
+(Schwester-Repo `yijing`, `../../yijing` — Vanilla-JS-Static-Site + native Apps) **nativ nach
 Obsidian**. Der eigentliche Mehrwert gegenüber der Web-App: **Befragungen werden
 Vault-Notes statt localStorage** — durchsuchbar, verlinkbar, Teil des Denkens.
 

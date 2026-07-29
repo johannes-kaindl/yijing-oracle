@@ -912,7 +912,7 @@ if (input.interpretation) {
 **Files:** keine (Verifikation)
 
 - [ ] **Step 1: Voll-Gate** — `npm run gate` → Expected: lint · typecheck · typecheck:test · test · check:pure · check:bundle alle grün. Fehler beheben, bis grün.
-- [ ] **Step 2: Deploy in Smoke-Vault** — `OBSIDIAN_PLUGIN_DIR="/Users/Shared/10_ObsidianVaults/yijing-oracle-smoke/.obsidian/plugins/yijing-oracle" npm run deploy`.
+- [ ] **Step 2: Deploy in Smoke-Vault** — `OBSIDIAN_PLUGIN_DIR="<smoke-vault>/.obsidian/plugins/yijing-oracle" npm run deploy` (`<smoke-vault>` = Pfad zum Smoke-Test-Vault `yijing-oracle-smoke`).
 - [ ] **Step 3: Manuelle Verifikation** (Handover-Note im Smoke-Vault-Root aktualisieren): Panel öffnen → werfen → „Deutung erzeugen" gegen lokalen Endpunkt (OpenClaw/LM Studio) → Live-Stream sichtbar (Antwort + Reasoning-`<details>`) → „Deutung speichern" → Note enthält `## KI-Deutung` als ersten Abschnitt mit geschlossenem `> [!note]- Denkprozess`-Callout → erneut deuten → idempotenter Ersatz (kein Duplikat). Settings: Endpunkt testen, Modelle laden, Reasoning-Modi durchschalten.
 - [ ] **Step 4: Commit** (falls Fixes) — `git add -A && git commit -m "chore(llm): Gate grün + Smoke-Verifikation"`
 
