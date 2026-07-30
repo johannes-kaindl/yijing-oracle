@@ -1,7 +1,7 @@
 # Yijing Oracle
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://codeberg.org/jkaindl/yijing-oracle/src/branch/main/LICENSE)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/yijing-oracle?gitea_url=https%3A%2F%2Fcodeberg.org&label=release)](https://codeberg.org/jkaindl/yijing-oracle/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://git.jkaindl.de/jkaindl/yijing-oracle/src/branch/main/LICENSE)
+[![Release](https://img.shields.io/gitea/v/release/jkaindl/yijing-oracle?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/yijing-oracle/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20desktop%20%26%20mobile-7c3aed)
 
 Cast the *I Ching* (Yijing) inside Obsidian. A three-coin oracle with the classic
@@ -9,7 +9,7 @@ Richard Wilhelm hexagram texts — and every reading is saved as a **vault note*
 searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 
 > Native Obsidian re-implementation of the oracle core from the
-> [Yijing web/app project](https://codeberg.org/jkaindl/Yijing). Not a port of the
+> [Yijing web/app project](https://git.jkaindl.de/jkaindl/Yijing). Not a port of the
 > whole thing — a focused plugin where the vault is the oracle journal.
 
 ## Features
@@ -57,14 +57,14 @@ Search for **Yijing Oracle** in **Settings → Community plugins → Browse**, t
 ### Manual
 
 Download `main.js`, `manifest.json` and `styles.css` from the
-[latest release](https://codeberg.org/jkaindl/yijing-oracle/releases) and place them in
+[latest release](https://git.jkaindl.de/jkaindl/yijing-oracle/releases) and place them in
 `<vault>/.obsidian/plugins/yijing-oracle/`, then enable the plugin under
 **Settings → Community plugins**.
 
 ### From source
 
 ```bash
-git clone https://codeberg.org/jkaindl/yijing-oracle
+git clone https://git.jkaindl.de/jkaindl/yijing-oracle
 cd yijing-oracle
 npm install
 npm run build   # produces main.js

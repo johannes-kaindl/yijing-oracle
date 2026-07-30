@@ -30,11 +30,11 @@
   "license": "AGPL-3.0-or-later",
   "repository": {
     "type": "git",
-    "url": "git+https://codeberg.org/jkaindl/yijing-oracle.git"
+    "url": "git+https://git.jkaindl.de/jkaindl/yijing-oracle.git"
   },
-  "homepage": "https://codeberg.org/jkaindl/yijing-oracle",
+  "homepage": "https://git.jkaindl.de/jkaindl/yijing-oracle",
   "bugs": {
-    "url": "https://codeberg.org/jkaindl/yijing-oracle/issues"
+    "url": "https://git.jkaindl.de/jkaindl/yijing-oracle/issues"
   },
   "devDependencies": {
     "@types/node": "^20",
