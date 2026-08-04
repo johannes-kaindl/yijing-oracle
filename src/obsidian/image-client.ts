@@ -1,23 +1,12 @@
 // A1111-kompatibler txt2img-Client (Draw Things, A1111, Forge, SD.Next).
 // HTTP wird injiziert (httpPostJson aus http.ts) — obsidian-frei + in Node testbar,
-// Muster wie ChatClient. ComfyUI käme später als zweite ImageBackend-Implementierung.
+// Muster wie ChatClient. Der Vertrag selbst liegt in core/image-backend.ts, damit ihn
+// beide Backends (hier und core/comfy/client.ts) aus der pure-Schicht beziehen.
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
+import { type HttpPostJson, type ImageBackend, type ImageRequest } from "../core/image-backend";
 
-export type HttpPostJson = (url: string, body: unknown) => Promise<{ status: number; json: unknown }>;
-
-export interface ImageRequest {
-  prompt: string;
-  negativePrompt: string;
-  width: number;
-  height: number;
-  steps: number;
-  seed: number;
-}
-
-export interface ImageBackend {
-  /** Liefert das Bild als Base64-PNG; wirft Error mit Klartext bei Fehlschlag. */
-  generate(req: ImageRequest): Promise<string>;
-}
+// Wiederausgang: hält die bestehenden Import-Pfade (view.ts) gültig.
+export { type HttpPostJson, type ImageBackend, type ImageRequest };
 
 export class Txt2ImgClient implements ImageBackend {
   constructor(
@@ -32,8 +21,9 @@ export class Txt2ImgClient implements ImageBackend {
       negative_prompt: req.negativePrompt,
       width: req.width,
       height: req.height,
-      steps: req.steps,
       seed: req.seed,
+      // steps === null → Feld weglassen, damit der Server seinen eigenen Default nimmt.
+      ...(req.steps === null ? {} : { steps: req.steps }),
     });
     if (status !== 200) throw new Error(`txt2img HTTP ${status}`);
     const images = (json as { images?: unknown })?.images;
