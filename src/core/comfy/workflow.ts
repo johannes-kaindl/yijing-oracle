@@ -93,3 +93,36 @@ export function inspectWorkflow(graph: unknown): InspectResult {
     },
   };
 }
+
+export interface PatchValues {
+  prompt: string;
+  negativePrompt: string;
+  seed: number;
+  /** null = Steps aus dem Workflow übernehmen. */
+  steps: number | null;
+  width: number;
+  height: number;
+}
+
+/** Setzt die Reading-Werte in eine **Kopie** des Graphen. Alles, was nicht in `slots`
+ *  benannt ist, bleibt unverändert — Sampler-Name, Scheduler, CFG, LoRAs und Upscaler
+ *  gehören dem Nutzer und sind bewusst nicht konfigurierbar. */
+export function patchWorkflow(graph: ComfyGraph, slots: WorkflowSlots, v: PatchValues): ComfyGraph {
+  const out = JSON.parse(JSON.stringify(graph)) as ComfyGraph;
+
+  out[slots.positive].inputs.text = v.prompt;
+  out[slots.negative].inputs.text = v.negativePrompt;
+  out[slots.sampler].inputs[slots.seedField] = v.seed;
+
+  if (v.steps !== null && slots.stepsField !== null) {
+    out[slots.sampler].inputs[slots.stepsField] = v.steps;
+  }
+
+  // Nicht jeder Latent-Node hat Maße (LatentFromBatch, LatentUpscale mit Verweis).
+  // Ein blind gesetztes width/height legte dort ein totes Feld an.
+  const latent = out[slots.latent].inputs;
+  if ("width" in latent) latent.width = v.width;
+  if ("height" in latent) latent.height = v.height;
+
+  return out;
+}
