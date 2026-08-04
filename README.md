@@ -98,7 +98,7 @@ Two commands skip the panel entirely and cast straight away:
 
 ## Configuration
 
-**Settings → Yijing Oracle**, grouped into five collapsible sections:
+**Settings → Yijing Oracle**, grouped into five sections:
 
 | Section | What's in it |
 |---|---|
@@ -106,7 +106,7 @@ Two commands skip the panel entirely and cast straight away:
 | **Note & storage** | Readings folder, filename scheme (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), open-after-save. |
 | **Note content** | Frontmatter on/off plus a renameable key per field, Wilhelm's footnotes, per-section callout wrapping. |
 | **AI interpretation** | Endpoints, model, API key, system prompt (built-in templates or your own), thinking behaviour. |
-| **Image generation** | Image endpoint, style suffix, negative prompt, size. See the [setup guide](docs/image-generation.md). |
+| **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](docs/image-generation.md). |
 
 **On endpoints:** list them one per line — the **first reachable one wins**, so the
 order is the priority. That way one config covers every network (localhost at your
