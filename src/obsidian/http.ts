@@ -1,9 +1,10 @@
 // Einziger Netz-Helfer über Obsidians `requestUrl` (CORS-frei, mobil-tauglich) — kapselt den
 // obsidian-Import, damit ChatClient obsidian-frei + in Node testbar bleibt. Streaming (SSE) geht
 // bewusst über XHR (streamSSE); requestUrl kann nicht streamen.
-import { requestUrl } from "obsidian";
+import { arrayBufferToBase64, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { parseLmStudioContext, type ModelContext } from "../vendor/kit/model-context";
+import { type ComfyTransport } from "../core/comfy/client";
 
 /** Passt zu `HttpGet` in chat-client.ts. */
 export async function httpGet(url: string): Promise<{ status: number; json: unknown }> {
@@ -77,13 +78,25 @@ export async function fetchModelContext(baseUrl: string, model: string): Promise
 }
 
 /** Erreichbarkeits-Probe für einen A1111-/Draw-Things-kompatiblen Bild-Server
- *  (GET <base>/sdapi/v1/options — der Standard-Statusendpunkt dieser API). Eigener Timeout via
- *  Promise.race, weil requestUrl weder timeout noch Abort kennt.
- *  Nicht probeEndpoint wiederverwendbar: das prüft /v1/models und ist LLM-spezifisch.
- *  classifyEndpointStatus prüft bei 200 auf die OpenAI-Modell-Listenform, die ein Bild-Server
- *  nicht hat — deshalb wird 200 hier direkt als ok gewertet und nur der Fehlerpfad klassifiziert. */
+ *  (GET <base>/sdapi/v1/options — der Standard-Statusendpunkt dieser API).
+ *  Nicht probeEndpoint wiederverwendbar: das prüft /v1/models und ist LLM-spezifisch. */
 export async function probeImageEndpoint(baseUrl: string, timeoutMs = 5000): Promise<EndpointStatus> {
-  const url = `${baseUrl}/sdapi/v1/options`;
+  return probeStatusUrl(`${baseUrl}/sdapi/v1/options`, timeoutMs);
+}
+
+/** Erreichbarkeits-Probe für ComfyUI (GET <base>/system_stats — der Endpunkt, der auch
+ *  Version und Gerät meldet). Zweites Exemplar derselben Bauart wie probeImageEndpoint:
+ *  200 direkt als ok werten, nur den Fehlerpfad klassifizieren. */
+export async function probeComfyEndpoint(baseUrl: string, timeoutMs = 5000): Promise<EndpointStatus> {
+  return probeStatusUrl(`${baseUrl}/system_stats`, timeoutMs);
+}
+
+/** Gemeinsamer Kern beider Bild-Backend-Proben: ein Status-Endpunkt, der bei Erfolg
+ *  schlicht 200 liefert. classifyEndpointStatus prüft im 200-Zweig auf die
+ *  OpenAI-Modell-Listenform, die ein Bild-Server nicht hat — deshalb wird 200 hier direkt
+ *  als ok gewertet. Eigener Timeout via Promise.race, weil requestUrl weder timeout noch
+ *  Abort kennt. */
+async function probeStatusUrl(url: string, timeoutMs: number): Promise<EndpointStatus> {
   let timer: number | undefined;
   const timeout = new Promise<"__timeout__">((resolve) => {
     timer = window.setTimeout(() => resolve("__timeout__"), timeoutMs);
@@ -102,4 +115,39 @@ export async function probeImageEndpoint(baseUrl: string, timeoutMs = 5000): Pro
   } finally {
     if (timer) window.clearTimeout(timer);
   }
+}
+
+/** GET, das rohe Bytes als Base64 liefert. ComfyUIs /view gibt PNG-Bytes zurück, nicht
+ *  Base64-im-JSON wie A1111 — die Konvertierung passiert hier, damit der Kern
+ *  obsidian-frei bleibt. Eigener Timeout via Promise.race (requestUrl kennt keinen). */
+export async function httpGetBase64(url: string, timeoutMs = 120000): Promise<{ status: number; base64: string }> {
+  let timer: number | undefined;
+  const timeout = new Promise<"__timeout__">((resolve) => {
+    timer = window.setTimeout(() => resolve("__timeout__"), timeoutMs);
+  });
+  try {
+    const raced = await Promise.race([
+      requestUrl({ url, throw: false }).then((r) => ({
+        status: r.status,
+        base64: r.status === 200 ? arrayBufferToBase64(r.arrayBuffer) : "",
+      })),
+      timeout,
+    ]);
+    if (raced === "__timeout__") throw new Error(`timeout after ${timeoutMs} ms`);
+    return raced;
+  } finally {
+    if (timer) window.clearTimeout(timer);
+  }
+}
+
+/** Fertig verdrahteter Transport für ComfyClient — bündelt die vier Netzwege plus
+ *  Uhr und Warten, damit der pure Client nichts davon selbst kennen muss. */
+export function comfyTransport(): ComfyTransport {
+  return {
+    postJson: (url, body) => httpPostJson(url, body),
+    getJson: (url) => httpGet(url),
+    getBase64: (url) => httpGetBase64(url),
+    sleep: (ms) => new Promise((r) => window.setTimeout(r, ms)),
+    now: () => Date.now(),
+  };
 }
