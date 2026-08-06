@@ -1,7 +1,7 @@
 name: Release
 
 # Baut das Plugin, attestiert die Assets und veröffentlicht ein GitHub-Release.
-# Läuft auf der GitHub-Seite (Mirror von Codeberg) bei einem SemVer-Tag (ohne v) oder manuell.
+# Läuft auf der GitHub-Seite (Mirror von Forgejo (git.jkaindl.de)) bei einem SemVer-Tag (ohne v) oder manuell.
 on:
   push:
     tags:
