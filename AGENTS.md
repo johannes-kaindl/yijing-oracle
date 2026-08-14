@@ -12,8 +12,8 @@ Orientierung für KI-Agenten (Claude Code, Codex, …) und Mitwirkende an diesem
 
 Obsidian-Plugin `yijing-oracle` (Autor: Johannes Kaindl): Drei-Münzen-I-Ging-Orakel im Vault —
 Hexagramm-Texte nach Richard Wilhelm (DE + EN), jede Befragung wird eine durchsuchbare Vault-Note.
-Local-first, optional KI-Deutung und Meditationsbild über lokale Server (OpenAI- bzw.
-A1111-kompatibel). Native Re-Implementierung des Orakel-Kerns der Yijing-Web-App
+Local-first, optional KI-Deutung und Meditationsbild über lokale Server (OpenAI-kompatibel für die
+Deutung; für das Bild wahlweise A1111-kompatibel oder ComfyUI mit eigenem Workflow-JSON). Native Re-Implementierung des Orakel-Kerns der Yijing-Web-App
 (Schwester-Repo `yijing`) — kein Port. Nicht mit der Top-Level-Web-App verwechseln:
 dies ist das Plugin.
 

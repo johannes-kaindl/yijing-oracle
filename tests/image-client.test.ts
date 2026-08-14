@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { Txt2ImgClient, type ImageRequest } from "../src/obsidian/image-client";
+import { Txt2ImgClient } from "../src/obsidian/image-client";
+import { type ImageRequest } from "../src/core/image-backend";
 
 const REQ: ImageRequest = { prompt: "a lake", negativePrompt: "text", width: 768, height: 768, steps: 28, seed: 42 };
 
@@ -22,6 +23,12 @@ describe("Txt2ImgClient", () => {
     expect(calls[0].body).toEqual({
       prompt: "a lake", negative_prompt: "text", width: 768, height: 768, steps: 28, seed: 42,
     });
+  });
+
+  it("lässt steps im Body weg, wenn null (Server-Default gewinnt)", async () => {
+    const { post, calls } = fakePost(200, { images: ["QkFTRTY0"] });
+    await new Txt2ImgClient("http://x", post).generate({ ...REQ, steps: null });
+    expect(calls[0].body).not.toHaveProperty("steps");
   });
 
   it("wirft bei non-200", async () => {

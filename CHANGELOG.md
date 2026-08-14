@@ -6,6 +6,26 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **ComfyUI as a second image backend.** The image section now has a backend choice. For
+  ComfyUI you paste a workflow exported from the app (Workflow → Export (API)); the plugin
+  inserts prompt, negative prompt, seed, steps and size into it and leaves everything else
+  alone — sampler, scheduler, CFG, LoRAs and upscalers stay yours. It finds the insertion
+  points by following the graph's own node links, so structurally different workflows
+  (SDXL, Flux, Z-Image Turbo) work with the same code. The settings show which nodes were
+  detected, so an unusable workflow fails while you set it up rather than after minutes of
+  waiting. Progress is reported live over a WebSocket.
+- **Steps setting for A1111** — previously hardcoded to 28. For ComfyUI it is an optional
+  override; left empty, the value from your workflow wins.
+
+### Fixed
+
+- **`check:pure` never checked anything.** The gate searched for `from 'obsidian'` with
+  single quotes while the entire codebase uses double quotes, so it could not produce a
+  match; it also passed when a scanned directory was missing. Replaced with the script
+  version used across the sibling plugins.
+
 ### Changed
 - **Settings sections no longer collapse.** They are all open now, separated by headings.
   This is a trade: collapsible sections and Obsidian's settings **search** (1.13+) are

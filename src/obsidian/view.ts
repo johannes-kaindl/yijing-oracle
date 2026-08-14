@@ -26,8 +26,10 @@ import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
 import { ChatClient } from "./chat-client";
 import { Txt2ImgClient } from "./image-client";
-import { httpGet, httpPostJson, probeEndpoint } from "./http";
-import { resolveActiveEndpoint } from "../vendor/kit/endpoint";
+import { ComfyClient } from "../core/comfy/client";
+import { ComfyProgressSocket } from "./comfy-progress";
+import { comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
+import { normalizeEndpoint, resolveActiveEndpoint } from "../vendor/kit/endpoint";
 import { nowStamp } from "./clock";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
@@ -76,6 +78,9 @@ export class OracleView extends ItemView {
   private abortCtrl: AbortController | null = null;
   private answerEl: HTMLElement | null = null;
   private reasoningEl: HTMLElement | null = null;
+  /** Fortschritt der laufenden Bildgenerierung (nur ComfyUI liefert Schritt-Meldungen). */
+  private imageProgress: { value: number; max: number } | null = null;
+  private imageProgressEl: HTMLElement | null = null;
   /** Klapp-Zustände der Kästen (überleben Re-Render). */
   private readingOpen = true;
   private interpretationOpen = true;
@@ -311,7 +316,8 @@ export class OracleView extends ItemView {
     const area = box.createDiv({ cls: "yijing-artwork-inner" });
 
     if (this.generatingImage) {
-      area.createEl("p", { text: t("view.generatingImage"), cls: "yijing-empty" });
+      this.imageProgressEl = area.createEl("p", { text: t("view.generatingImage"), cls: "yijing-empty" });
+      this.updateImageProgressDom();
       return;
     }
 
@@ -421,25 +427,74 @@ export class OracleView extends ItemView {
     });
 
     this.generatingImage = true;
+    this.imageProgress = null;
     await this.render();
+
+    const prompt = buildSdPrompt(scene, img.styleSuffix);
+    // Default-Seed = Frage-Hash → gleiche Frage reproduziert dasselbe Bild.
+    const seedValue = seed ?? hashString(c.question);
+    let socket: ComfyProgressSocket | null = null;
+
     try {
-      const png = await new Txt2ImgClient(endpoint, httpPostJson).generate({
-        prompt: buildSdPrompt(scene, img.styleSuffix),
-        negativePrompt: img.negativePrompt,
-        width: img.size,
-        height: img.size,
-        steps: 28,
-        // Default-Seed = Frage-Hash → gleiche Frage reproduziert dasselbe Bild.
-        seed: seed ?? hashString(c.question),
-      });
+      let png: string;
+
+      if (img.backend === "comfyui") {
+        // EIN client_id für beide Kanäle: der Socket bekommt nur dann Events zu diesem
+        // Lauf, wenn /prompt dieselbe ID trägt. Zwei getrennt erzeugte IDs wären ein
+        // stiller Fehler — das Bild käme, der Balken bliebe für immer bei 0 %.
+        const clientId = crypto.randomUUID();
+        const client = new ComfyClient(endpoint, img.comfyWorkflow, comfyTransport(), {
+          clientId,
+          onProgress: (p) => {
+            this.imageProgress = p;
+            this.updateImageProgressDom();
+          },
+        });
+        socket = new ComfyProgressSocket(normalizeEndpoint(endpoint), clientId, (p) =>
+          client.reportProgress(p),
+        );
+        socket.open();
+
+        png = await client.generate({
+          prompt,
+          negativePrompt: img.negativePrompt,
+          width: img.size,
+          height: img.size,
+          steps: img.comfyStepsOverride,
+          seed: seedValue,
+        });
+      } else {
+        png = await new Txt2ImgClient(endpoint, httpPostJson).generate({
+          prompt,
+          negativePrompt: img.negativePrompt,
+          width: img.size,
+          height: img.size,
+          steps: img.steps,
+          seed: seedValue,
+        });
+      }
+
       c.artwork = { pngBase64: png, scene, saved: false };
     } catch (e) {
       new Notice(t("notice.imageError", String((e as Error)?.message ?? e)));
       console.error("[yijing-oracle]", e);
     } finally {
+      socket?.close();
       this.generatingImage = false;
+      this.imageProgress = null;
+      this.imageProgressEl = null;
       await this.render();
     }
+  }
+
+  /** Fortschritt ohne vollständigen Re-Render (kein Flackern), Muster wie updateStreamDom.
+   *  Ohne Fortschrittsdaten bleibt der ursprüngliche Text stehen — der WebSocket kann
+   *  ausfallen, dann läuft die Generierung mit unbestimmter Anzeige weiter. */
+  private updateImageProgressDom(): void {
+    if (!this.imageProgressEl) return;
+    const p = this.imageProgress;
+    if (!p) return;
+    this.imageProgressEl.setText(t("view.imageProgress", String(p.value), String(p.max)));
   }
 
   /** Leichtes Live-Update der Stream-Container ohne vollständigen Re-Render (kein Flackern). */
