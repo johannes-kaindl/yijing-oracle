@@ -4,6 +4,8 @@
 [![Release](https://img.shields.io/gitea/v/release/jkaindl/yijing-oracle?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/yijing-oracle/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20desktop%20%26%20mobile-7c3aed)
 
+*Auch auf Deutsch verfügbar: [`README.de.md`](README.de.md).*
+
 Cast the *I Ching* (Yijing) inside Obsidian. A three-coin oracle with the classic
 Richard Wilhelm hexagram texts — and every reading is saved as a **vault note**:
 searchable, linkable, part of your thinking. Local-first, no cloud, no account.
