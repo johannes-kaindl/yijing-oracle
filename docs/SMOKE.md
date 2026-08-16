@@ -52,7 +52,7 @@ Deshalb:
 | C1–C7 | Einstellungen-Tab öffnet · A1111-Felder · Umschalten tauscht sie · gültiger Workflow wird erkannt (4 Node-IDs) · kaputtes JSON meldet einen Fehler · leeres Feld schweigt · Zurückschalten stellt wieder her | 3, 6, 9 |
 | D1–D5 | Bild-Kasten erscheint · Generieren startet · PNG kommt an · Anzeige zeigt Fortschritt **oder nennt seinen Grund** · Szenen-Satz steht darunter | 4, 7 |
 | E1–E3 | Speichern legt genau eine Notiz an · Notiz trägt den Text · Bild liegt als Anhang und ist eingebettet | 8 |
-| F1–F4 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** | — (neu mit 0.5.0) |
+| F1–F5 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur | — (neu mit 0.5.0) |
 
 **Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen, ob sich das Panel
 flüssig anfühlt, und der Export eines zweiten Workflows aus ComfyUI (Schritte 5, 10, 11 der
@@ -114,6 +114,15 @@ und alle drei Fallstricke der Umstellung sind **stille**:
    (`defs[0].items[0].name`), nicht aus einer festen Zeichenkette — sonst misst der Treiber
    die UI-Sprache.
 
+**F5 misst den anderen Pfad — und fand sofort etwas.** Unter 1.13 ruft der Host `display()`
+nie, der Fallback für ältere Versionen liefe also ungeprüft mit; ein direkter Aufruf zeichnet
+ihn in denselben Container. Der erste Lauf meldete 48 gegen 49 Zeilen. Ursache: eine
+**Definition ohne Namen und ohne Control** (die Erklärzeile über den Callouts, nur `desc`)
+wird vom nativen 1.13-Renderer **stillschweigend übersprungen**, während der Fallback-Walker
+sie zeichnet. Das war ein echter Regress gegenüber 0.4.0 — behoben in 0.5.1, indem die Zeile
+eine `render`-Hatch wurde, die beide Pfade zeichnen. **Merksatz: eine Zeile ohne Regler
+braucht im deklarativen Modell trotzdem einen Renderer.**
+
 **Die Gegenprobe, die den Umbau rechtfertigt** (2026-08-16, gegen dieselbe laufende Instanz,
 0.4.0 aus git deployt und wieder zurück):
 
@@ -135,6 +144,7 @@ Hauptfenster, das DOM im zweiten.
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
 |---|---|---|---|
+| 2026-08-16 (3) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **33/33** | ✅ F5 hatte im ersten Lauf einen echten Befund (48 ≠ 49 Zeilen, s. oben) — nach dem Fix beide Pfade 49 |
 | 2026-08-16 (2) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **32/32** | ✅ Vorher-Messung gegen den 0.4.0-Stand: `settingItems` 0 statt 7, 0 Suchtreffer statt 1 (Tabelle oben). F4 zusätzlich gegen einen Unsinns-Begriff: 0 Treffer |
 | 2026-08-16 | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **28/28** | ✅ zwei Defekte künstlich eingebaut, jeweils genau die erwarteten Punkte rot: Ausfall-Meldung ausgebaut → **27/28** (nur D4, mit dem historischen Symptom im Text); `image`-Defaults-Merge ausgebaut → **16/20** (B1, B4 direkt; C2, C3 als Folgewirkung in der UI) |
 

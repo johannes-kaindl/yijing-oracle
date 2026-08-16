@@ -117,7 +117,17 @@ export function frontmatterRows(ctx: SectionCtx): SettingRow[] {
 export function calloutRows(ctx: SectionCtx): SettingRow[] {
   const s = ctx.host.settings;
   const rows: SettingRow[] = [
-    { name: "", desc: t("set.calloutDesc"), searchable: false },
+    // Erklaerzeile ohne eigenen Regler. Als Hatch, NICHT als Definition mit blossem `desc`:
+    // der native 1.13-Renderer ueberspringt eine Definition ohne Namen und ohne Control
+    // stillschweigend (gemessen 2026-08-16 gegen 1.13.7 — im Fallback stand die Zeile, im
+    // nativen Pfad fehlte sie). Eine `render`-Hatch zeichnen beide Pfade.
+    {
+      name: "",
+      searchable: false,
+      render: (setting: Setting) => {
+        setting.setDesc(t("set.calloutDesc"));
+      },
+    },
   ];
 
   for (const key of CALLOUT_SECTIONS) {

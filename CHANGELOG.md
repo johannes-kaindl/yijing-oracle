@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- The explanatory line above the callout settings was missing on Obsidian 1.13 and later
+  (introduced in 0.5.0). A settings row with text but no control is skipped by Obsidian's
+  declarative renderer; it now draws through the same path as the classic one.
+
 ## [0.5.0] — 2026-08-16
 
 ### Changed

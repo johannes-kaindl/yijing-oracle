@@ -577,6 +577,24 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     `"${begriff}" → ${treffer} Treffer unter "${PLUGIN_NAME}", Unsinn → ${nichts}`,
   );
 
+  // F5 prueft den ANDEREN Pfad. Unter 1.13 ruft der Host `display()` nie — der Fallback
+  // fuer aeltere Obsidian-Versionen liefe also ungeprueft mit. Ein direkter Aufruf zeichnet
+  // ihn in denselben Container: dieselben Zeilen, mit der klassischen Setting-API gebaut.
+  // Das ersetzt keine Messung auf einem echten 1.12, deckt aber den teuren Fehler ab (der
+  // Walker zeichnet die Struktur gar nicht oder nur halb).
+  const nativZeilen = await zeilenZahl(ui);
+  await cdp.evaluate(`
+    app.setting.activeTab.display();
+    await new Promise((r) => setTimeout(r, 700));
+    return true;
+  `);
+  const fallbackZeilen = await zeilenZahl(ui);
+  record(
+    "F5 Fallback-Pfad (< 1.13) zeichnet dieselbe Struktur",
+    fallbackZeilen === nativZeilen,
+    `nativ ${nativZeilen} Zeilen, display()-Fallback ${fallbackZeilen}`,
+  );
+
   await closeSettings(cdp, ui);
 }
 
