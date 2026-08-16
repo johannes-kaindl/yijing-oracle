@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Settings now use Obsidian's declarative settings API.** On Obsidian 1.13 and later the
+  settings are rendered by Obsidian itself from `getSettingDefinitions()`, which means they
+  finally appear in the **settings search** — measured against a running 1.13.7: searching for
+  a setting of this plugin returned nothing before this change and finds it now. Nothing moves
+  or disappears: the same seven sections in the same order, and on Obsidian below 1.13 an
+  identical fallback draws them with the classic API, so `minAppVersion` stays at 1.8.7.
+- The reading folder is now a **folder field with autocompletion** instead of plain text.
+
+### Fixed
+
+- Settings values are validated in one place now instead of in each input handler. A step
+  count of `abc`, an empty template or a stray object no longer reach `data.json`; they fall
+  back to the documented default. Leaving the ComfyUI step override empty still means "the
+  workflow wins" — that is a value, not a missing one.
+
 ## [0.4.0] — 2026-08-16
 
 ### Added

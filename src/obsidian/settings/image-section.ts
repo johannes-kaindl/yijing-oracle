@@ -1,158 +1,156 @@
 // Bildmeditation: Backend-Wahl, Endpunkt (+ Verbindungstest), Workflow (ComfyUI),
 // Stil, Negativ-Prompt, Größe.
-import { Setting, setIcon } from "obsidian";
+import { type Setting, setIcon } from "obsidian";
 import { t } from "../../vendor/kit/i18n";
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { DEFAULT_IMAGE_SETTINGS, type ImageSettings } from "../../core/image-settings";
 import { statusKindKey } from "../../core/settings/endpoint-editor-model";
 import { inspectWorkflow, type WorkflowSlots } from "../../core/comfy/workflow";
 import { probeComfyEndpoint, probeImageEndpoint } from "../http";
-import { type SectionCtx } from "./section-ctx";
+import { type SectionCtx, type SettingRow } from "./section-ctx";
 
-export function renderImageSection(containerEl: HTMLElement, ctx: SectionCtx): void {
+export function imageRows(ctx: SectionCtx): SettingRow[] {
   const img: ImageSettings = ctx.host.settings.image;
   const isComfy = img.backend === "comfyui";
 
-  new Setting(containerEl)
-    .setName(t("set.imgBackend"))
-    .setDesc(t("set.imgBackendDesc"))
-    .addDropdown((d) => {
-      d.addOption("a1111", t("set.imgBackendA1111"));
-      d.addOption("comfyui", t("set.imgBackendComfy"));
-      d.setValue(img.backend);
-      d.onChange(async (v) => {
-        img.backend = v === "comfyui" ? "comfyui" : "a1111";
-        await ctx.host.saveSettings();
-        ctx.rerender(); // je Backend andere Felder
-      });
-    });
+  const rows: SettingRow[] = [
+    {
+      name: t("set.imgBackend"),
+      desc: t("set.imgBackendDesc"),
+      control: {
+        type: "dropdown",
+        key: "image.backend",
+        options: { a1111: t("set.imgBackendA1111"), comfyui: t("set.imgBackendComfy") },
+      },
+    },
+    endpointRow(ctx, img, isComfy),
+  ];
 
-  // Single-Endpoint → Test-Button statt Zeilen-Editor. Der Platzhalter folgt dem Backend:
-  // Draw Things lauscht auf :7860, ComfyUI Desktop auf :8000.
-  const epSetting = new Setting(containerEl)
-    .setName(t("set.imgEndpoint"))
-    .setDesc(t("set.imgEndpointDesc"));
+  // Backend-abhängige Zeilen werden weggelassen statt per `visible` versteckt — der native
+  // 1.13-Renderer wertet `visible` an Gruppen-Items nicht aus.
+  if (isComfy) rows.push(...comfyRows(ctx, img));
+  else rows.push(a1111StepsRow());
 
-  const statusEl = epSetting.settingEl.createSpan({ cls: "yijing-ep-status" });
-
-  epSetting
-    .addText((txt) =>
-      txt
-        .setPlaceholder(isComfy ? "http://127.0.0.1:8000" : "http://127.0.0.1:7860")
-        .setValue(img.endpoint)
-        .onChange(async (v) => {
-          img.endpoint = v.trim();
-          await ctx.host.saveSettings();
-        }),
-    )
-    .addButton((b) =>
-      b.setButtonText(t("set.imgTest")).onClick(async () => {
-        if (!img.endpoint) return;
-        statusEl.removeClass("is-ok", "is-error");
-        statusEl.addClass("is-checking");
-        setIcon(statusEl, "loader");
-        statusEl.setAttribute("aria-label", t("set.ep.status.checking"));
-        const base = normalizeEndpoint(img.endpoint);
-        const status = isComfy ? await probeComfyEndpoint(base) : await probeImageEndpoint(base);
-        statusEl.removeClass("is-checking");
-        setIcon(statusEl, status.reachable ? "circle-check" : "circle-x");
-        statusEl.addClass(status.reachable ? "is-ok" : "is-error");
-        statusEl.setAttribute("aria-label", t(statusKindKey(status.kind)));
-      }),
-    );
-
-  if (isComfy) renderComfyFields(containerEl, ctx, img);
-  else renderA1111Fields(containerEl, ctx, img);
-
-  new Setting(containerEl)
-    .setName(t("set.imgStyle"))
-    .setDesc(t("set.imgStyleDesc"))
-    .addText((txt) =>
-      txt
-        .setPlaceholder(DEFAULT_IMAGE_SETTINGS.styleSuffix)
-        .setValue(img.styleSuffix)
-        .onChange(async (v) => {
-          img.styleSuffix = v;
-          await ctx.host.saveSettings();
-        }),
-    );
-
-  new Setting(containerEl).setName(t("set.imgNegative")).addText((txt) =>
-    txt
-      .setPlaceholder(DEFAULT_IMAGE_SETTINGS.negativePrompt)
-      .setValue(img.negativePrompt)
-      .onChange(async (v) => {
-        img.negativePrompt = v;
-        await ctx.host.saveSettings();
-      }),
+  rows.push(
+    {
+      name: t("set.imgStyle"),
+      desc: t("set.imgStyleDesc"),
+      control: { type: "text", key: "image.styleSuffix", placeholder: DEFAULT_IMAGE_SETTINGS.styleSuffix },
+    },
+    {
+      name: t("set.imgNegative"),
+      control: {
+        type: "text",
+        key: "image.negativePrompt",
+        placeholder: DEFAULT_IMAGE_SETTINGS.negativePrompt,
+      },
+    },
+    {
+      name: t("set.imgSize"),
+      control: {
+        type: "dropdown",
+        key: "image.size",
+        options: Object.fromEntries([512, 768, 1024].map((px) => [String(px), `${px} × ${px}`])),
+      },
+    },
   );
 
-  new Setting(containerEl).setName(t("set.imgSize")).addDropdown((d) => {
-    for (const px of [512, 768, 1024]) d.addOption(String(px), `${px} × ${px}`);
-    d.setValue(String(img.size));
-    d.onChange(async (v) => {
-      img.size = Number(v);
-      await ctx.host.saveSettings();
-    });
-  });
+  return rows;
 }
 
-function renderA1111Fields(containerEl: HTMLElement, ctx: SectionCtx, img: ImageSettings): void {
-  new Setting(containerEl)
-    .setName(t("set.imgSteps"))
-    .setDesc(t("set.imgStepsDesc"))
-    .addText((txt) =>
-      txt
-        .setPlaceholder(String(DEFAULT_IMAGE_SETTINGS.steps))
-        .setValue(String(img.steps))
-        .onChange(async (v) => {
-          const n = Number(v);
-          img.steps = Number.isFinite(n) && n > 0 ? Math.floor(n) : DEFAULT_IMAGE_SETTINGS.steps;
-          await ctx.host.saveSettings();
-        }),
-    );
+/** Single-Endpoint → Textfeld mit Test-Knopf und Status-Punkt statt Zeilen-Editor. Hatch,
+ *  weil Status-Anzeige und Knopf zusammen an einer Zeile hängen. Der Platzhalter folgt dem
+ *  Backend: Draw Things lauscht auf :7860, ComfyUI Desktop auf :8000. */
+function endpointRow(ctx: SectionCtx, img: ImageSettings, isComfy: boolean): SettingRow {
+  return {
+    name: t("set.imgEndpoint"),
+    desc: t("set.imgEndpointDesc"),
+    render: (setting: Setting) => {
+      const statusEl = setting.settingEl.createSpan({ cls: "yijing-ep-status" });
+
+      setting
+        .addText((txt) =>
+          txt
+            .setPlaceholder(isComfy ? "http://127.0.0.1:8000" : "http://127.0.0.1:7860")
+            .setValue(img.endpoint)
+            .onChange((v) => {
+              ctx.write("image.endpoint", v);
+            }),
+        )
+        .addButton((b) =>
+          b.setButtonText(t("set.imgTest")).onClick(async () => {
+            if (!img.endpoint) return;
+            statusEl.removeClass("is-ok", "is-error");
+            statusEl.addClass("is-checking");
+            setIcon(statusEl, "loader");
+            statusEl.setAttribute("aria-label", t("set.ep.status.checking"));
+            const base = normalizeEndpoint(img.endpoint);
+            const status = isComfy ? await probeComfyEndpoint(base) : await probeImageEndpoint(base);
+            statusEl.removeClass("is-checking");
+            setIcon(statusEl, status.reachable ? "circle-check" : "circle-x");
+            statusEl.addClass(status.reachable ? "is-ok" : "is-error");
+            statusEl.setAttribute("aria-label", t(statusKindKey(status.kind)));
+          }),
+        );
+    },
+  };
 }
 
-function renderComfyFields(containerEl: HTMLElement, ctx: SectionCtx, img: ImageSettings): void {
-  const wf = new Setting(containerEl)
-    .setName(t("set.imgWorkflow"))
-    .setDesc(t("set.imgWorkflowDesc"));
+function a1111StepsRow(): SettingRow {
+  return {
+    name: t("set.imgSteps"),
+    desc: t("set.imgStepsDesc"),
+    control: {
+      type: "number",
+      key: "image.steps",
+      placeholder: String(DEFAULT_IMAGE_SETTINGS.steps),
+    },
+  };
+}
 
-  const feedbackEl = wf.settingEl.createDiv({ cls: "yijing-workflow-status" });
-
-  wf.addTextArea((ta) => {
-    ta.setValue(img.comfyWorkflow).onChange(async (v) => {
-      img.comfyWorkflow = v;
-      await ctx.host.saveSettings();
-      describeWorkflow(feedbackEl, v);
-    });
-    ta.inputEl.rows = 6;
-  });
-
-  describeWorkflow(feedbackEl, img.comfyWorkflow);
-
-  const stepsSetting = new Setting(containerEl)
-    .setName(t("set.imgStepsOverride"))
-    .setDesc(t("set.imgStepsOverrideDesc"))
-    .addText((txt) =>
-      txt
-        .setPlaceholder("—")
-        .setValue(img.comfyStepsOverride === null ? "" : String(img.comfyStepsOverride))
-        .onChange(async (v) => {
-          const n = Number(v.trim());
-          img.comfyStepsOverride =
-            v.trim() === "" || !Number.isFinite(n) || n <= 0 ? null : Math.floor(n);
-          await ctx.host.saveSettings();
-        }),
-    );
-
-  // Ein Eingabefeld, dessen Wert nirgends ankommt, ist ein Versprechen ohne Deckung —
-  // deshalb deaktivieren statt den Wert still zu verwerfen.
+function comfyRows(ctx: SectionCtx, img: ImageSettings): SettingRow[] {
   const slots = slotsOf(img.comfyWorkflow);
-  if (slots && slots.stepsField === null) {
-    stepsSetting.setDesc(t("set.imgStepsNoField"));
-    stepsSetting.setDisabled(true);
-  }
+  const stepsFieldMissing = slots !== null && slots.stepsField === null;
+
+  return [
+    {
+      name: t("set.imgWorkflow"),
+      desc: t("set.imgWorkflowDesc"),
+      // Hatch statt Textarea-Control: die Rückmeldung unter dem Feld aktualisiert sich bei
+      // jedem Tastendruck. Als Control ginge das nur über einen Neuaufbau — der nähme dem
+      // Feld mitten im Einfügen den Fokus.
+      render: (setting: Setting) => {
+        const feedbackEl = setting.settingEl.createDiv({ cls: "yijing-workflow-status" });
+        setting.addTextArea((ta) => {
+          ta.setValue(img.comfyWorkflow).onChange((v) => {
+            ctx.write("image.comfyWorkflow", v);
+            describeWorkflow(feedbackEl, v);
+          });
+          ta.inputEl.rows = 6;
+        });
+        describeWorkflow(feedbackEl, img.comfyWorkflow);
+      },
+    },
+    {
+      name: t("set.imgStepsOverride"),
+      // Ein Eingabefeld, dessen Wert nirgends ankommt, ist ein Versprechen ohne Deckung —
+      // deshalb deaktivieren statt den Wert still zu verwerfen.
+      desc: stepsFieldMissing ? t("set.imgStepsNoField") : t("set.imgStepsOverrideDesc"),
+      // Hatch statt "number"-Control: null ist hier ein gültiger Wert („der Workflow
+      // gewinnt"), und ein Zahlen-Control kennt kein Leer.
+      render: (setting: Setting) => {
+        setting.addText((txt) =>
+          txt
+            .setPlaceholder("—")
+            .setValue(img.comfyStepsOverride === null ? "" : String(img.comfyStepsOverride))
+            .onChange((v) => {
+              ctx.write("image.comfyStepsOverride", v);
+            }),
+        );
+        if (stepsFieldMissing) setting.setDisabled(true);
+      },
+    },
+  ];
 }
 
 function slotsOf(json: string): WorkflowSlots | null {

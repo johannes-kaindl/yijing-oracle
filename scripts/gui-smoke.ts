@@ -45,6 +45,8 @@ import { execFileSync } from "node:child_process";
 import { Cdp, attachTo, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
 
 const PLUGIN_ID = "yijing-oracle";
+/** manifest.json → name. Nicht lokalisiert — taugt als Anker in der Einstellungs-Suche. */
+const PLUGIN_NAME = "Yijing Oracle";
 /** src/obsidian/view.ts: VIEW_TYPE_YIJING. */
 const PANEL_VIEW = "yijing-oracle-panel";
 const DATA_PATH = `.obsidian/plugins/${PLUGIN_ID}/data.json`;
@@ -461,6 +463,147 @@ async function abschnittSettings(cdp: Cdp, port: number, workflowFixture: string
   await closeSettings(cdp, ui);
 }
 
+/**
+ * F — die deklarative Settings-API (`getSettingDefinitions`, Obsidian >= 1.13).
+ *
+ * Warum das ein eigener Abschnitt ist: die Migration verlegt das Rendern der Einstellungen
+ * vom eigenen Code zum Host. Was danach in der Oberflaeche steht, kann kein vitest-Fall mehr
+ * zeigen — und die drei Fallstricke der Umstellung sind alle **stille**: bedingte Zeilen, die
+ * nie erscheinen (`visible` wertet der native Renderer an Gruppen-Items nicht aus), ein Tab,
+ * der nach einer Zustandsaenderung nicht nachzieht (der Host rendert gecachte `settingItems`),
+ * und Zeilen, die zwar rendern, aber nicht in der Einstellungs-Suche landen — dem einzigen
+ * Grund, aus dem die Umstellung ueberhaupt lohnt.
+ *
+ * Unter 1.12 gibt es den nativen Pfad nicht; dort wird der Abschnitt uebersprungen statt rot.
+ */
+async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
+  console.log("\n── F · Deklarative Settings-API ──");
+
+  const ui = await openSettingsTab(cdp, port);
+  if (!ui) {
+    skipped("F Deklarative API", "Einstellungen-Tab in keinem Fenster gefunden");
+    return;
+  }
+
+  // Die Definitionen leben im HAUPTfenster: das ausgelagerte Einstellungen-Fenster hat
+  // seinen eigenen Kontext und kennt kein `app` (gemessen 2026-08-16 gegen 1.13.7 — ein
+  // `app.setting.activeTab` dort wirft "app is not defined").
+  const defs = await cdp.evaluate<{
+    hatApi: boolean;
+    hatUpdate: boolean;
+    gruppen: number;
+    leereGruppen: number;
+    uebernommen: number | null;
+    fmMitFeldern: number;
+    fmOhneFelder: number;
+  } | null>(`
+    const tab = app.setting.activeTab;
+    if (!tab || typeof tab.getSettingDefinitions !== "function") return null;
+    const fmGruppe = (d) => d.find((g) => (g.items || []).some((i) => i.control && i.control.key === "includeFrontmatter"));
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+
+    const vorher = p.settings.includeFrontmatter;
+    p.settings.includeFrontmatter = true;
+    const mit = (fmGruppe(tab.getSettingDefinitions()).items || []).length;
+    p.settings.includeFrontmatter = false;
+    const ohne = (fmGruppe(tab.getSettingDefinitions()).items || []).length;
+    p.settings.includeFrontmatter = vorher;
+
+    const d = tab.getSettingDefinitions();
+    return {
+      hatApi: true,
+      hatUpdate: typeof tab.update === "function",
+      gruppen: d.length,
+      leereGruppen: d.filter((g) => !(g.items || []).length).length,
+      uebernommen: Array.isArray(tab.settingItems) ? tab.settingItems.length : null,
+      fmMitFeldern: mit,
+      fmOhneFelder: ohne,
+    };
+  `);
+
+  if (!defs?.hatUpdate) {
+    // Kein update() → Obsidian < 1.13, der native Pfad existiert nicht.
+    skipped("F Deklarative API", "Obsidian ohne native 1.13-Settings-API (Fallback-Pfad)");
+    await closeSettings(cdp, ui);
+    return;
+  }
+
+  record(
+    "F1 Tab liefert deklarative Definitionen",
+    defs.gruppen > 0 && defs.leereGruppen === 0 && defs.uebernommen === defs.gruppen,
+    `${defs.gruppen} Gruppen, keine leer, vom Host uebernommen: ${String(defs.uebernommen)}`,
+  );
+
+  // Genau der Fallstrick, an dem zwei Nachbar-Plugins haengen geblieben sind: bedingte
+  // Zeilen muessen WEGGELASSEN werden. Ein `visible: false` waere hier unsichtbar falsch —
+  // die Zahl bliebe gleich und die Zeile stuende trotzdem in der Oberflaeche.
+  record(
+    "F2 bedingte Zeilen werden weggelassen, nicht versteckt",
+    defs.fmOhneFelder === 1 && defs.fmMitFeldern > 1,
+    `Frontmatter-Gruppe: ${defs.fmMitFeldern} Zeilen mit Feldern, ${defs.fmOhneFelder} ohne`,
+  );
+
+  const zeilenVorher = await zeilenZahl(ui);
+  await cdp.evaluate(`
+    await app.setting.activeTab.setControlValue("includeFrontmatter", false);
+    await new Promise((r) => setTimeout(r, 500));
+    return true;
+  `);
+  const zeilenAus = await zeilenZahl(ui);
+  await cdp.evaluate(`
+    await app.setting.activeTab.setControlValue("includeFrontmatter", true);
+    await new Promise((r) => setTimeout(r, 500));
+    return true;
+  `);
+  const zeilenWieder = await zeilenZahl(ui);
+  const erwarteteDifferenz = defs.fmMitFeldern - defs.fmOhneFelder;
+  record(
+    "F3 Oberflaeche zieht nach einer Wertaenderung nach",
+    zeilenVorher - zeilenAus === erwarteteDifferenz && zeilenWieder === zeilenVorher,
+    `Zeilen ${zeilenVorher} → ${zeilenAus} → ${zeilenWieder} (erwartete Differenz ${erwarteteDifferenz})`,
+  );
+
+  // Der eigentliche Gewinn der Umstellung. Der Suchbegriff kommt aus der eigenen Definition,
+  // nicht aus einer festen Zeichenkette — sonst misst der Treiber die UI-Sprache.
+  const begriff = await cdp.evaluate<string>(`
+    const d = app.setting.activeTab.getSettingDefinitions();
+    return d[0].items[0].name;
+  `);
+  const treffer = await sucheInEinstellungen(ui, begriff);
+  const nichts = await sucheInEinstellungen(ui, "zzqqxx-gibtesnicht");
+  record(
+    "F4 Einstellungen erscheinen in Obsidians Einstellungs-Suche",
+    treffer > 0 && nichts === 0,
+    `"${begriff}" → ${treffer} Treffer unter "${PLUGIN_NAME}", Unsinn → ${nichts}`,
+  );
+
+  await closeSettings(cdp, ui);
+}
+
+/** Gerenderte Setting-Zeilen in der Einstellungen-Oberflaeche. */
+async function zeilenZahl(ui: SettingsUi): Promise<number> {
+  return ui.cdp.evaluate<number>(`
+    const wurzel = ${wurzelAusdruck(ui)};
+    return wurzel ? wurzel.querySelectorAll(".setting-item").length : -1;
+  `);
+}
+
+/** Tippt in Obsidians Einstellungs-Suche und zaehlt die Treffer, die UNSEREM Plugin
+ *  zugeordnet sind — die Ergebnisse stehen je Tab in einer eigenen Gruppe. */
+async function sucheInEinstellungen(ui: SettingsUi, begriff: string): Promise<number> {
+  return ui.cdp.evaluate<number>(`
+    const feld = document.querySelector('input[type="search"]');
+    if (!feld) return -1;
+    feld.value = ${JSON.stringify(begriff)};
+    feld.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 600));
+    const gruppe = [...document.querySelectorAll(".setting-search-result-group")].find(
+      (g) => g.querySelector(".setting-search-result-tab-label")?.textContent?.trim() === ${JSON.stringify(PLUGIN_NAME)},
+    );
+    return gruppe ? gruppe.querySelectorAll(".setting-search-result-item").length : 0;
+  `);
+}
+
 /** D — echter Bildlauf gegen ComfyUI (Handover-Schritte 4, 7, 8). Braucht einen
  *  laufenden Server; ohne ihn wird der Abschnitt als uebersprungen protokolliert,
  *  nicht als bestanden. */
@@ -624,6 +767,7 @@ async function main(): Promise<void> {
     await abschnittPanel(cdp);
     await abschnittMigration(cdp);
     await abschnittSettings(cdp, port, workflowFixture);
+    await abschnittDeklarativ(cdp, port);
 
     if (keinBild) {
       skipped("D Bildlauf", "--kein-bild gesetzt");

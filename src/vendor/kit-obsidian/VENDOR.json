@@ -1,0 +1,6 @@
+{
+  "source": "obsidian-kit",
+  "version": "0.26.1",
+  "vendored": "settings_walker.ts, folder-suggest.ts",
+  "note": "Verbatim snapshot (nur ein Herkunftsstempel vorangestellt). Never hand-edit. Re-copy from obsidian-kit to update. Eigene Ablage neben src/vendor/kit/, weil diese Module `obsidian` importieren und check:pure src/vendor/kit/ pauschal prueft."
+}

@@ -45,6 +45,16 @@ einen Vollständigkeits-`Record<EndpointStatusKind, true>` im Test setzen, der a
 `typecheck:test` bricht, sobald eine weitere Klasse dazukommt (CORE-TEST-04; Referenz:
 `obsidian-transmute/tests/i18n-status-keys.test.ts`).
 
+**Settings sind zweigleisig — `getSettingDefinitions()` ist die Wahrheit, nicht `display()`.**
+Ab 0.5.0 rendert Obsidian ≥ 1.13 die Einstellungen selbst aus den Definitionen (nur so landen sie
+in der Einstellungs-Suche); `display()` zeichnet dieselbe Struktur mit dem vendorierten Kit-Walker
+für ältere Versionen nach. Wer eine Zeile ergänzt, ergänzt sie **einmal** in der Sektionsdatei —
+und beachtet drei gemessene Fallstricke: bedingte Zeilen **weglassen** statt `visible: false`
+(der native Renderer wertet es an Gruppen-Items nicht aus), Werte über `core/settings/controls.ts`
+schreiben (der Host prüft nur den Control-Typ, nicht unsere Grenzen), und nach einer
+Zustandsänderung `refreshSettingsTab` anstoßen (der Host rendert gecachte `settingItems`).
+Prüfpunkte F1–F4 im GUI-Smoke messen genau das.
+
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.
 - `src/core/**` und `src/vendor/kit/**` importieren nie `obsidian` (`check:pure`-gated).
 - Zweisprachigkeit DE/EN: Hexagramm-Texte + UI hängen an Reading- bzw. UI-Sprache.

@@ -24,22 +24,6 @@ export default [
     },
   },
   {
-    // Alt: eine Datei src/obsidian/settings.ts. Seit 04a6125 (Aufteilung der
-    // 447-Zeilen-Klasse) liegt die SettingsTab-Klasse (display()) in settings/index.ts —
-    // Pfad hier entsprechend nachgezogen, sonst liefe der Override ins Leere.
-    files: ["src/obsidian/settings/index.ts"],
-    rules: {
-      // Deklarative Settings-API (getSettingDefinitions) setzt Obsidian >=1.13.0 voraus;
-      // manifest minAppVersion ist 1.8.7 < 1.13.0, also ist display() der einzig
-      // unterstuetzte Weg — die Empfehlung ist hier ein Fehlalarm des Versionskonflikts.
-      "obsidianmd/settings-tab/prefer-setting-definitions": "off",
-      // display() ist seit 1.13.0 zugunsten getSettingDefinitions() deprecated, aber unter
-      // minAppVersion 1.8.7 der einzig unterstuetzte Settings-Weg (auch fuer this.display()
-      // zum Re-Render) — die Deprecation-Warnung ist hier ein Versionskonflikt-Fehlalarm.
-      "@typescript-eslint/no-deprecated": "off",
-    },
-  },
-  {
     // Sentence-case-Override, ebenfalls aus dem alten settings.ts uebernommen, jetzt auf
     // die Sektionsdateien verteilt, in denen die betroffenen Placeholder liegen.
     files: ["src/obsidian/settings/image-section.ts", "src/obsidian/settings/note-section.ts"],
