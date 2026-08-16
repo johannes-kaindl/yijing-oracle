@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-08-16
+
 ### Added
 
 - **ComfyUI as a second image backend.** The image section now has a backend choice. For
