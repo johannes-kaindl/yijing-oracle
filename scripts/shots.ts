@@ -2,9 +2,10 @@
  * Aufnahme-Treiber fuer die README-Bilder — faehrt den Vertrag aus `docs/images/README.md`
  * gegen ein **laufendes** Obsidian, statt die Bilder von Hand zu klicken.
  *
- * Teilt sich die CDP-Bruecke mit `scripts/gui-smoke.ts` (`scripts/lib/cdp.ts`) — deshalb
- * liegt sie dort und nicht hier. Zwei Kopien waeren der Anfang derselben Drift, die bei
- * `release.mjs` zu sieben Fassungen fuehrte.
+ * Teilt sich die CDP-Bruecke mit `scripts/gui-smoke.ts`; Bruecke, Aufnahme-Primitive und
+ * Fixture→Vault liegen zentral im Dach (`obsidian-plugins/tools/obsidian-cdp/`, seit
+ * 2026-08-16 — vorher vendored unter `scripts/lib/`). Kopien waeren der Anfang derselben
+ * Drift, die bei `release.mjs` zu sieben Fassungen fuehrte.
  *
  * ## Ablauf
  *
@@ -37,9 +38,9 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 
-import { Cdp, attachTo, openExisting, pollUntil, setAppConfig, setPluginSetting } from "./lib/cdp.js";
-import { boxOf, capture, setWindowSize, withMetrics, writeShot, type Rect, type ShotOptions } from "./lib/shot.js";
-import { buildVault, stagingVaultDir } from "./lib/vault.js";
+import { Cdp, attachTo, openExisting, pollUntil, setAppConfig, setPluginSetting } from "../../tools/obsidian-cdp/cdp.js";
+import { boxOf, capture, setWindowSize, withMetrics, writeShot, type Rect, type ShotOptions } from "../../tools/obsidian-cdp/shot.js";
+import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
 const PLUGIN_ID = "yijing-oracle";
 const REPO_NAME = "yijing-oracle";

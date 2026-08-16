@@ -42,7 +42,7 @@
 
 import { execFileSync } from "node:child_process";
 
-import { Cdp, attachTo, pollUntil } from "./lib/cdp.js";
+import { Cdp, attachTo, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
 
 const PLUGIN_ID = "yijing-oracle";
 /** src/obsidian/view.ts: VIEW_TYPE_YIJING. */
