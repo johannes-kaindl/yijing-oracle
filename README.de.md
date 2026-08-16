@@ -16,6 +16,8 @@ kein Konto.
 > [Yijing-Web-/App-Projekt](https://git.jkaindl.de/jkaindl/Yijing). Keine Portierung des
 > Ganzen — ein fokussiertes Plugin, in dem der Vault das Orakel-Journal ist.
 
+<p align="center"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/hero.png" width="600" alt="Eine gespeicherte Befragung als Notiz in Obsidian, daneben das Orakel-Panel mit demselben Hexagramm"></p>
+
 ## Features
 
 - **Seitenleisten-Panel** — Frage stellen (oder nicht), Münzen werfen, Hexagramm-Figur,
@@ -45,7 +47,12 @@ kein Konto.
   Werfen funktioniert vollständig offline.
 - **Optional, für die KI-Deutung:** ein OpenAI-kompatibler lokaler Server (z.B.
   [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com)). Endpunkt und
-  Modell werden in den Plugin-Einstellungen gesetzt.
+  Modell werden in den Plugin-Einstellungen gesetzt. **Der Server braucht aktiviertes
+  CORS** — die Deutung streamt aus Obsidians Renderer, der immer
+  `Origin: app://obsidian.md` mitsendet, und die meisten lokalen Server weisen das
+  standardmäßig ab (LM Studio: `lms server start --cors`). Der Verbindungstest in den
+  Einstellungen ist davon unberührt; er nimmt einen anderen Weg, der keinen `Origin`
+  sendet.
 - **Optional, für Meditationsbilder:** ein A1111-kompatibler Bild-Server (z.B.
   [Draw Things](https://drawthings.ai) mit aktiviertem API-Server). Siehe die
   [Einrichtungsanleitung](docs/image-generation.md).
@@ -95,12 +102,26 @@ Von dort aus:
 - Frühere Befragungen stehen unter dem Panel — ein Klick darauf **rekonstruiert den
   Wurf** aus ihrem Frontmatter.
 
+<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/panel.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/panel.png" width="380" alt="Das Orakel-Panel: Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien und die Weissagungs-Vorschau"></a><br><sub>Das Panel nach einem Wurf — zum Vergrößern klicken</sub></p>
+
+<img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/reading-note.png" width="600" alt="Eine gespeicherte Befragung als Notiz: die Frage, das Ausgangs-Hexagramm mit Trigrammen, Urteil und Bild, die wandelnde Linie und das resultierende Hexagramm">
+<br><sub>Jeder Wurf wird zu einer Notiz wie dieser — durchsuchbar, verlinkbar, deine.</sub>
+
 Zwei Befehle übergehen das Panel und werfen sofort:
 
 | Befehl | Was er tut |
 |---|---|
 | *Befragung in neue Notiz werfen* | Wirft und schreibt die Notiz, ohne Frage. |
 | *Befragung an der Cursorposition werfen* | Wirft und fügt einen Link in die aktive Notiz ein. |
+
+### Die beiden optionalen Funktionen
+
+<table>
+<tr>
+<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/interpretation.png" width="408" alt="Der Deutungs-Kasten im Panel mit einer fertigen Deutung und der zugeklappten Denkspur"><br><sub>KI-Deutung, gestreamt von einem lokalen Modell</sub></td>
+<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/artwork.png" width="408" alt="Der Bildmeditations-Kasten im Panel mit erzeugtem Bild und dem Szenen-Satz darunter"><br><sub>Bildmeditation, lokal erzeugt</sub></td>
+</tr>
+</table>
 
 ## Konfiguration
 
@@ -118,6 +139,8 @@ Zwei Befehle übergehen das Panel und werfen sofort:
 Reihenfolge ist also die Priorität. So deckt eine Konfiguration jedes Netz ab
 (localhost am Schreibtisch, LAN-IP unterwegs), ohne dass etwas umgestellt werden muss.
 Jede Zeile hat ihren eigenen Verbindungstest mit einem Ergebnis in Klartext.
+
+<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="Die Plugin-Einstellungen von oben nach unten: Allgemein, Notiz und Ablage, Notiz-Inhalt, KI-Deutung, Bildgenerierung"></a><br><sub>Die vollständige Einstellungsseite — zum Vergrößern klicken</sub></p>
 
 ## Funktionsweise
 

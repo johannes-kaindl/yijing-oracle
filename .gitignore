@@ -13,3 +13,4 @@ node_modules/
 
 # GUI-Smoke-Bundle — Wegwerf-Artefakt von npm run smoke:gui
 .gui-smoke.mjs
+.shots.mjs

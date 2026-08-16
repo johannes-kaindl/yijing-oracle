@@ -14,6 +14,8 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 > [Yijing web/app project](https://git.jkaindl.de/jkaindl/Yijing). Not a port of the
 > whole thing — a focused plugin where the vault is the oracle journal.
 
+<p align="center"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/hero.png" width="600" alt="A saved reading open as a note in Obsidian, the oracle panel beside it showing the same hexagram"></p>
+
 ## Features
 
 - **Sidebar panel** — ask a question (or don't), cast the coins, see the hexagram
@@ -41,7 +43,11 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
   works fully offline.
 - **Optional, for AI interpretation:** an OpenAI-compatible local server (e.g.
   [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com)). Endpoint and
-  model are set in the plugin settings.
+  model are set in the plugin settings. **The server needs CORS enabled** — the
+  interpretation streams from Obsidian's renderer, which always sends
+  `Origin: app://obsidian.md`, and most local servers reject that by default (LM Studio:
+  `lms server start --cors`). The connection test in the settings passes either way; it
+  takes a different route that sends no `Origin`.
 - **Optional, for meditation images:** an A1111-compatible image server (e.g.
   [Draw Things](https://drawthings.ai) with its API server enabled). See the
   [setup guide](docs/image-generation.md).
@@ -91,12 +97,26 @@ From there:
 - Past readings are listed below the panel — clicking one **reconstructs the cast**
   from its frontmatter.
 
+<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/panel.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/panel.png" width="380" alt="The oracle panel: question field, cast button, the hexagram as six lines, and the reading preview"></a><br><sub>The panel after a cast — click to enlarge</sub></p>
+
+<img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/reading-note.png" width="600" alt="A saved reading as a note: the question, the primary hexagram with its trigrams, judgment and image, the changing line, and the resulting hexagram">
+<br><sub>Every cast becomes a note like this — searchable, linkable, yours.</sub>
+
 Two commands skip the panel entirely and cast straight away:
 
 | Command | What it does |
 |---|---|
 | *Cast a reading into a new note* | Casts and writes the note, no question. |
 | *Cast a reading at the cursor* | Casts and inserts a link in the active note. |
+
+### The two optional features
+
+<table>
+<tr>
+<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/interpretation.png" width="408" alt="The AI interpretation box in the panel with a finished reading interpretation and a collapsed reasoning trace"><br><sub>AI interpretation, streamed from a local model</sub></td>
+<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/artwork.png" width="408" alt="The meditation image box in the panel showing a generated image and the scene sentence below it"><br><sub>Meditation image, generated locally</sub></td>
+</tr>
+</table>
 
 ## Configuration
 
@@ -114,6 +134,8 @@ Two commands skip the panel entirely and cast straight away:
 order is the priority. That way one config covers every network (localhost at your
 desk, LAN IP on the go) without switching anything. Each row has its own connection
 test with a plain-language result.
+
+<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
 
 ## How it works
 
