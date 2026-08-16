@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.1] — 2026-08-16
+
 ### Fixed
 
 - The explanatory line above the callout settings was missing on Obsidian 1.13 and later
