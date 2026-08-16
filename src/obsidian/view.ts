@@ -80,6 +80,10 @@ export class OracleView extends ItemView {
   private reasoningEl: HTMLElement | null = null;
   /** Fortschritt der laufenden Bildgenerierung (nur ComfyUI liefert Schritt-Meldungen). */
   private imageProgress: { value: number; max: number } | null = null;
+  /** Der Fortschritts-Socket kam nicht zustande — fuer diesen Lauf kommt kein Zaehler
+   *  mehr. Wird angezeigt statt verschwiegen: sonst steht minutenlang "Bild wird
+   *  generiert…" da, was von einem haengenden Lauf nicht zu unterscheiden ist. */
+  private imageProgressBlocked = false;
   private imageProgressEl: HTMLElement | null = null;
   /** Klapp-Zustände der Kästen (überleben Re-Render). */
   private readingOpen = true;
@@ -428,6 +432,7 @@ export class OracleView extends ItemView {
 
     this.generatingImage = true;
     this.imageProgress = null;
+    this.imageProgressBlocked = false;
     await this.render();
 
     const prompt = buildSdPrompt(scene, img.styleSuffix);
@@ -450,8 +455,14 @@ export class OracleView extends ItemView {
             this.updateImageProgressDom();
           },
         });
-        socket = new ComfyProgressSocket(normalizeEndpoint(endpoint), clientId, (p) =>
-          client.reportProgress(p),
+        socket = new ComfyProgressSocket(
+          normalizeEndpoint(endpoint),
+          clientId,
+          (p) => client.reportProgress(p),
+          () => {
+            this.imageProgressBlocked = true;
+            this.updateImageProgressDom();
+          },
         );
         socket.open();
 
@@ -482,6 +493,7 @@ export class OracleView extends ItemView {
       socket?.close();
       this.generatingImage = false;
       this.imageProgress = null;
+      this.imageProgressBlocked = false;
       this.imageProgressEl = null;
       await this.render();
     }
@@ -493,8 +505,12 @@ export class OracleView extends ItemView {
   private updateImageProgressDom(): void {
     if (!this.imageProgressEl) return;
     const p = this.imageProgress;
-    if (!p) return;
-    this.imageProgressEl.setText(t("view.imageProgress", String(p.value), String(p.max)));
+    if (p) {
+      this.imageProgressEl.setText(t("view.imageProgress", String(p.value), String(p.max)));
+      return;
+    }
+    // Kein Zaehler und kein Socket: den Grund nennen, nicht die Zeile leer lassen.
+    if (this.imageProgressBlocked) this.imageProgressEl.setText(t("view.imageProgressBlocked"));
   }
 
   /** Leichtes Live-Update der Stream-Container ohne vollständigen Re-Render (kein Flackern). */

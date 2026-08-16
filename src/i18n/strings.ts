@@ -80,6 +80,8 @@ export function registerI18n(): void {
       "view.generateImage": "Generate image",
       "view.generatingImage": "Generating image…",
       "view.imageProgress": "Generating image… step {0}/{1}",
+      "view.imageProgressBlocked":
+        "Generating image… (no progress: ComfyUI refuses the connection from Obsidian — start it with --enable-cors-header \"app://obsidian.md\"). The image itself is unaffected.",
       "view.regenerate": "Regenerate (new seed)",
       "notice.noEndpoint": "No endpoint reachable, or no model — check the settings.",
       "notice.llmError": "Interpretation failed — check the endpoint in the settings.",
@@ -223,6 +225,8 @@ export function registerI18n(): void {
       "view.generateImage": "Bild generieren",
       "view.generatingImage": "Bild wird generiert…",
       "view.imageProgress": "Bild wird generiert… Schritt {0}/{1}",
+      "view.imageProgressBlocked":
+        "Bild wird generiert… (kein Fortschritt: ComfyUI lehnt die Verbindung aus Obsidian ab — mit --enable-cors-header \"app://obsidian.md\" starten). Das Bild selbst ist davon nicht betroffen.",
       "view.regenerate": "Neu generieren (neuer Seed)",
       "notice.noEndpoint": "Kein Endpunkt erreichbar oder kein Modell — in den Einstellungen prüfen.",
       "notice.llmError": "Deutung fehlgeschlagen — Endpunkt in den Einstellungen prüfen.",

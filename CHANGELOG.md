@@ -15,12 +15,21 @@ All notable changes to this project are documented here. The format follows
   points by following the graph's own node links, so structurally different workflows
   (SDXL, Flux, Z-Image Turbo) work with the same code. The settings show which nodes were
   detected, so an unusable workflow fails while you set it up rather than after minutes of
-  waiting. Progress is reported live over a WebSocket.
+  waiting. Progress is reported live over a WebSocket — where ComfyUI allows the connection
+  (see below).
 - **Steps setting for A1111** — previously hardcoded to 28. For ComfyUI it is an optional
   override; left empty, the value from your workflow wins.
 
 ### Fixed
 
+- **The image panel no longer stays silent when progress is unavailable.** ComfyUI requires
+  the `Origin` header to match its own host, and Obsidian's renderer always sends
+  `app://obsidian.md` — so the progress WebSocket is rejected with 403 on a default setup,
+  and the step counter never appeared. The image itself was never affected: those requests
+  go through Obsidian's `requestUrl` in the main process, which sends no `Origin` at all.
+  The panel now says so instead of showing an unchanging "Generating image…" that is
+  indistinguishable from a stuck run. To get the counter, start ComfyUI with
+  `--enable-cors-header "app://obsidian.md"`.
 - **`check:pure` never checked anything.** The gate searched for `from 'obsidian'` with
   single quotes while the entire codebase uses double quotes, so it could not produce a
   match; it also passed when a scanned directory was missing. Replaced with the script
