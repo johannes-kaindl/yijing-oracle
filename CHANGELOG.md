@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.0] — 2026-08-16
+
 ### Changed
 
 - **Settings now use Obsidian's declarative settings API.** On Obsidian 1.13 and later the
