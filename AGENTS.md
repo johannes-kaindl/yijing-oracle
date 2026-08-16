@@ -31,6 +31,20 @@ npm run release        # Release-Skript (nur auf Zuruf)
 
 ## Conventions
 
+**Beim nächsten Kit-Sweep mitziehen: die Statusklasse `unauthorized`.**
+Dieses Repo führt die Endpunkt-Statusklassen selbst über `t()` (`set.ep.status.*`), hat
+aber noch die **alte** Fassung von `endpoint_diagnostics.ts` vendored — die Klasse gibt es
+hier also noch nicht, und der fehlende Schlüssel fällt (noch) nicht auf. **In dem Moment,
+in dem das Kit nachgezogen wird, erbt dieses Repo den Fehler**: `t()` fällt auf den
+Schlüssel zurück, nicht auf EN, und in der Endpunkt-Zeile stünde `set.ep.status.unauthorized`
+— aussehend wie ein String, nicht wie ein Fehler (gemessen im Sweep 2026-08-16; in
+`markdown-presentation` und `vault-crews` ist genau das bereits eingetreten).
+
+**Deshalb gehört zum Kit-Sweep hier beides:** den Schlüssel in EN **und** DE ergänzen und
+einen Vollständigkeits-`Record<EndpointStatusKind, true>` im Test setzen, der am
+`typecheck:test` bricht, sobald eine weitere Klasse dazukommt (CORE-TEST-04; Referenz:
+`obsidian-transmute/tests/i18n-status-keys.test.ts`).
+
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.
 - `src/core/**` und `src/vendor/kit/**` importieren nie `obsidian` (`check:pure`-gated).
 - Zweisprachigkeit DE/EN: Hexagramm-Texte + UI hängen an Reading- bzw. UI-Sprache.
