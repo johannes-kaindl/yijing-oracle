@@ -22,6 +22,13 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **A blocked AI interpretation now says why.** Local model servers reject requests coming
+  from Obsidian's renderer unless CORS is enabled — the interpretation streams over
+  `XMLHttpRequest`, which always sends `Origin: app://obsidian.md`. The old message
+  ("check the endpoint in the settings") pointed the wrong way, because the endpoint is
+  fine: the settings connection test goes through `requestUrl` in the main process and
+  sends no `Origin` at all. The panel now names CORS and the fix (LM Studio:
+  `lms server start --cors`); the README lists it as a requirement.
 - **The image panel no longer stays silent when progress is unavailable.** ComfyUI requires
   the `Origin` header to match its own host, and Obsidian's renderer always sends
   `app://obsidian.md` — so the progress WebSocket is rejected with 403 on a default setup,

@@ -399,10 +399,12 @@ export class OracleView extends ItemView {
         new Notice(t("notice.noInterpretation"));
       }
     } catch (e) {
-      const aborted = (e as Error)?.name === "AbortError";
+      const name = (e as Error)?.name;
       c.interpretation = null;
-      if (!aborted) {
-        new Notice(t("notice.llmError"));
+      if (name !== "AbortError") {
+        // Ein blockierter Renderer-Request ist kein Endpunkt-Problem — der Endpunkt
+        // antwortet dem Verbindungstest ja. Der Rat muss deshalb ein anderer sein.
+        new Notice(t(name === "NetworkError" ? "notice.llmBlocked" : "notice.llmError"));
         console.error("[yijing-oracle]", e);
       }
     } finally {

@@ -38,7 +38,17 @@ export function streamSSE(
     xhr.open(init.method, url);
     for (const [k, v] of Object.entries(init.headers)) xhr.setRequestHeader(k, v);
     xhr.onprogress = (): void => pump();
-    xhr.onerror = (): void => reject(new Error("Chat-Netzwerkfehler"));
+    // Eigener Fehlername statt nur einer Meldung: die Oberflaeche muss diesen Fall von
+    // "Endpunkt nicht erreichbar" unterscheiden koennen. Er tritt naemlich genau dann auf,
+    // wenn der Endpunkt erreichbar IST — der Verbindungstest laeuft ueber `requestUrl` im
+    // Main-Prozess und sendet keinen Origin, dieser Stream als XHR im Renderer sendet
+    // zwingend `app://obsidian.md`. Ein lokaler Server mit Origin-/CORS-Pruefung weist
+    // ihn ab, und "pruefe den Endpunkt" waere dann genau der falsche Rat.
+    xhr.onerror = (): void => {
+      const e = new Error("Chat network request blocked or failed");
+      e.name = "NetworkError";
+      reject(e);
+    };
     xhr.onabort = (): void => reject(abortError());
     xhr.onload = (): void => {
       pump();

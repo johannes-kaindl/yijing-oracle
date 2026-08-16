@@ -44,3 +44,23 @@ describe("streamSSE", () => {
     expect(reasoning.join("")).toBe("denk");
   });
 });
+
+/** Der Renderer-Weg (XHR) sendet einen Origin-Header, den ein lokaler LLM-Server per CORS
+ *  abweisen kann — waehrend Obsidians `requestUrl` (Main-Prozess, kein Origin) denselben
+ *  Server als erreichbar meldet. Der Verbindungstest ist dann gruen und die Deutung
+ *  scheitert trotzdem; damit die Oberflaeche das unterscheiden kann, traegt der Fehler
+ *  seit 2026-08-16 einen eigenen Namen (gemessen gegen LM Studio ohne `--cors`). */
+class FehlerXHR extends FakeXHR {
+  override send(): void {
+    this.onerror?.();
+  }
+}
+
+describe("streamSSE bei Verbindungsfehlern", () => {
+  it("markiert den Netzwerkfehler als eigenen Typ", async () => {
+    (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FehlerXHR;
+    await expect(
+      streamSSE("http://x/v1/chat/completions", { method: "POST", headers: {}, body: "{}" }, () => {}, () => {}),
+    ).rejects.toMatchObject({ name: "NetworkError" });
+  });
+});

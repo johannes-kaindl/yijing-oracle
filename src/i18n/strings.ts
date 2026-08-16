@@ -85,6 +85,8 @@ export function registerI18n(): void {
       "view.regenerate": "Regenerate (new seed)",
       "notice.noEndpoint": "No endpoint reachable, or no model — check the settings.",
       "notice.llmError": "Interpretation failed — check the endpoint in the settings.",
+      "notice.llmBlocked":
+        "The model server refused the streaming request. Local servers usually block requests coming from Obsidian unless CORS is enabled — in LM Studio, restart it with `lms server start --cors`. The connection test passes regardless, because it takes a different route.",
       "notice.noInterpretation": "No interpretation received.",
       "notice.imageError": "Image generation failed: {0}",
       "set.llmHead": "AI interpretation",
@@ -230,6 +232,8 @@ export function registerI18n(): void {
       "view.regenerate": "Neu generieren (neuer Seed)",
       "notice.noEndpoint": "Kein Endpunkt erreichbar oder kein Modell — in den Einstellungen prüfen.",
       "notice.llmError": "Deutung fehlgeschlagen — Endpunkt in den Einstellungen prüfen.",
+      "notice.llmBlocked":
+        "Der Modell-Server hat die Streaming-Anfrage abgewiesen. Lokale Server blockieren Anfragen aus Obsidian meist, solange CORS nicht aktiviert ist — in LM Studio mit `lms server start --cors` neu starten. Der Verbindungstest bleibt davon unberührt, weil er einen anderen Weg nimmt.",
       "notice.noInterpretation": "Keine Deutung erhalten.",
       "notice.imageError": "Bildgenerierung fehlgeschlagen: {0}",
       "set.llmHead": "KI-Deutung",
