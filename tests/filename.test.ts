@@ -42,6 +42,20 @@ describe("buildFilename", () => {
     const out = buildFilename("{question}", V({ question: long }));
     expect(out.length).toBeLessThanOrEqual(48);
   });
+
+  // Regression: bis 0.5.1 löste die Substitution mit `subs[key] ?? "{key}"` auf. subs ist ein
+  // Objekt-Literal, also war subs["toString"] nicht nullish — der Literal-Fallback feuerte nie
+  // und ein geerbtes Prototyp-Member landete im Dateinamen (elfmal Funktions-Quelltext, bei
+  // {__proto__} "object Object"). Der Object.hasOwn-Guard im Kit schliesst das. Die Namensliste
+  // wird bewusst aus Object.prototype erzeugt statt hart notiert: kommt in einer kuenftigen
+  // Engine ein Prototyp-Member dazu, faellt der Test von selbst darauf.
+  it("leaves JavaScript prototype names literal instead of leaking inherited members", () => {
+    const inherited = Object.getOwnPropertyNames(Object.prototype).filter((n) => /^\w+$/.test(n));
+    expect(inherited.length).toBeGreaterThan(0);
+    for (const name of inherited) {
+      expect(buildFilename(`{${name}} {hexpair}`, V())).toBe(`{${name}} H3-H54`);
+    }
+  });
 });
 
 describe("sanitizeFilename", () => {

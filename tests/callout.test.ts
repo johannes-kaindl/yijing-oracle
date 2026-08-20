@@ -13,6 +13,14 @@ describe("wrapCallout", () => {
   it("erhält Leerzeilen als '>'-Zeilen (Callout-Kontinuität)", () => {
     expect(wrapCallout("T", "a\n\nb", "note", false)).toBe("> [!note]- T\n> a\n>\n> b");
   });
+
+  // Regression: bis 0.5.1 sprengte ein \n in Titel ODER Typ den Kopf — alles hinter dem Umbruch
+  // landete als nackter Text NEBEN dem Callout. Der Typ kommt je Sektion aus einem freien
+  // Textfeld (src/obsidian/settings/note-section.ts), dessen trim() nur die Ränder putzt.
+  it("Umbruch in Titel oder Typ sprengt den Kopf nicht — er bleibt EINE Zeile", () => {
+    expect(wrapCallout("A\nB", "x", "note", false)).toBe("> [!note]- A B\n> x");
+    expect(wrapCallout("T", "x", "no\nte", false)).toBe("> [!no te]- T\n> x");
+  });
 });
 
 describe("note-callouts config", () => {
