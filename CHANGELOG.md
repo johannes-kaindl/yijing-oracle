@@ -6,6 +6,23 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **A filename template containing a JavaScript prototype name no longer produces a garbled
+  file name.** Twelve placeholders — `{toString}`, `{constructor}`, `{valueOf}`,
+  `{hasOwnProperty}`, `{isPrototypeOf}`, `{toLocaleString}`, `{propertyIsEnumerable}`,
+  `{__proto__}`, `{__defineGetter__}`, `{__defineSetter__}`, `{__lookupGetter__}`,
+  `{__lookupSetter__}` — resolved to inherited object members instead of staying literal:
+  `{toString}` produced a note named `function toString() { native code }`,
+  `{__proto__}` produced `object Object`. They now stay literal like any other typo in the
+  template, which is what every other unknown placeholder already did. The filename template
+  is a free text field in the settings, so the way in was typing, not code.
+- **A line break in a callout title or type no longer breaks the callout.** Everything after
+  the break used to land as bare text next to the callout; line breaks in the head are now
+  collapsed to a single space. The callout type is a free text field per section, and
+  trimming only removed whitespace at the edges — a break pasted into the middle survived.
+  Output is byte-identical for every input that produced a valid callout before.
+
 ## [0.5.1] — 2026-08-16
 
 ### Fixed

@@ -6,7 +6,7 @@ import { type Reading } from "./reading";
 import { getHexagram, type HexagramData, type HexLine, type Lang, type Register, type TrigramInfo } from "./data";
 import { type FrontmatterField, buildFrontmatter } from "./frontmatter";
 import { MARKER_START, MARKER_END } from "./llm/insert";
-import { wrapCallout } from "./llm/callout";
+import { wrapCallout } from "../vendor/kit/callout";
 import { type CalloutConfig, type CalloutOption, DEFAULT_CALLOUTS } from "./note-callouts";
 import { rulingSentence } from "./ruling";
 

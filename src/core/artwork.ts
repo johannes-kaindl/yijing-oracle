@@ -3,7 +3,7 @@
 // Pure — die Attachment-I/O macht reading-writer.ts.
 import { type Lang } from "./data";
 import { type CalloutOption } from "./note-callouts";
-import { wrapCallout } from "./llm/callout";
+import { wrapCallout } from "../vendor/kit/callout";
 import { MARKER_END as DEUTUNG_END } from "./llm/insert";
 
 export const ARTWORK_MARKER_START = "<!-- yijing:bild:start -->";

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { wrapCallout } from "../src/core/llm/callout";
+import { wrapCallout } from "../src/vendor/kit/callout";
 import { CALLOUT_SECTIONS, DEFAULT_CALLOUTS, mergeCallouts } from "../src/core/note-callouts";
 
 describe("wrapCallout", () => {

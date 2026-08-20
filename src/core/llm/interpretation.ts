@@ -1,4 +1,4 @@
-import { wrapCallout } from "./callout";
+import { wrapCallout } from "../../vendor/kit/callout";
 import { type Lang } from "../data";
 
 export type ThinkingInNote = "closed-callout" | "open-callout" | "text" | "none";
