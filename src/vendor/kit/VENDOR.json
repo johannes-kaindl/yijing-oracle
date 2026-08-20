@@ -1,7 +1,16 @@
 {
   "source": "obsidian-kit",
-  "version": "0.16.0",
-  "sha": "92c60d5",
-  "vendored": "reasoning.ts, settings.ts, endpoint.ts, sse.ts, think.ts (als think-splitter.ts), model-context.ts, endpoint_diagnostics.ts, i18n.ts",
-  "note": "Verbatim snapshot. Never hand-edit. Re-copy from obsidian-kit to update. endpoint_diagnostics.ts und i18n.ts 2026-07-28 re-vendored (drift-audit): der Task-10-Content-Drift war rein kosmetisch (Formatter-Reformat + ein fehlender Inline-Kommentar), jetzt wieder byte-identisch zu 0.16.0."
+  "note": "Verbatim snapshots. Never hand-edit. Re-copy from obsidian-kit to update. Pro Datei gepinnt statt pro Ordner (Form aus finance-ledger/src/vendor/kit/VENDOR.json): dieser Ordner traegt zwei Kit-Staende, und ein pauschales version-Feld waere eine Falschaussage ueber die acht Altdateien. Kein pauschales Nachziehen auf 0.27.0 — s. AGENTS.md 'Die Vendor-Falle' (mit einem nachgezogenen endpoint_diagnostics.ts erbt dieses Repo die Statusklasse 'unauthorized', fuer die es hier keinen t()-Schluessel gibt).",
+  "files": [
+    { "vendored": "pure/callout.ts", "as": "callout.ts", "version": "0.27.0", "sha": "548041b" },
+    { "vendored": "pure/filename-template.ts", "as": "filename-template.ts", "version": "0.27.0", "sha": "548041b" },
+    { "vendored": "pure/reasoning.ts", "as": "reasoning.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird." },
+    { "vendored": "pure/settings.ts", "as": "settings.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand dem Pin nach, im Funktionsrumpf aber byte-identisch zu 0.27.0 (Abweichung nur im Doc-Kommentar) — gemessen 2026-08-20." },
+    { "vendored": "pure/endpoint.ts", "as": "endpoint.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird." },
+    { "vendored": "pure/sse.ts", "as": "sse.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird." },
+    { "vendored": "pure/think-splitter.ts", "as": "think.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — hier unter abweichendem Dateinamen abgelegt (Kopfstempel nennt die Kit-Quelle)." },
+    { "vendored": "pure/model-context.ts", "as": "model-context.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — traegt einen eigenen Kopfstempel mit obsidian-kit#0.7.0." },
+    { "vendored": "pure/endpoint_diagnostics.ts", "as": "endpoint_diagnostics.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — NICHT beilaeufig nachziehen: neuere Kit-Staende kennen die Statusklasse 'unauthorized', fuer die dieses Repo keinen t()-Schluessel hat (AGENTS.md)." },
+    { "vendored": "pure/i18n.ts", "as": "i18n.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — haengt mit endpoint_diagnostics.ts zusammen, nur gemeinsam nachziehen." }
+  ]
 }
