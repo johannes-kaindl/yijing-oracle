@@ -174,7 +174,7 @@ async function openSettingsTab(cdp: Cdp, port: number): Promise<SettingsUi | nul
 
   // Fall 2 (ab 1.13): eigenes Fenster. Das Kriterium ist nicht der Titel (der ist
   // lokalisiert), sondern die Sache: kein Workspace, aber unsere Sektion im DOM.
-  const zweit = await attachTo("settings", port);
+  const zweit = await attachTo("settings", port, PLUGIN_ID);
   if (!zweit) return null;
   const da = await zweit.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-ep-status"));`);
   if (!da) {

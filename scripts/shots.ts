@@ -356,8 +356,12 @@ function null_als_ganzes(): Rect {
 /**
  * Der Einstellungen-Tab — seit Obsidian 1.13 ein **eigenes Fenster**.
  *
- * Es traegt keinen Workspace, deshalb waehlt `attachTo("settings", …)` es ueber die Sache
- * statt ueber den (lokalisierten) Titel. Der Tab ist hoeher als jedes Fenster: aufgenommen
+ * Es traegt keinen Workspace, deshalb waehlt `attachTo("settings", …)` die ART ueber die
+ * Sache statt ueber das erste Wort des Titels ("Settings"/"Einstellungen" ist lokalisiert
+ * und wechselt mit der UI-Sprache). Den VAULT waehlt es seit 2026-08-30 sehr wohl ueber
+ * den Titel, naemlich ueber " - <vault> - Obsidian" — dieser Teil ist nicht lokalisiert.
+ * Deshalb steht REPO_NAME als dritter Parameter da: ohne ihn ist die Wahl bei zwei
+ * offenen Vaults ein Muenzwurf. Der Tab ist hoeher als jedes Fenster: aufgenommen
  * wird er in einer simulierten Fenstergroesse, zugeschnitten bis zum **letzten Kind** des
  * Inhalts-Containers — nicht auf dessen Hoehe, die ist im simulierten Fenster so gross wie
  * die Simulation und ergaebe einen langen leeren Streifen.
@@ -371,7 +375,7 @@ async function settingsBild(cdp: Cdp, port: number, opts: ShotOptions): Promise<
     return true;
   `);
 
-  const fenster = (await attachTo("settings", port)) ?? cdp;
+  const fenster = (await attachTo("settings", port, REPO_NAME)) ?? cdp;
   try {
     const da = await fenster.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-ep-status"));`);
     if (!da) return "settings.png — Tab-Inhalt in keinem Fenster gefunden";
