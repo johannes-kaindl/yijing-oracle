@@ -446,6 +446,10 @@ async function main(): Promise<void> {
       console.log(`  Aufnahmesprache auf "en" gesetzt (Vorwert "${vorher || "(leer)"}" gemerkt)`);
     }
     console.log(
+      "\n⚠️  Erst pruefen, ob schon ein Obsidian laeuft — ein Quit zerstoert den Zustand\n" +
+      "    einer fremden Session, und der eigene Lauf ist danach trotzdem gruen:\n" +
+      "      lsof -nP -iTCP:9222 -sTCP:LISTEN\n" +
+      "    Hoert der Port, haengt jemand dran: erst fragen, dann quitten.\n" +
       "\nJetzt Obsidian neu starten und den Aufnahme-Vault oeffnen:\n" +
         "  osascript -e 'quit app \"Obsidian\"'\n" +
         "  open -a Obsidian --args --remote-debugging-port=9222\n" +
