@@ -59,6 +59,8 @@
 import { execFileSync } from "node:child_process";
 
 import { Cdp, attachTo, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
+import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
+import { join } from "node:path";
 
 const PLUGIN_ID = "yijing-oracle";
 /** manifest.json → name. Nicht lokalisiert — taugt als Anker in der Einstellungs-Suche. */
@@ -822,6 +824,28 @@ async function main(): Promise<void> {
   }
   await schlaf(1500);
 
+  // Herkunfts-Guard: laeuft dieser Smoke ueberhaupt gegen UNSEREN Build? Der Pfad kommt aus
+  // der LAUFENDEN Instanz, nicht aus stagingVaultDir(REPO_NAME) — ein Treiber dockt per
+  // --vault an ein beliebiges Fenster an, und ein aus der Konvention abgeleiteter Pfad pruefte
+  // im Zweifel eine Datei, die mit dem Lauf nichts zu tun hat (Lesson 2026-09-02,
+  // kuro-gamification). `manifest.version` taugt dafuer nicht: Store- und Repo-Build tragen
+  // dieselbe Nummer.
+  //
+  // Die Warnung wird hier NUR gemerkt und unter der Bilanz nochmal ausgegeben — ein
+  // console.warn am Anfang eines mehrminuetigen Laufs ist beim Ablesen des Ergebnisses
+  // weggescrollt, und dann steht wieder ein sauber aussehendes "N/M gruen" da, das fuer den
+  // Repo-Stand nichts belegt (der Zustand vom 2026-08-30, 69 von 150 Punkten).
+  // Deklaration VOR dem try, sonst ist sie im finally nicht mehr sichtbar.
+  let herkunftsWarnung: string | null = null;
+  const vaultInfo = await cdp.evaluate<{ basePath: string; configDir: string }>(`
+    return { basePath: app.vault.adapter.basePath, configDir: app.vault.configDir };
+  `);
+  requireEigenerBuild(
+    join(vaultInfo.basePath, vaultInfo.configDir, "plugins", PLUGIN_ID, "main.js"),
+    join(process.cwd(), "main.js"),   // frisch gebaut, sonst sagt der Vergleich nichts
+    (meldung) => { herkunftsWarnung = meldung; console.warn(meldung); },
+  );
+
   // Vorwert VOR dem try lesen: nur so ist er auch nach einem Abbruch im finally da.
   const originalData = await readVaultFile(cdp, DATA_PATH);
   if (originalData !== null) await writeVaultFile(cdp, DATA_RESCUE, originalData);
@@ -875,6 +899,9 @@ async function main(): Promise<void> {
     const bestanden = checks.filter((c) => c.passed).length;
     console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden`);
     for (const c of checks.filter((c) => !c.passed)) console.log(`  ❌ ${c.name} — ${c.detail}`);
+    if (herkunftsWarnung) {
+      console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
+    }
     cdp.close();
     process.exitCode = bestanden === checks.length ? 0 : 1;
   }

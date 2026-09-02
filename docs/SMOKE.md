@@ -173,6 +173,15 @@ den Nutzer hart:
   `inputEl` wirklich so übernimmt, sagt nur das laufende Programm. Gezählt werden die
   `input[type=password]` im Plugin-Tab: genau eines.
 
+> [!warning] Wer im Settings-Tab **Text** misst, braucht kein `\b`
+> Aus `markdown-presentation` (2026-09-02, im Austausch am CDP-Lock): `textContent` klebt die
+> Texte benachbarter Knoten **ohne Trenner** aneinander — im Tab steht dann etwa
+> `…-Keysettings.themesFolder.name`. Ein Regex mit `\b` vor dem Schlüssel-Präfix findet dort
+> **nichts**, obwohl der rohe Schlüssel sichtbar im Fenster steht: zwischen „y" und „s" ist keine
+> Wortgrenze. Der Prüfpunkt war grün, während der Defekt danebenstand; gefunden hat es nur die
+> Gegenprobe. F6/F7 sind davon **nicht** betroffen (F7 liest `input.type`, F6 zählt
+> `.setting-search-result-item`) — aber der nächste textmessende Prüfpunkt wäre es.
+
 ## Durchläufe
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
