@@ -851,14 +851,6 @@ async function main(): Promise<void> {
   // Repo-Stand nichts belegt (der Zustand vom 2026-08-30, 69 von 150 Punkten).
   // Deklaration VOR dem try, sonst ist sie im finally nicht mehr sichtbar.
   let herkunftsWarnung: string | null = null;
-  const vaultInfo = await cdp.evaluate<{ basePath: string; configDir: string }>(`
-    return { basePath: app.vault.adapter.basePath, configDir: app.vault.configDir };
-  `);
-  requireEigenerBuild(
-    join(vaultInfo.basePath, vaultInfo.configDir, "plugins", PLUGIN_ID, "main.js"),
-    join(process.cwd(), "main.js"),   // frisch gebaut, sonst sagt der Vergleich nichts
-    (meldung) => { herkunftsWarnung = meldung; console.warn(meldung); },
-  );
 
   // Vorwert VOR dem try lesen: nur so ist er auch nach einem Abbruch im finally da.
   const originalData = await readVaultFile(cdp, DATA_PATH);
@@ -866,6 +858,25 @@ async function main(): Promise<void> {
   const aufraeumen: string[] = [];
 
   try {
+    // Der Guard steht FRUEH IM try — beide Haelften sind noetig und ziehen in
+    // verschiedene Richtungen:
+    //   im try, damit das finally laeuft. Dort haengt `cdp.close()`; ein Guard, der davor
+    //     wirft, laesst den CDP-Socket offen. Das ist die Ursache des "haengenden Treibers"
+    //     aus der Dach-Messung vom 2026-08-30, die faelschlich als "zu viele Fenster"
+    //     gelesen wurde. (Dieser Treiber hatte den Fehler: bis 2026-09-02 stand der Aufruf
+    //     VOR dem try — gemeldet von vault-rag, nachgemessen, hier behoben.)
+    //   frueh, damit das finally NICHTS ZU TUN hat: `aufraeumen` ist noch leer, und
+    //     `originalData` wird unveraendert zurueckgeschrieben. Wer den Guard spaeter
+    //     platziert, verliert diese Haelfte.
+    const vaultInfo = await cdp.evaluate<{ basePath: string; configDir: string }>(`
+      return { basePath: app.vault.adapter.basePath, configDir: app.vault.configDir };
+    `);
+    requireEigenerBuild(
+      join(vaultInfo.basePath, vaultInfo.configDir, "plugins", PLUGIN_ID, "main.js"),
+      join(process.cwd(), "main.js"),   // frisch gebaut, sonst sagt der Vergleich nichts
+      (meldung) => { herkunftsWarnung = meldung; console.warn(meldung); },
+    );
+
     await abschnittPanel(cdp);
     await abschnittMigration(cdp);
     await abschnittSettings(cdp, port, workflowFixture);

@@ -189,11 +189,27 @@ den Nutzer hart:
 > Gegenprobe. F6/F7 sind davon **nicht** betroffen (F7 liest `input.type`, F6 zählt
 > `.setting-search-result-item`) — aber der nächste textmessende Prüfpunkt wäre es.
 
-**Warum der Guard abbricht statt zu warnen — und warum er VOR dem `try` steht.** Ein Lauf gegen
+**Warum der Guard abbricht statt zu warnen — und warum er FRÜH IM `try` steht.** Ein Lauf gegen
 fremden Code soll keine Bilanz erzeugen, die jemand später zitiert; deshalb wirft der
-`fremd`-Zweig, statt eine Zeile zu drucken, die im Protokoll untergeht. Und weil der Aufruf vor
-dem `try` sitzt, ist zum Abbruchzeitpunkt noch nichts am Wirt verändert — es gibt nichts
-aufzuräumen, was das übersprungene `finally` hätte erledigen müssen.
+`fremd`-Zweig, statt eine Zeile zu drucken, die im Protokoll untergeht.
+
+Bei der Platzierung ziehen zwei Anforderungen in verschiedene Richtungen, und **man braucht
+beide**:
+
+- **im `try`**, damit das `finally` läuft — dort hängt `cdp.close()`. Ein Guard, der davor wirft,
+  lässt den CDP-Socket offen. Das ist die Ursache des „hängenden Treibers" aus der Dach-Messung
+  vom 2026-08-30, die damals fälschlich als „zu viele Fenster" gelesen wurde.
+- **früh**, damit das `finally` nichts zu tun *hat*: `aufraeumen` ist noch leer, `originalData`
+  wird unverändert zurückgeschrieben. Wer den Guard später platziert, verliert diese Hälfte.
+
+> [!bug] Dieser Treiber hatte den Fehler — und die Doku hat ihn als Vorzug beschrieben
+> Bis zum 2026-09-02 stand der Aufruf **vor** dem `try`, und genau hier stand als Begründung,
+> das sei gut so, weil „nichts aufzuräumen" sei. Die Schlussfolgerung stimmte, die Begründung
+> war falsch, und der Nebeneffekt (offener Socket beim Abbruch) war unsichtbar — der
+> Positivfall-Lauf desselben Tages ist mit offenem Socket beendet worden. Gemeldet von
+> `vault-rag`, an beiden Treibern nachgemessen (dort steht der Aufruf **im** `try`, Z. 265 nach
+> `try {` in Z. 242), hier behoben. **Eine Begründung, die zufällig zum richtigen Ergebnis
+> führt, ist keine geprüfte Begründung** — sie trägt beim nächsten Nachbau nicht mit.
 
 ## Durchläufe
 
