@@ -8,7 +8,7 @@
     "build": "tsc --noEmit && node esbuild.config.mjs --production",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json --noEmit",
-    "test": "node scripts/check-no-abs-paths.mjs && vitest run --passWithNoTests",
+    "test": "node scripts/check-no-abs-paths.mjs && node scripts/check-no-nul-bytes.mjs && vitest run --passWithNoTests",
     "lint": "node scripts/check-no-inline-disables.mjs && eslint src --max-warnings 0",
     "deploy": "npm run build && cp main.js manifest.json styles.css \"${OBSIDIAN_PLUGIN_DIR:?set OBSIDIAN_PLUGIN_DIR}\"/",
     "check:pure": "node scripts/check-pure.mjs",

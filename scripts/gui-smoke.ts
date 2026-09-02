@@ -106,7 +106,15 @@ function record(name: string, passed: boolean, detail: string): void {
 
 /** Was der Lauf bewusst NICHT misst. Steht im Protokoll, damit eine Luecke nicht wie
  *  ein bestandener Punkt aussieht. */
+/** Uebersprungene Abschnitte. Bewusst eine EIGENE Liste und nicht `checks`: ein
+ *  uebersprungener Abschnitt ist weder bestanden noch durchgefallen, und beide Zuordnungen
+ *  waeren falsch (obsidian-transmute hat ihn einmal als gruen gezaehlt, vault-rag als rot —
+ *  derselbe Baufehler in beide Richtungen). Er gehoert aber IN die Bilanz: sonst liest sich
+ *  ein „27/27 bestanden" wie ein vollstaendiger Lauf, obwohl zwei Abschnitte nie liefen. */
+const uebersprungen: string[] = [];
+
 function skipped(name: string, reason: string): void {
+  uebersprungen.push(name);
   console.log(`⏭️  ${name} — uebersprungen: ${reason}`);
 }
 
@@ -903,7 +911,10 @@ async function main(): Promise<void> {
     }
 
     const bestanden = checks.filter((c) => c.passed).length;
-    console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden`);
+    const nachsatz = uebersprungen.length
+      ? ` · ${uebersprungen.length} Abschnitt(e) NICHT gelaufen: ${uebersprungen.join(", ")}`
+      : "";
+    console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden${nachsatz}`);
     for (const c of checks.filter((c) => !c.passed)) console.log(`  ❌ ${c.name} — ${c.detail}`);
     if (herkunftsWarnung) {
       console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
