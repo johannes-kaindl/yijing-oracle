@@ -6,9 +6,10 @@ import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpo
 import { parseLmStudioContext, type ModelContext } from "../vendor/kit/model-context";
 import { type ComfyTransport } from "../core/comfy/client";
 
-/** Passt zu `HttpGet` in chat-client.ts. */
-export async function httpGet(url: string): Promise<{ status: number; json: unknown }> {
-  const r = await requestUrl({ url, throw: false });
+/** Passt zu `HttpGet` in chat-client.ts. `headers` traegt den Authorization-Header, wenn
+ *  ein API-Schluessel konfiguriert ist (authHeaders in core/llm/auth.ts). */
+export async function httpGet(url: string, headers?: Record<string, string>): Promise<{ status: number; json: unknown }> {
+  const r = await requestUrl({ url, headers, throw: false });
   let json: unknown = undefined;
   try { json = r.json; } catch { /* nicht-JSON-Body → json bleibt undefined */ }
   return { status: r.status, json };
@@ -38,8 +39,15 @@ export async function httpPostJson(url: string, body: unknown, timeoutMs = 18000
 }
 
 /** Erreichbarkeits-Probe (GET <baseUrl>/v1/models) mit Klartext-Diagnose. baseUrl normalisiert.
- *  Eigener Timeout via Promise.race, weil requestUrl weder timeout noch Abort kennt. */
-export async function probeEndpoint(baseUrl: string, timeoutMs = 5000): Promise<EndpointStatus> {
+ *  Eigener Timeout via Promise.race, weil requestUrl weder timeout noch Abort kennt.
+ *
+ *  `headers` ist hier NICHT optional im Sinne von "kann man weglassen": ohne den
+ *  Authorization-Header antwortet ein externer Anbieter mit 401, der Endpunkt gilt nie als
+ *  erreichbar und wird von resolveActiveEndpoint still uebersprungen — das Feature wirkt
+ *  tot, ohne Meldung. Deshalb ist der Parameter PFLICHT und steht vor dem Timeout: ein
+ *  vergessener Netzweg soll am Compiler auffallen, nicht an einem Nutzer, dessen Endpunkt
+ *  grundlos als unerreichbar gilt. Wer keinen Schluessel hat, uebergibt authHeaders("") = {}. */
+export async function probeEndpoint(baseUrl: string, headers: Record<string, string>, timeoutMs = 5000): Promise<EndpointStatus> {
   const url = `${baseUrl}/v1/models`;
   let timer: number | undefined;
   const timeout = new Promise<"__timeout__">(resolve => {
@@ -47,7 +55,7 @@ export async function probeEndpoint(baseUrl: string, timeoutMs = 5000): Promise<
   });
   try {
     const raced = await Promise.race([
-      requestUrl({ url, throw: false }).then(r => {
+      requestUrl({ url, headers, throw: false }).then(r => {
         let body: unknown = undefined;
         try { body = r.json; } catch { /* nicht-JSON → body bleibt undefined */ }
         return { status: r.status, body } as const;
@@ -67,9 +75,9 @@ export async function probeEndpoint(baseUrl: string, timeoutMs = 5000): Promise<
 /** Kontextlänge des Modells von einem LM-Studio-Server (GET /api/v0/models). Liefert null,
  *  wenn der Server den Endpunkt nicht kennt (Ollama/MLX/vLLM) oder das Modell fehlt — die
  *  Anzeige entfällt dann stillschweigend, kein Fehler, kein Platzhalter. */
-export async function fetchModelContext(baseUrl: string, model: string): Promise<ModelContext | null> {
+export async function fetchModelContext(baseUrl: string, model: string, headers: Record<string, string>): Promise<ModelContext | null> {
   try {
-    const r = await httpGet(`${baseUrl}/api/v0/models`);
+    const r = await httpGet(`${baseUrl}/api/v0/models`, headers);
     if (r.status !== 200) return null;
     return parseLmStudioContext(r.json, model);
   } catch {

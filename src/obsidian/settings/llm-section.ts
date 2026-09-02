@@ -9,6 +9,7 @@ import { DEFAULT_SYSTEM_PROMPT } from "../../core/llm/defaults";
 import { type LlmSettings, effectiveModel } from "../../core/llm/settings-defaults";
 import { ChatClient } from "../chat-client";
 import { fetchModelContext, httpGet } from "../http";
+import { authHeaders } from "../../core/llm/auth";
 import { buildEndpointList } from "./endpoint-list";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
 
@@ -45,7 +46,26 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
     },
     {
       name: t("set.llmApiKey"),
-      control: { type: "text", key: "llm.apiKey" },
+      desc: t("set.llmApiKeyDesc"),
+      // Ein maskiertes Feld ist schwerer wiederzufinden als ein beschriftetes: der Wert ist
+      // unlesbar, es bleibt die Beschriftung — und die haengt an der UI-Sprache. Diese
+      // Begriffe sind bewusst NICHT uebersetzt: sie sind in beiden Sprachen die, unter denen
+      // gesucht wird.
+      aliases: ["api key", "api-key", "apikey", "token", "bearer", "schluessel", "schlüssel"],
+      // Hatch statt Control, weil Obsidians deklarative API keinen Passwort-Typ kennt:
+      // `SettingTextControl` traegt genau `type: 'text'` und `placeholder` (gemessen an
+      // obsidian.d.ts 1.13.1). Maskieren geht nur ueber das inputEl — und daran kommt nur
+      // ein eigener Renderer. Die Auffindbarkeit kostet das nicht: `searchable`/`aliases`
+      // sitzen auf SettingDefinitionBase, von der auch SettingDefinitionRender erbt.
+      render: (setting: Setting) => {
+        setting.addText((tx) => {
+          tx.inputEl.type = "password";
+          tx.setValue(llm.apiKey);
+          // ctx.write speichert nur (setControlValue) und baut den Tab NICHT neu auf —
+          // ein Rerender je Tastendruck wuerde den Fokus aus dem Feld reissen.
+          tx.onChange((v) => ctx.write("llm.apiKey", v));
+        });
+      },
     },
     {
       name: t("set.llmModel"),
@@ -144,7 +164,7 @@ function promptRow(
 function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettings): void {
   const primary = llm.endpoints[0] ?? "";
 
-  void new ChatClient(primary, llm.model, httpGet).listModels().then((models) => {
+  void new ChatClient(primary, llm.model, httpGet, llm.apiKey).listModels().then((models) => {
     if (models.length) {
       // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
       // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.
@@ -163,7 +183,7 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
       });
 
       // Kontextlänge — entfällt still, wenn der Server sie nicht liefert (Ollama/MLX/vLLM).
-      void fetchModelContext(normalizeEndpoint(primary), llm.model).then((cx) => {
+      void fetchModelContext(normalizeEndpoint(primary), llm.model, authHeaders(llm.apiKey)).then((cx) => {
         const len = cx?.loadedContextLength ?? cx?.maxContextLength;
         if (len) modelSetting.setDesc(t("set.llmContext", len.toLocaleString()));
       });

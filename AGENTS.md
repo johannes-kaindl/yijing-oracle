@@ -31,28 +31,40 @@ npm run release        # Release-Skript (nur auf Zuruf)
 
 ## Conventions
 
-**Beim nächsten Kit-Sweep mitziehen: die Statusklasse `unauthorized`.**
-Dieses Repo führt die Endpunkt-Statusklassen selbst über `t()` (`set.ep.status.*`), hat
-aber noch die **alte** Fassung von `endpoint_diagnostics.ts` vendored — die Klasse gibt es
-hier also noch nicht, und der fehlende Schlüssel fällt (noch) nicht auf. **In dem Moment,
-in dem das Kit nachgezogen wird, erbt dieses Repo den Fehler**: `t()` fällt auf den
-Schlüssel zurück, nicht auf EN, und in der Endpunkt-Zeile stünde `set.ep.status.unauthorized`
-— aussehend wie ein String, nicht wie ein Fehler (gemessen im Sweep 2026-08-16; in
-`markdown-presentation` und `vault-crews` ist genau das bereits eingetreten).
+**Erledigt am 2026-09-02: die Statusklasse `unauthorized`.** Hier stand ein Sperrvermerk —
+dieses Repo führte die Endpunkt-Statusklassen über `t()`, hatte aber die alte Fassung von
+`endpoint_diagnostics.ts` vendored, und ein beiläufiger Kit-Nachzug hätte `t()` auf den
+Schlüsselnamen zurückfallen lassen: in der Endpunkt-Zeile stünde `set.ep.status.unauthorized`,
+aussehend wie ein String, nicht wie ein Fehler (in `markdown-presentation` und `vault-crews`
+bereits eingetreten). Beides ist jetzt da: der Schlüssel in EN und DE, die Datei auf Kit 0.29.0.
 
-**Deshalb gehört zum Kit-Sweep hier beides:** den Schlüssel in EN **und** DE ergänzen und
-einen Vollständigkeits-`Record<EndpointStatusKind, true>` im Test setzen, der am
-`typecheck:test` bricht, sobald eine weitere Klasse dazukommt (CORE-TEST-04; Referenz:
-`obsidian-transmute/tests/i18n-status-keys.test.ts`).
+**Was an seine Stelle tritt, ist kein Vermerk, sondern ein Wächter.**
+`tests/i18n-status-keys.test.ts` hält einen `Record<EndpointStatusKind, true>`; bringt ein
+Kit-Nachzug eine weitere Statusklasse mit, bricht er am `typecheck:test`, bevor der rohe
+Schlüssel eine Oberfläche erreicht (CORE-TEST-04, Form aus `obsidian-transmute`). Gegenprobe
+gefahren: eine erfundene Klasse in der Union lässt genau diesen Record brechen.
+**Die Lehre gilt über diesen Fall hinaus:** ein Sperrvermerk in einer Datei ist eine Notiz, die
+nur wirkt, wenn jemand sie liest — und Vendoring ist der Vorgang, bei dem niemand liest. Wo ein
+Vermerk „nicht beiläufig nachziehen" sagt, gehört stattdessen etwas hin, das beim Nachziehen
+bricht.
 
 **Settings sind zweigleisig — `getSettingDefinitions()` ist die Wahrheit, nicht `display()`.**
 Ab 0.5.0 rendert Obsidian ≥ 1.13 die Einstellungen selbst aus den Definitionen (nur so landen sie
 in der Einstellungs-Suche); `display()` zeichnet dieselbe Struktur mit dem vendorierten Kit-Walker
 für ältere Versionen nach. Wer eine Zeile ergänzt, ergänzt sie **einmal** in der Sektionsdatei —
-und beachtet drei gemessene Fallstricke: bedingte Zeilen **weglassen** statt `visible: false`
+und beachtet vier gemessene Fallstricke: bedingte Zeilen **weglassen** statt `visible: false`
 (der native Renderer wertet es an Gruppen-Items nicht aus), Werte über `core/settings/controls.ts`
-schreiben (der Host prüft nur den Control-Typ, nicht unsere Grenzen), und nach einer
-Zustandsänderung `refreshSettingsTab` anstoßen (der Host rendert gecachte `settingItems`).
+schreiben (der Host prüft nur den Control-Typ, nicht unsere Grenzen), nach einer
+Zustandsänderung `refreshSettingsTab` anstoßen (der Host rendert gecachte `settingItems`), und
+**alles, was das `inputEl` braucht, ist eine `render`-Hatch** — die deklarative API kennt kein
+Passwortfeld: `SettingTextControl` trägt genau `type: 'text'` und `placeholder` (gemessen an
+`obsidian.d.ts` 1.13.1, dazu `SecretComponent`/`SecretStorage` als eigene, ungenutzte Schiene).
+Ob das die Auffindbarkeit kostet, ist noch **abgeleitet, nicht gemessen**: `searchable`/`aliases`
+sitzen auf `SettingDefinitionBase`, von der auch `SettingDefinitionRender` erbt — daraus *sollte*
+folgen, dass eine Hatch-Zeile in der Einstellungs-Suche bleibt. Der DEFER von 2026-07-16 stand
+schon einmal auf so einer Ableitung und war falsch; belastbar wird der Satz erst durch
+Prüfpunkt F6, der die maskierte Zeile in der Suche sucht. Betroffen ist heute das
+API-Schlüssel-Feld (maskiert seit 2026-09-02).
 Prüfpunkte F1–F4 im GUI-Smoke messen genau das.
 
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.

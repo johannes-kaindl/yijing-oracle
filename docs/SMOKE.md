@@ -68,7 +68,7 @@ Deshalb:
 | C1–C7 | Einstellungen-Tab öffnet · A1111-Felder · Umschalten tauscht sie · gültiger Workflow wird erkannt (4 Node-IDs) · kaputtes JSON meldet einen Fehler · leeres Feld schweigt · Zurückschalten stellt wieder her | 3, 6, 9 |
 | D1–D5 | Bild-Kasten erscheint · Generieren startet · PNG kommt an · Anzeige zeigt Fortschritt **oder nennt seinen Grund** · Szenen-Satz steht darunter | 4, 7 |
 | E1–E3 | Speichern legt genau eine Notiz an · Notiz trägt den Text · Bild liegt als Anhang und ist eingebettet | 8 |
-| F1–F5 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur | — (neu mit 0.5.0) |
+| F1–F7 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur · die maskierte API-Schlüssel-Zeile bleibt über Aliase auffindbar · das API-Schlüssel-Feld ist maskiert | — (F1–F5 neu mit 0.5.0, F6–F7 mit dem Auth-Fix 2026-09-02) |
 
 **Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen, ob sich das Panel
 flüssig anfühlt, und der Export eines zweiten Workflows aus ComfyUI (Schritte 5, 10, 11 der
@@ -155,6 +155,23 @@ Ein zweiter Fund aus demselben Lauf, für künftige Treiber: das ausgelagerte
 Einstellungen-Fenster hat einen **eigenen JS-Kontext** und kennt kein `app` — ein
 `app.setting.activeTab` dort wirft `app is not defined`. Definitionen misst man im
 Hauptfenster, das DOM im zweiten.
+
+**F6/F7 messen die eine Zeile, die nicht deklarativ sein darf.** Obsidians Definitions-API kennt
+keinen Passwort-Typ — `SettingTextControl` trägt genau `type: 'text'` und `placeholder` (gemessen
+an `obsidian.d.ts` 1.13.1). Ein Feld, das einen API-Schlüssel trägt, muss aber maskieren, also ist
+diese Zeile eine `render`-Hatch. Damit stehen zwei stille Fehlschläge im Raum, und beide träfen
+den Nutzer hart:
+
+- **F6** — die Zeile fällt aus der Einstellungs-Suche. Auffindbarkeit war der ganze Ertrag von
+  0.5.0; sie an einer Zeile wieder zu verlieren, ohne es zu merken, wäre der teuerste Rückschritt.
+  Gesucht wird nach **„bearer"**: der Begriff steht in *keiner* Beschriftung und in keiner
+  Beschreibung, sondern nur in den `aliases` der Zeile. Ein Treffer beweist deshalb, dass Aliase
+  durchschlagen — eine Suche nach „API" hätte auch angeschlagen, wenn die Definition gar nichts
+  von der Zeile wüsste.
+- **F7** — die Maskierung greift im nativen Pfad nicht. Der Unit-Test
+  (`tests/api-key-field.test.ts`) misst den Renderer gegen den Obsidian-Mock; ob der Host das
+  `inputEl` wirklich so übernimmt, sagt nur das laufende Programm. Gezählt werden die
+  `input[type=password]` im Plugin-Tab: genau eines.
 
 ## Durchläufe
 

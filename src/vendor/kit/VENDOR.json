@@ -1,16 +1,74 @@
 {
   "source": "obsidian-kit",
-  "note": "Verbatim snapshots. Never hand-edit. Re-copy from obsidian-kit to update. Drei Altdateien (reasoning.ts, settings.ts, endpoint.ts) verletzen das historisch: ihre Doc-Kommentare sind gegenueber dem gepinnten Kit-Stand gekuerzt, die Code-Zeilen sind identisch. Wer gegen 92c60d5 difft und Abweichungen sieht, hat also keinen falschen Pin gefunden — es steht bei der jeweiligen Datei. Pro Datei gepinnt statt pro Ordner (Form aus finance-ledger/src/vendor/kit/VENDOR.json): dieser Ordner traegt zwei Kit-Staende, und ein pauschales version-Feld waere eine Falschaussage ueber die acht Altdateien. Kein pauschales Nachziehen auf 0.27.0 — s. AGENTS.md 'Die Vendor-Falle' (mit einem nachgezogenen endpoint_diagnostics.ts erbt dieses Repo die Statusklasse 'unauthorized', fuer die es hier keinen t()-Schluessel gibt).",
+  "note": "Verbatim snapshots. Never hand-edit. Re-copy from obsidian-kit to update. Drei Altdateien (reasoning.ts, settings.ts, endpoint.ts) verletzen das historisch: ihre Doc-Kommentare sind gegenueber dem gepinnten Kit-Stand gekuerzt, die Code-Zeilen sind identisch. Wer gegen 92c60d5 difft und Abweichungen sieht, hat also keinen falschen Pin gefunden — es steht bei der jeweiligen Datei. Pro Datei gepinnt statt pro Ordner (Form aus finance-ledger/src/vendor/kit/VENDOR.json): dieser Ordner traegt mehrere Kit-Staende, und ein pauschales version-Feld waere eine Falschaussage. Der Sperrvermerk gegen ein Nachziehen von endpoint_diagnostics.ts ist am 2026-09-02 ERLEDIGT: die Statusklasse 'unauthorized' hat jetzt einen t()-Schluessel in EN und DE, gesichert durch tests/i18n-status-keys.test.ts (Record-Waechter, bricht am typecheck:test bei jeder weiteren Klasse).",
   "files": [
-    { "vendored": "pure/callout.ts", "as": "callout.ts", "version": "0.27.0", "sha": "548041b" },
-    { "vendored": "pure/filename-template.ts", "as": "filename-template.ts", "version": "0.27.0", "sha": "548041b" },
-    { "vendored": "pure/reasoning.ts", "as": "reasoning.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird. NICHT byte-identisch zu 0.16.0: der Doc-Kommentar von reasoningHappened ist hier um eine Zeile gekuerzt. Code-Zeilen sind identisch (gemessen 2026-08-20, diff gegen 92c60d5 ohne Kommentar-/Leerzeilen) — die Abweichung ist eine Hand-Edit-Altlast, kein Versionsrueckstand. So auch in KIT-MATRIX.md gefuehrt." },
-    { "vendored": "pure/settings.ts", "as": "settings.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand dem Pin nach, im Funktionsrumpf aber byte-identisch zu 0.27.0 (Abweichung nur im Doc-Kommentar) — gemessen 2026-08-20." },
-    { "vendored": "pure/endpoint.ts", "as": "endpoint.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird. NICHT byte-identisch zu 0.16.0: die Doc-Kommentare von resolveActiveEndpoint und parseEndpointList sind hier gekuerzt (14 Zeilen weniger). Code-Zeilen sind identisch (gemessen 2026-08-20, diff gegen 92c60d5 ohne Kommentar-/Leerzeilen) — die Abweichung ist eine Hand-Edit-Altlast, kein Versionsrueckstand. So auch in KIT-MATRIX.md gefuehrt." },
-    { "vendored": "pure/sse.ts", "as": "sse.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird." },
-    { "vendored": "pure/think-splitter.ts", "as": "think.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — hier unter abweichendem Dateinamen abgelegt (Kopfstempel nennt die Kit-Quelle)." },
-    { "vendored": "pure/model-context.ts", "as": "model-context.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — traegt einen eigenen Kopfstempel mit obsidian-kit#0.7.0." },
-    { "vendored": "pure/endpoint_diagnostics.ts", "as": "endpoint_diagnostics.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — NICHT beilaeufig nachziehen: neuere Kit-Staende kennen die Statusklasse 'unauthorized', fuer die dieses Repo keinen t()-Schluessel hat (AGENTS.md)." },
-    { "vendored": "pure/i18n.ts", "as": "i18n.ts", "version": "0.16.0", "sha": "92c60d5", "note": "Rueckstand — haengt mit endpoint_diagnostics.ts zusammen, nur gemeinsam nachziehen." }
+    {
+      "vendored": "pure/callout.ts",
+      "as": "callout.ts",
+      "version": "0.27.0",
+      "sha": "548041b"
+    },
+    {
+      "vendored": "pure/filename-template.ts",
+      "as": "filename-template.ts",
+      "version": "0.27.0",
+      "sha": "548041b"
+    },
+    {
+      "vendored": "pure/reasoning.ts",
+      "as": "reasoning.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird. NICHT byte-identisch zu 0.16.0: der Doc-Kommentar von reasoningHappened ist hier um eine Zeile gekuerzt. Code-Zeilen sind identisch (gemessen 2026-08-20, diff gegen 92c60d5 ohne Kommentar-/Leerzeilen) — die Abweichung ist eine Hand-Edit-Altlast, kein Versionsrueckstand. So auch in KIT-MATRIX.md gefuehrt."
+    },
+    {
+      "vendored": "pure/settings.ts",
+      "as": "settings.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand dem Pin nach, im Funktionsrumpf aber byte-identisch zu 0.27.0 (Abweichung nur im Doc-Kommentar) — gemessen 2026-08-20."
+    },
+    {
+      "vendored": "pure/endpoint.ts",
+      "as": "endpoint.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird. NICHT byte-identisch zu 0.16.0: die Doc-Kommentare von resolveActiveEndpoint und parseEndpointList sind hier gekuerzt (14 Zeilen weniger). Code-Zeilen sind identisch (gemessen 2026-08-20, diff gegen 92c60d5 ohne Kommentar-/Leerzeilen) — die Abweichung ist eine Hand-Edit-Altlast, kein Versionsrueckstand. So auch in KIT-MATRIX.md gefuehrt."
+    },
+    {
+      "vendored": "pure/sse.ts",
+      "as": "sse.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand — nur nachziehen, wenn der Satz bewusst gehoben wird."
+    },
+    {
+      "vendored": "pure/think-splitter.ts",
+      "as": "think.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand — hier unter abweichendem Dateinamen abgelegt (Kopfstempel nennt die Kit-Quelle)."
+    },
+    {
+      "vendored": "pure/model-context.ts",
+      "as": "model-context.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand — traegt einen eigenen Kopfstempel mit obsidian-kit#0.7.0."
+    },
+    {
+      "vendored": "src/vendor/code-kit/pure/endpoint_diagnostics.ts",
+      "as": "endpoint_diagnostics.ts",
+      "version": "0.29.0",
+      "sha": "7c04a48",
+      "note": "Nachgezogen 2026-09-02 (war 0.16.0/92c60d5). Bringt die Statusklasse 'unauthorized' (401/403 galt vorher als 'not-an-llm-api') und extractModelIds — Letzteres noch UNGENUTZT: ChatClient.listModels haelt eine eigene, sortierende Fassung. Das Kit vendort diese Datei seinerseits aus code-kit@0.5.0; der Kopfstempel nennt beide Stationen, damit die Kopier-Kette sichtbar bleibt."
+    },
+    {
+      "vendored": "pure/i18n.ts",
+      "as": "i18n.ts",
+      "version": "0.16.0",
+      "sha": "92c60d5",
+      "note": "Rueckstand dem Pin nach. Die fruehere Angabe 'haengt mit endpoint_diagnostics.ts zusammen, nur gemeinsam nachziehen' ist am 2026-09-02 gemessen hinfaellig: die Engine ist inhaltlich identisch mit dem aktuellen code-kit-Stand (src/ts/pure/i18n.ts), einziger Unterschied ist eine zusaetzliche Kommentarzeile hier. Es gab keine Kopplung."
+    }
   ]
 }

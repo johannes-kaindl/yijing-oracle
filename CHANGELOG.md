@@ -8,6 +8,19 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- **The API key is now actually sent.** The setting existed since 0.2.0, was stored, and was
+  never put on the wire — no request carried an `Authorization` header. Anyone pointing the
+  plugin at an external OpenAI-compatible provider got a 401 with no usable hint, because the
+  field looked filled in. The key now travels on every LLM request: the chat stream, the model
+  list, the LM Studio context lookup **and the reachability probe**. The probe is the one that
+  mattered most: without the header an authenticated endpoint answers 401, never counts as
+  reachable, and is silently skipped — the feature looked dead rather than misconfigured.
+- **The API key field is masked.** It was a plain text field, so the key was readable in
+  screenshots and during screen sharing.
+- **An endpoint that rejects the key now says so.** A 401 or 403 was reported as "Responds, but
+  is not an OpenAI-compatible endpoint" — the least helpful thing to say about a server that is
+  answering correctly and only refusing the credentials. It now reads "Access denied — the API
+  key is missing or invalid."
 - **A filename template containing a JavaScript prototype name no longer produces a garbled
   file name.** Twelve placeholders — `{toString}`, `{constructor}`, `{valueOf}`,
   `{hasOwnProperty}`, `{isPrototypeOf}`, `{toLocaleString}`, `{propertyIsEnumerable}`,

@@ -26,6 +26,7 @@ import { OracleView, VIEW_TYPE_YIJING, type OracleHost } from "./obsidian/view";
 import { writeReading } from "./obsidian/reading-writer";
 import { nowStamp } from "./obsidian/clock";
 import { probeEndpoint } from "./obsidian/http";
+import { authHeaders } from "./core/llm/auth";
 import { normalizeEndpoint } from "./vendor/kit/endpoint";
 import { type EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
 
@@ -90,7 +91,7 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
   /** SettingsHost: Per-Zeile-Probe für den Endpunkt-Editor. Injiziert, damit die
    *  Settings-Schicht die Netz-Anbindung nicht selbst kennt. */
   probeEndpoint(endpoint: string): Promise<EndpointStatus> {
-    return probeEndpoint(normalizeEndpoint(endpoint));
+    return probeEndpoint(normalizeEndpoint(endpoint), authHeaders(this.settings.llm.apiKey));
   }
 
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */

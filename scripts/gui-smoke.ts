@@ -611,6 +611,36 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     `nativ ${nativZeilen} Zeilen, display()-Fallback ${fallbackZeilen}`,
   );
 
+  // F6/F7 messen die API-Schluessel-Zeile. Sie ist der einzige Fall, in dem eine Zeile
+  // maskieren MUSS und die deklarative API es nicht kann (SettingTextControl kennt nur
+  // type: 'text') — sie ist deshalb eine render-Hatch. Zwei Dinge koennen dabei still
+  // schiefgehen, und beide waeren dem Nutzer gegenueber schwerwiegend:
+  //   F6 — die Zeile faellt aus der Einstellungs-Suche. Genau die Auffindbarkeit war der
+  //        ganze Ertrag von 0.5.0. Gesucht wird nach "bearer": der Begriff steht in KEINER
+  //        Beschriftung, ein Treffer beweist also, dass `aliases` durchschlaegt, und nicht
+  //        nur, dass irgendein Wort irgendwo vorkommt.
+  //   F7 — die Maskierung greift im nativen Pfad nicht. Der Unit-Test misst den Renderer
+  //        gegen den Mock; ob Obsidian das inputEl wirklich so uebernimmt, sagt nur das
+  //        laufende Programm.
+  const trefferAlias = await sucheInEinstellungen(ui, "bearer");
+  record(
+    "F6 maskierte Zeile bleibt ueber Aliase auffindbar",
+    trefferAlias > 0,
+    `"bearer" → ${trefferAlias} Treffer unter "${PLUGIN_NAME}" (Begriff kommt in keiner Beschriftung vor)`,
+  );
+
+  await sucheInEinstellungen(ui, "");
+  const maskiert = await ui.cdp.evaluate<{ felder: number; typen: string[] }>(`
+    const wurzel = document.querySelector(".vertical-tab-content-container") || document;
+    const felder = [...wurzel.querySelectorAll("input")].filter((i) => i.type === "password");
+    return { felder: felder.length, typen: felder.map((f) => f.type) };
+  `);
+  record(
+    "F7 API-Schluessel-Feld ist maskiert",
+    maskiert.felder === 1,
+    `${maskiert.felder} Feld(er) mit type=password im Plugin-Tab`,
+  );
+
   await closeSettings(cdp, ui);
 }
 

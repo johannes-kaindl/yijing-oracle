@@ -1,6 +1,6 @@
-// vendored from obsidian-kit, src/pure/endpoint_diagnostics.ts
+// vendored from obsidian-kit@0.29.0 (src/vendor/code-kit/pure/endpoint_diagnostics.ts), urspruenglich code-kit@0.5.0 — do not hand-edit
 export type EndpointStatusKind =
-  | "ok" | "refused" | "unknown-host" | "timeout" | "not-an-llm-api" | "unknown";
+  | "ok" | "refused" | "unknown-host" | "timeout" | "not-an-llm-api" | "unauthorized" | "unknown";
 
 export interface EndpointStatus {
   reachable: boolean;         // true nur bei kind === "ok"
@@ -21,6 +21,7 @@ const KLARTEXT: Record<Exclude<EndpointStatusKind, "unknown">, string> = {
   "unknown-host": "Hostname unbekannt — Tippfehler in der Adresse?",
   "timeout": "Zeitüberschreitung — Netz nicht erreichbar (falsches Netz / VPN aus?).",
   "not-an-llm-api": "Antwortet, ist aber kein OpenAI-kompatibler Endpunkt — falscher Pfad/Dienst?",
+  "unauthorized": "Zugriff verweigert — Schlüssel fehlt oder ist ungültig.",
 };
 
 function hasModelListForm(body: unknown): boolean {
@@ -38,6 +39,9 @@ export function classifyEndpointStatus(input: ProbeInput): EndpointStatus {
   if (input.kind === "response") {
     if (input.status === 200 && hasModelListForm(input.body)) {
       return { reachable: true, kind: "ok", klartext: KLARTEXT["ok"] };
+    }
+    if (input.status === 401 || input.status === 403) {
+      return { reachable: false, kind: "unauthorized", klartext: KLARTEXT["unauthorized"] };
     }
     return { reachable: false, kind: "not-an-llm-api", klartext: KLARTEXT["not-an-llm-api"] };
   }
@@ -97,4 +101,19 @@ export function validateEndpointInput(url: string): EndpointWarning[] {
     warnings.push({ rule: "placeholder-ip", message: "Sieht aus wie eine Beispiel-/Platzhalter-Adresse" });
   }
   return warnings;
+}
+
+/** Zieht die Modell-ids aus der Antwort von `GET /v1/models` (OpenAI-kompatible Form
+ *  `{ data: [{ id }] }`). Tolerant gegen alles, was ein Endpunkt statt JSON liefern kann:
+ *  HTML-Fehlerseiten, `null`, fehlendes `data`, Einträge ohne `id`. Wirft nie — ein
+ *  unbrauchbarer Body ergibt eine leere Liste, die der Aufrufer wie „keine Modelle"
+ *  behandelt. Gegenstück zu `classifyEndpointStatus`, das denselben Body auf
+ *  *Erreichbarkeit* prüft; beide werden typisch am selben Probe-Ergebnis aufgerufen. */
+export function extractModelIds(body: unknown): string[] {
+  if (typeof body !== "object" || body === null) return [];
+  const data = (body as { data?: unknown }).data;
+  if (!Array.isArray(data)) return [];
+  return data
+    .map((entry) => (typeof entry === "object" && entry !== null ? (entry as { id?: unknown }).id : undefined))
+    .filter((id): id is string => typeof id === "string");
 }

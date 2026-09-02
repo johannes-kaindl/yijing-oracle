@@ -29,6 +29,7 @@ import { Txt2ImgClient } from "./image-client";
 import { ComfyClient } from "../core/comfy/client";
 import { ComfyProgressSocket } from "./comfy-progress";
 import { comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
+import { authHeaders } from "../core/llm/auth";
 import { normalizeEndpoint, resolveActiveEndpoint } from "../vendor/kit/endpoint";
 import { nowStamp } from "./clock";
 
@@ -353,7 +354,7 @@ export class OracleView extends ItemView {
     // (localhost am Host vs. LAN-IP unterwegs) ohne Umkonfiguration.
     const endpoint = await resolveActiveEndpoint(
       llm.endpoints,
-      async (ep) => (await probeEndpoint(ep)).reachable,
+      async (ep) => (await probeEndpoint(ep, authHeaders(llm.apiKey))).reachable,
     );
     if (!endpoint) {
       new Notice(t("notice.noEndpoint"));
@@ -364,7 +365,7 @@ export class OracleView extends ItemView {
     // ab, dass die Settings noch nie geöffnet und so kein Default persistiert wurde).
     let model = llm.model.trim();
     if (!model) {
-      const models = await new ChatClient(endpoint, "", httpGet).listModels();
+      const models = await new ChatClient(endpoint, "", httpGet, llm.apiKey).listModels();
       model = effectiveModel("", models);
     }
     if (!model) {
@@ -381,7 +382,7 @@ export class OracleView extends ItemView {
     c.interpretation = { answer: "", reasoning: "", model };
     await this.render();
 
-    const client = new ChatClient(endpoint, model, httpGet);
+    const client = new ChatClient(endpoint, model, httpGet, llm.apiKey);
     try {
       const res = await client.stream(
         messages,
