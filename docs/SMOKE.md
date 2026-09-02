@@ -189,10 +189,17 @@ den Nutzer hart:
 > Gegenprobe. F6/F7 sind davon **nicht** betroffen (F7 liest `input.type`, F6 zählt
 > `.setting-search-result-item`) — aber der nächste textmessende Prüfpunkt wäre es.
 
+**Warum der Guard abbricht statt zu warnen — und warum er VOR dem `try` steht.** Ein Lauf gegen
+fremden Code soll keine Bilanz erzeugen, die jemand später zitiert; deshalb wirft der
+`fremd`-Zweig, statt eine Zeile zu drucken, die im Protokoll untergeht. Und weil der Aufruf vor
+dem `try` sitzt, ist zum Abbruchzeitpunkt noch nichts am Wirt verändert — es gibt nichts
+aufzuräumen, was das übersprungene `finally` hätte erledigen müssen.
+
 ## Durchläufe
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
 |---|---|---|---|
+| 2026-09-02 (2) | 1.13.7 (Catalyst), ohne Bildlauf | **27/27 · 2 Abschnitte nicht gelaufen** | ✅ **Herkunfts-Guard im Positivfall gesehen**, mit dem eigenen Einbau: eine Kommentarzeile an die Vault-`main.js` (gültiges JS, das Plugin lief weiter) → Abbruch mit Byte- und sha1-Vergleich, **kein Prüfpunkt lief**. 101 Bytes reichten. Danach deployt → wieder still, 27/27. Damit ist sein Schweigen ein Messwert: „Build ist echt“, nicht „Guard tot“ |
 | 2026-09-02 | 1.13.7 (Catalyst), ohne Bildlauf (`--kein-bild`) | **27/27** | ✅ zwei Sabotagen **einzeln** gefahren, je genau ein Punkt rot und kein zweiter mit: `aliases` entfernt → F6 rot (26/27), Maskierung entfernt → F7 rot (26/27). **F6 war dabei zuerst blind** (s. o.) — der Fehler fiel nur auf, weil der Punkt trotz Sabotage grün BLIEB. Herkunft belegt: Drei-Datei-Hash vor jedem Lauf + Guard still. Staging-Vault `yijing-oracle`, nicht Pallas |
 | 2026-08-16 (3) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **33/33** | ✅ F5 hatte im ersten Lauf einen echten Befund (48 ≠ 49 Zeilen, s. oben) — nach dem Fix beide Pfade 49 |
 | 2026-08-16 (2) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **32/32** | ✅ Vorher-Messung gegen den 0.4.0-Stand: `settingItems` 0 statt 7, 0 Suchtreffer statt 1 (Tabelle oben). F4 zusätzlich gegen einen Unsinns-Begriff: 0 Treffer |
