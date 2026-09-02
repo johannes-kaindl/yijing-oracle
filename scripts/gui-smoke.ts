@@ -925,13 +925,27 @@ async function main(): Promise<void> {
     const nachsatz = uebersprungen.length
       ? ` · ${uebersprungen.length} Abschnitt(e) NICHT gelaufen: ${uebersprungen.join(", ")}`
       : "";
-    console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden${nachsatz}`);
-    for (const c of checks.filter((c) => !c.passed)) console.log(`  ❌ ${c.name} — ${c.detail}`);
-    if (herkunftsWarnung) {
-      console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
+    // Kein einziger Pruefpunkt = Abbruch vor der ersten Messung (typisch: der
+    // Herkunfts-Guard). Das darf NICHT als Bilanz erscheinen: "0/0 bestanden" liest sich wie
+    // ein bestandener Lauf, und `bestanden === checks.length` ist bei 0 === 0 wahr — der
+    // exitCode waere 0 gewesen. Gerettet hat ihn bisher nur die unbehandelte Exception; wer
+    // sie je faengt, haette einen "erfolgreichen" Lauf ohne eine einzige Messung.
+    // Gemessen am 2026-09-02, unmittelbar nachdem der Guard ins try wanderte und das finally
+    // erstmals im Abbruchfall lief — der Fix des einen Fehlers hat den anderen sichtbar
+    // gemacht, der vorher hinter dem uebersprungenen finally lag.
+    if (checks.length === 0) {
+      console.log("\nKEIN Pruefpunkt gelaufen — der Lauf wurde abgebrochen, bevor gemessen wurde.");
+      cdp.close();
+      process.exitCode = 1;
+    } else {
+      console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden${nachsatz}`);
+      for (const c of checks.filter((c) => !c.passed)) console.log(`  ❌ ${c.name} — ${c.detail}`);
+      if (herkunftsWarnung) {
+        console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
+      }
+      cdp.close();
+      process.exitCode = bestanden === checks.length ? 0 : 1;
     }
-    cdp.close();
-    process.exitCode = bestanden === checks.length ? 0 : 1;
   }
 }
 

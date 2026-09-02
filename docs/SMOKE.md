@@ -210,11 +210,21 @@ beide**:
 > `vault-rag`, an beiden Treibern nachgemessen (dort steht der Aufruf **im** `try`, Z. 265 nach
 > `try {` in Z. 242), hier behoben. **Eine Begründung, die zufällig zum richtigen Ergebnis
 > führt, ist keine geprüfte Begründung** — sie trägt beim nächsten Nachbau nicht mit.
+>
+> **Der Fix hat sofort einen zweiten Fehler freigelegt, der hinter dem ersten lag.** Sobald das
+> `finally` im Abbruchfall lief, druckte es „Ergebnis: **0/0 bestanden**" — und
+> `bestanden === checks.length` ist bei `0 === 0` wahr, also wurde `process.exitCode = 0`
+> gesetzt. Gerettet hat den Lauf nur die unbehandelte Exception; wer sie je fängt, hätte einen
+> „erfolgreichen" Lauf ohne eine einzige Messung. Jetzt: `KEIN Pruefpunkt gelaufen — der Lauf
+> wurde abgebrochen, bevor gemessen wurde`, Exit 1. **Ein übersprungener Codepfad versteckt die
+> Fehler, die in ihm stecken** — der zweite war zwei Wochen unsichtbar, weil der erste ihn nie
+> zur Ausführung kommen ließ.
 
 ## Durchläufe
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
 |---|---|---|---|
+| 2026-09-02 (3) | 1.13.7 (Catalyst), ohne Bildlauf | **27/27 · 2 Abschnitte nicht gelaufen** | ✅ Guard-Platzierung korrigiert (vor dem `try` → früh **im** `try`) und verifiziert: der Abbruchlauf zeigt jetzt die Aufräum-Ausgabe, `cdp.close()` läuft. Dabei fiel die `0/0 bestanden`-Bilanz auf (Exit wäre 0 gewesen) — behoben, Abbruch meldet jetzt „KEIN Pruefpunkt gelaufen“ mit Exit 1. Bestätigungslauf danach: 27/27, `npm-exit=0` |
 | 2026-09-02 (2) | 1.13.7 (Catalyst), ohne Bildlauf | **27/27 · 2 Abschnitte nicht gelaufen** | ✅ **Herkunfts-Guard im Positivfall gesehen**, mit dem eigenen Einbau: eine Kommentarzeile an die Vault-`main.js` (gültiges JS, das Plugin lief weiter) → Abbruch mit Byte- und sha1-Vergleich, **kein Prüfpunkt lief**. 101 Bytes reichten. Danach deployt → wieder still, 27/27. Damit ist sein Schweigen ein Messwert: „Build ist echt“, nicht „Guard tot“ |
 | 2026-09-02 | 1.13.7 (Catalyst), ohne Bildlauf (`--kein-bild`) | **27/27** | ✅ zwei Sabotagen **einzeln** gefahren, je genau ein Punkt rot und kein zweiter mit: `aliases` entfernt → F6 rot (26/27), Maskierung entfernt → F7 rot (26/27). **F6 war dabei zuerst blind** (s. o.) — der Fehler fiel nur auf, weil der Punkt trotz Sabotage grün BLIEB. Herkunft belegt: Drei-Datei-Hash vor jedem Lauf + Guard still. Staging-Vault `yijing-oracle`, nicht Pallas |
 | 2026-08-16 (3) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **33/33** | ✅ F5 hatte im ersten Lauf einen echten Befund (48 ≠ 49 Zeilen, s. oben) — nach dem Fix beide Pfade 49 |
