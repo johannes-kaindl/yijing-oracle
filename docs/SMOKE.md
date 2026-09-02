@@ -164,10 +164,17 @@ den Nutzer hart:
 
 - **F6** — die Zeile fällt aus der Einstellungs-Suche. Auffindbarkeit war der ganze Ertrag von
   0.5.0; sie an einer Zeile wieder zu verlieren, ohne es zu merken, wäre der teuerste Rückschritt.
-  Gesucht wird nach **„bearer"**: der Begriff steht in *keiner* Beschriftung und in keiner
-  Beschreibung, sondern nur in den `aliases` der Zeile. Ein Treffer beweist deshalb, dass Aliase
-  durchschlagen — eine Suche nach „API" hätte auch angeschlagen, wenn die Definition gar nichts
-  von der Zeile wüsste.
+  Gesucht wird nach **„token"**: der Begriff steht in keinem der vier Strings der Zeile
+  (`name`/`desc` in EN und DE), sondern nur in ihren `aliases`. Ein Treffer beweist deshalb, dass
+  Aliase durchschlagen — eine Suche nach „API" hätte auch angeschlagen, wenn die Definition gar
+  nichts von der Zeile wüsste.
+  > [!bug] Dieser Prüfpunkt war beim Erstlauf blind — und der Erstlauf war grün
+  > Zuerst suchte F6 nach **„bearer"**. Er blieb grün, obwohl die Gegenprobe die `aliases`
+  > entfernt hatte: derselbe Commit hatte eine Erklärzeile ergänzt, die
+  > „Authorization: Bearer …" enthält — der Punkt maß die **Beschreibung** statt der Aliase.
+  > Ohne Sabotage hätte ein grünes 27/27 den blinden Prüfpunkt beglaubigt. **Ein Prüfpunkt, der
+  > einen Suchbegriff verwendet, muss belegen, dass der Begriff nur an der geprüften Stelle
+  > steht** — und der Beleg ist die Gegenprobe, nicht die Behauptung im Kommentar.
 - **F7** — die Maskierung greift im nativen Pfad nicht. Der Unit-Test
   (`tests/api-key-field.test.ts`) misst den Renderer gegen den Obsidian-Mock; ob der Host das
   `inputEl` wirklich so übernimmt, sagt nur das laufende Programm. Gezählt werden die
@@ -186,6 +193,7 @@ den Nutzer hart:
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
 |---|---|---|---|
+| 2026-09-02 | 1.13.7 (Catalyst), ohne Bildlauf (`--kein-bild`) | **27/27** | ✅ zwei Sabotagen **einzeln** gefahren, je genau ein Punkt rot und kein zweiter mit: `aliases` entfernt → F6 rot (26/27), Maskierung entfernt → F7 rot (26/27). **F6 war dabei zuerst blind** (s. o.) — der Fehler fiel nur auf, weil der Punkt trotz Sabotage grün BLIEB. Herkunft belegt: Drei-Datei-Hash vor jedem Lauf + Guard still. Staging-Vault `yijing-oracle`, nicht Pallas |
 | 2026-08-16 (3) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **33/33** | ✅ F5 hatte im ersten Lauf einen echten Befund (48 ≠ 49 Zeilen, s. oben) — nach dem Fix beide Pfade 49 |
 | 2026-08-16 (2) | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **32/32** | ✅ Vorher-Messung gegen den 0.4.0-Stand: `settingItems` 0 statt 7, 0 Suchtreffer statt 1 (Tabelle oben). F4 zusätzlich gegen einen Unsinns-Begriff: 0 Treffer |
 | 2026-08-16 | 1.13.7 (Catalyst), ComfyUI 0.30.0 | **28/28** | ✅ zwei Defekte künstlich eingebaut, jeweils genau die erwarteten Punkte rot: Ausfall-Meldung ausgebaut → **27/28** (nur D4, mit dem historischen Symptom im Text); `image`-Defaults-Merge ausgebaut → **16/20** (B1, B4 direkt; C2, C3 als Folgewirkung in der UI) |

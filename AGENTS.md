@@ -59,12 +59,12 @@ Zustandsänderung `refreshSettingsTab` anstoßen (der Host rendert gecachte `set
 **alles, was das `inputEl` braucht, ist eine `render`-Hatch** — die deklarative API kennt kein
 Passwortfeld: `SettingTextControl` trägt genau `type: 'text'` und `placeholder` (gemessen an
 `obsidian.d.ts` 1.13.1, dazu `SecretComponent`/`SecretStorage` als eigene, ungenutzte Schiene).
-Ob das die Auffindbarkeit kostet, ist noch **abgeleitet, nicht gemessen**: `searchable`/`aliases`
-sitzen auf `SettingDefinitionBase`, von der auch `SettingDefinitionRender` erbt — daraus *sollte*
-folgen, dass eine Hatch-Zeile in der Einstellungs-Suche bleibt. Der DEFER von 2026-07-16 stand
-schon einmal auf so einer Ableitung und war falsch; belastbar wird der Satz erst durch
-Prüfpunkt F6, der die maskierte Zeile in der Suche sucht. Betroffen ist heute das
-API-Schlüssel-Feld (maskiert seit 2026-09-02).
+Das kostet die Auffindbarkeit **nicht** — am 2026-09-02 gegen 1.13.7 gemessen, nicht abgeleitet:
+`searchable`/`aliases` sitzen auf `SettingDefinitionBase`, von der auch `SettingDefinitionRender`
+erbt, und Prüfpunkt **F6** findet die maskierte Zeile über einen Alias (ohne `aliases` 0 Treffer,
+mit 1). Betroffen ist heute das API-Schlüssel-Feld (maskiert seit 2026-09-02).
+**Gib einer maskierten Zeile `aliases`**: ihr Wert ist unlesbar, es bleibt die Beschriftung — und
+die hängt an der UI-Sprache.
 Prüfpunkte F1–F4 im GUI-Smoke messen genau das.
 
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.

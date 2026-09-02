@@ -618,17 +618,23 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
   // type: 'text') — sie ist deshalb eine render-Hatch. Zwei Dinge koennen dabei still
   // schiefgehen, und beide waeren dem Nutzer gegenueber schwerwiegend:
   //   F6 — die Zeile faellt aus der Einstellungs-Suche. Genau die Auffindbarkeit war der
-  //        ganze Ertrag von 0.5.0. Gesucht wird nach "bearer": der Begriff steht in KEINER
-  //        Beschriftung, ein Treffer beweist also, dass `aliases` durchschlaegt, und nicht
-  //        nur, dass irgendein Wort irgendwo vorkommt.
+  //        ganze Ertrag von 0.5.0. Gesucht wird nach "token": der Begriff steht in KEINEM der
+  //        vier Strings der Zeile (name/desc in EN und DE), ein Treffer beweist also, dass
+  //        `aliases` durchschlaegt, und nicht nur, dass irgendein Wort irgendwo vorkommt.
+  //        ⚠️ Hier stand zuerst "bearer" — und der Punkt war GRUEN, obwohl die Gegenprobe die
+  //        Aliase entfernt hatte: "Authorization: Bearer …" steht in der Erklaerzeile, die
+  //        derselbe Commit hinzugefuegt hat. Der Punkt mass die Beschreibung statt der Aliase.
+  //        Gefunden hat das nur die Sabotage; ein gruener Erstlauf haette den Fehler
+  //        beglaubigt (Muster von markdown-presentation, 2026-09-02: ein Punkt, der trotz
+  //        Sabotage gruen BLEIBT, ist sofort verdaechtig).
   //   F7 — die Maskierung greift im nativen Pfad nicht. Der Unit-Test misst den Renderer
   //        gegen den Mock; ob Obsidian das inputEl wirklich so uebernimmt, sagt nur das
   //        laufende Programm.
-  const trefferAlias = await sucheInEinstellungen(ui, "bearer");
+  const trefferAlias = await sucheInEinstellungen(ui, "token");
   record(
     "F6 maskierte Zeile bleibt ueber Aliase auffindbar",
     trefferAlias > 0,
-    `"bearer" → ${trefferAlias} Treffer unter "${PLUGIN_NAME}" (Begriff kommt in keiner Beschriftung vor)`,
+    `"token" → ${trefferAlias} Treffer unter "${PLUGIN_NAME}" (Begriff steht nur in den aliases)`,
   );
 
   await sucheInEinstellungen(ui, "");
