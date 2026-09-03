@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-09-03
+
 ### Security
 
 - **The API key no longer lives in `data.json`.** Until now it was stored there in plain text —
