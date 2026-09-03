@@ -135,6 +135,10 @@ order is the priority. That way one config covers every network (localhost at yo
 desk, LAN IP on the go) without switching anything. Each row has its own connection
 test with a plain-language result.
 
+**On the API key:** on Obsidian 1.11.4 or newer it is kept in Obsidian's keychain
+(OS-encrypted, per device), not in the vault — so it is never synced or backed up along
+with your notes, and you enter it once on each device. Leave it empty for local servers.
+
 <p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
 
 ## How it works
