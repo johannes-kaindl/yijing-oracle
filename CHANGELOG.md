@@ -6,6 +6,17 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- **The API key no longer lives in `data.json`.** Until now it was stored there in plain text —
+  a file inside the vault that every sync (Obsidian Sync, iCloud, Dropbox, git) and every backup
+  carries along. On Obsidian 1.11.4 or newer the key now goes into Obsidian's keychain
+  (`SecretStorage`, OS-encrypted, per device); an existing key is moved there on the first load
+  and wiped from `data.json`. The keychain is not synced, so on each additional device the key
+  is entered once. On older Obsidian versions (down to the plugin's floor, 1.8.7) nothing
+  changes. Should the keychain refuse to store the value, the key stays in `data.json` as before
+  and a warning is written to the console — never a silent loss.
+
 ### Fixed
 
 - **The API key is now actually sent.** The setting existed since 0.2.0, was stored, and was

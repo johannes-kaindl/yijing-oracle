@@ -70,6 +70,8 @@ const PANEL_VIEW = "yijing-oracle-panel";
 const DATA_PATH = `.obsidian/plugins/${PLUGIN_ID}/data.json`;
 /** Sicherungskopie fuer den Fall, dass der Lauf hart abbricht (Ctrl-C, Absturz). */
 const DATA_RESCUE = `.obsidian/plugins/${PLUGIN_ID}/data.json.smoke-rescue`;
+/** src/core/settings/api-key-storage.ts: API_KEY_SECRET_ID — der feste Schluesselbund-Eintrag. */
+const API_KEY_SECRET_ID = "yijing-oracle-llm-api-key";
 
 /** Bestands-`data.json` in der Form von 0.3.0: kennt weder `backend` noch `comfyWorkflow`
  *  noch `comfyStepsOverride`. Genau das ist Schritt 2 der Handover-Checkliste — die Frage
@@ -152,6 +154,26 @@ async function removeVaultFile(cdp: Cdp, path: string): Promise<void> {
   await cdp.evaluate(`
     const p = ${JSON.stringify(path)};
     if (await app.vault.adapter.exists(p)) await app.vault.adapter.remove(p);
+    return true;
+  `);
+}
+
+/** Schluesselbund-Zustand: `null` als Ganzes, wenn Obsidian keinen hat (< 1.11.4). */
+async function schluesselbund(cdp: Cdp): Promise<{ wert: string | null } | null> {
+  return cdp.evaluate<{ wert: string | null } | null>(`
+    if (!app.secretStorage) return null;
+    return { wert: app.secretStorage.getSecret(${JSON.stringify(API_KEY_SECRET_ID)}) };
+  `);
+}
+
+/** Eintrag zuruecksetzen: loeschen, wenn er vorher fehlte (deleteSecret gibt es zur Laufzeit,
+ *  nicht in der .d.ts — s. _docs/LESSONS.md 2026-08-30), sonst den Vorwert schreiben. */
+async function schluesselbundZuruecksetzen(cdp: Cdp, vorher: string | null): Promise<void> {
+  await cdp.evaluate(`
+    const s = app.secretStorage; if (!s) return false;
+    const id = ${JSON.stringify(API_KEY_SECRET_ID)};
+    if (${JSON.stringify(vorher)} === null && typeof s.deleteSecret === "function") s.deleteSecret(id);
+    else s.setSecret(id, ${JSON.stringify(vorher ?? "")});
     return true;
   `);
 }
@@ -422,6 +444,20 @@ async function abschnittMigration(cdp: Cdp): Promise<void> {
     !("activeEndpoint" in llm),
     "activeEndpoint" in llm ? "Feld ist wieder da" : "Feld fehlt wie erwartet",
   );
+  // Seit 2026-09-03 wandert der Schluessel beim Laden in Obsidians Schluesselbund und
+  // data.json wird bereinigt — B6 misst nur den Speicher, das hier misst die PLATTE. Zwei
+  // richtige Ausgaenge (Muster obsidian-paperize 2026-09-02): mit Schluesselbund liegt der
+  // Wert dort und data.json ist leer; ohne (< 1.11.4) bleibt er in data.json wie bis 0.5.1.
+  const platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { apiKey?: string } };
+  const aufPlatte = platte.llm?.apiKey ?? "(fehlt)";
+  const bund = await schluesselbund(cdp);
+  record(
+    "B8 Altwert wandert beim Laden in den Schluesselbund, data.json wird bereinigt",
+    bund ? aufPlatte === "" && bund.wert === BESTAND_030.llm.apiKey : aufPlatte === BESTAND_030.llm.apiKey,
+    bund
+      ? `data.json apiKey=${JSON.stringify(aufPlatte)} · Schluesselbund=${JSON.stringify(bund.wert)}`
+      : `kein Schluesselbund (< 1.11.4) — data.json apiKey=${JSON.stringify(aufPlatte)}`,
+  );
 }
 
 /** C — Bild-Sektion im Settings-Modal (Handover-Schritte 3, 6, 9). */
@@ -657,6 +693,40 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     `${maskiert.felder} Feld(er) mit type=password im Plugin-Tab`,
   );
 
+  // F8 misst den SPEICHERpfad ueber das echte Feld (B8 den Ladepfad): eine Eingabe muss im
+  // Schluesselbund ankommen und data.json leer lassen. Bewusst ueber die Komponente statt
+  // ueber `plugin.settings` — ein Punkt, der den Zustand direkt schreibt, haette den Weg,
+  // auf dem ein Defekt saesse, nie betreten (REGISTRY: „Pruefpunkt, der den Defektpfad
+  // umgeht"). Der native Setter + `input`-Event: Obsidians TextComponent hoert auf `input`,
+  // eine blosse Zuweisung an `value` feuert nichts. Getippt wird im Einstellungen-Fenster
+  // (eigener JS-Kontext, kennt kein `app`), gemessen im Hauptfenster.
+  const F8_WERT = "smoke-f8-schluessel";
+  const getippt = await ui.cdp.evaluate<boolean>(`
+    const wurzel = document.querySelector(".vertical-tab-content-container") || document;
+    const feld = [...wurzel.querySelectorAll("input")].find((i) => i.type === "password");
+    if (!feld) return false;
+    Object.getOwnPropertyDescriptor(Object.getPrototypeOf(feld), "value").set.call(feld, ${JSON.stringify(F8_WERT)});
+    feld.dispatchEvent(new Event("input", { bubbles: true }));
+    return true;
+  `);
+  let f8 = { bund: null as { wert: string | null } | null, platte: "(nicht gelesen)" };
+  for (let i = 0; i < 10 && getippt; i++) {
+    await schlaf(300);
+    f8.bund = await schluesselbund(cdp);
+    if (f8.bund?.wert === F8_WERT || f8.bund === null) break;
+  }
+  const f8Platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { apiKey?: string } };
+  f8.platte = f8Platte.llm?.apiKey ?? "(fehlt)";
+  record(
+    "F8 Eingabe im Feld landet im Schluesselbund, nicht in data.json",
+    getippt && (f8.bund ? f8.bund.wert === F8_WERT && f8.platte === "" : f8.platte === F8_WERT),
+    !getippt
+      ? "kein Passwortfeld gefunden"
+      : f8.bund
+        ? `Schluesselbund=${JSON.stringify(f8.bund.wert)} · data.json apiKey=${JSON.stringify(f8.platte)}`
+        : `kein Schluesselbund (< 1.11.4) — data.json apiKey=${JSON.stringify(f8.platte)}`,
+  );
+
   await closeSettings(cdp, ui);
 }
 
@@ -855,6 +925,10 @@ async function main(): Promise<void> {
   // Vorwert VOR dem try lesen: nur so ist er auch nach einem Abbruch im finally da.
   const originalData = await readVaultFile(cdp, DATA_PATH);
   if (originalData !== null) await writeVaultFile(cdp, DATA_RESCUE, originalData);
+  // Auch der Schluesselbund-Eintrag ist Zustand des Wirts: B8 und F8 schreiben ihn, und die
+  // data.json-Ruecksicherung allein liesse den Smoke-Schluessel dort stehen — beim naechsten
+  // Laden GEWAENNE er gegen data.json (Schluesselbund hat Vorrang).
+  const originalBund = await schluesselbund(cdp);
   const aufraeumen: string[] = [];
 
   try {
@@ -907,12 +981,28 @@ async function main(): Promise<void> {
       `);
       console.log(`  Papierkorb: ${pfad}`);
     }
+    if (originalBund) {
+      await schluesselbundZuruecksetzen(cdp, originalBund.wert);
+      console.log(`  Schluesselbund zurueckgesetzt: ${originalBund.wert === null ? "Eintrag entfernt" : "Vorwert geschrieben"}`);
+    }
     if (originalData !== null) {
       await writeVaultFile(cdp, DATA_PATH, originalData);
       await removeVaultFile(cdp, DATA_RESCUE);
       await reloadPlugin(cdp);
       const wieder = await readVaultFile(cdp, DATA_PATH);
-      console.log(`  data.json zurueckgeschrieben: ${wieder === originalData ? "byte-gleich" : "ABWEICHUNG — pruefen!"}`);
+      // Trug die Wirts-data.json noch einen Klartext-Schluessel, migriert ihn der Reload in
+      // den Schluesselbund und schreibt data.json neu — das ist die Sache selbst, keine
+      // Abweichung. Erkannt daran, dass nur `llm.apiKey` geleert wurde.
+      const migriert = wieder !== originalData && (() => {
+        try {
+          const a = JSON.parse(originalData) as { llm?: { apiKey?: string } };
+          const b = JSON.parse(wieder ?? "{}") as { llm?: { apiKey?: string } };
+          if (!a.llm?.apiKey || b.llm?.apiKey !== "") return false;
+          a.llm.apiKey = "";
+          return JSON.stringify(a) === JSON.stringify(b);
+        } catch { return false; }
+      })();
+      console.log(`  data.json zurueckgeschrieben: ${wieder === originalData ? "byte-gleich" : migriert ? "Klartext-Schluessel des Wirts in den Schluesselbund migriert (erwartet)" : "ABWEICHUNG — pruefen!"}`);
     }
     await closeSettings(cdp, null);
 
