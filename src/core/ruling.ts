@@ -1,5 +1,5 @@
 // Zhu-Xi-Linienregeln (Wilhelm/Baynes „Über die Befragung des Orakels").
-// Port von /Users/Shared/code/yijing/web/ruling.js — pure, KEIN obsidian-Import.
+// Port von ~/Projects/jkaindl/apps/yijing/web/ruling.js — pure, KEIN obsidian-Import.
 // changingIndices: 0-basiert, Index 0 = unterste Linie. primaryNumber = King-Wen-Nr.
 import { type Lang } from "./data";
 import { type Reading } from "./reading";
