@@ -80,6 +80,22 @@ Obsidians `SecretComponent` ist ein Verweis auf einen Eintrag, kein Passwortfeld
 Speicherpfad über das echte Feld, und das `finally` setzt den Schlüsselbund-Eintrag zurück —
 sonst gewänne der Smoke-Schlüssel beim nächsten Laden gegen `data.json`.
 
+## UI-Abweichungen
+
+Deklaration nach `UI-STANDARD.md` §1a — von einem verbindlichen §8-Baustein abzuweichen ist
+erlaubt, stillschweigend abzuweichen nicht.
+
+- **Endpunkt-Liste ist eine eigenständige Re-Implementierung, nicht das Kit-Modul**
+  (`src/obsidian/settings/endpoint-list.ts`, `string[]` + ein globaler Schlüsselbund-Eintrag,
+  ohne Pro-Endpoint-`apiKey`/Modell-Override). Grund: das Kit-Modul
+  (`obsidian-kit/src/obsidian/endpoint-list.ts`, 0.35.0) baut auf `EndpointConfig[]` +
+  `ModelListCache`/`ModelListClient` auf — eine Übernahme wäre ein Schema-/Feature-Wechsel,
+  kein Vendoring (Bruch, Welle 2, siehe Cockpit-Task „Endpunkt-Liste auf
+  Kit-EndpointConfig-Modell migrieren"). Aufgelöst wird das über Plan 3 des LLM Endpoint
+  Managers (`obsidian-plugins/docs/superpowers/plans/2026-09-13-llm-endpoint-manager-3-endpoint-source.md`),
+  sobald der Manager released ist — nicht über eine eigene Migration.
+  `gilt-solange:` `src/obsidian/settings/endpoint-list.ts` enthält nicht `EndpointConfig`.
+
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.
 - `src/core/**` und `src/vendor/kit/**` importieren nie `obsidian` (`check:pure`-gated).
 - Zweisprachigkeit DE/EN: Hexagramm-Texte + UI hängen an Reading- bzw. UI-Sprache.
