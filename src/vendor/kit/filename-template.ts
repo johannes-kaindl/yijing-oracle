@@ -1,5 +1,4 @@
-// uebernommen aus obsidian-kit/src/pure/filename-template.ts, 2026-08-20
-// Verbatim (Kit 0.27.0). Nie von Hand editieren — bei Bedarf neu aus dem Kit ziehen.
+// vendored from code-kit@0.6.0, src/ts/pure/filename-template.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Konfigurierbares Dateinamen-Schema: `{platzhalter}` auflösen, das Ergebnis auf
  *  dateisystem- und Obsidian-sichere Zeichen bringen, und über eine Fallback-Kette
  *  absichern, dass kein leerer Dateiname entsteht. Obsidian-frei (PROF-OBS-03/04) und

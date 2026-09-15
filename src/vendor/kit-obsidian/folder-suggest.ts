@@ -1,5 +1,4 @@
-// uebernommen aus obsidian-kit/src/obsidian/folder-suggest.ts, 2026-08-16
-// Verbatim (Kit 0.26.1). Nie von Hand editieren — bei Bedarf neu aus dem Kit ziehen.
+// vendored from obsidian-kit@0.35.0, src/obsidian/folder-suggest.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { AbstractInputSuggest, type App, type TFolder } from "obsidian";
 
 /** Ordner-Autocomplete für ein Settings-Textfeld (REGISTRY „Ordner-Autocomplete

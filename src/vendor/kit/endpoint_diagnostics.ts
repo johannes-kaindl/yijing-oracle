@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.29.0 (src/vendor/code-kit/pure/endpoint_diagnostics.ts), urspruenglich code-kit@0.5.0 — do not hand-edit
+// vendored from code-kit@0.6.0, src/ts/pure/endpoint_diagnostics.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export type EndpointStatusKind =
   | "ok" | "refused" | "unknown-host" | "timeout" | "not-an-llm-api" | "unauthorized" | "unknown";
 

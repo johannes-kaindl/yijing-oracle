@@ -1,4 +1,4 @@
-// vendored from obsidian-kit, src/pure/reasoning.ts
+// vendored from code-kit@0.6.0, src/ts/pure/reasoning.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export type ThinkingSupport = "none" | "hybrid" | "always";
 
 /** Union-Params zum Abschalten von Reasoning über viele lokale Server hinweg.
@@ -18,11 +18,13 @@ export function suppressParams(suppress: boolean): Record<string, unknown> {
 
 const THINK_TAG = /<think>([\s\S]*?)<\/think>/;
 
-/** Hat das Modell real gedacht? (separates reasoning-Feld ODER inline <think> mit Inhalt). */
+/** Hat das Modell real gedacht? (separates reasoning-Feld ODER inline <think> mit Inhalt).
+ *  Dient dazu, „Suppress hat nicht gegriffen" ehrlich zu erkennen. */
 export function reasoningHappened(content: string, reasoning: string | undefined): boolean {
   if (reasoning && reasoning.trim() !== "") return true;
   const m = THINK_TAG.exec(content);
-  return !!m && m[1].trim() !== "";
+  // `?? ""` statt `?.`: fehlte die Gruppe, heißt das „kein Inhalt" — also false, nicht true.
+  return !!m && (m[1] ?? "").trim() !== "";
 }
 
 const ALWAYS_ON = /\b(gpt-oss|harmony)\b/i;

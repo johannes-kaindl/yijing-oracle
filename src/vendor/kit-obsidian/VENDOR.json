@@ -1,6 +1,7 @@
 {
   "source": "obsidian-kit",
-  "version": "0.26.1",
-  "vendored": "settings_walker.ts, folder-suggest.ts",
-  "note": "Verbatim snapshot (nur ein Herkunftsstempel vorangestellt). Never hand-edit. Re-copy from obsidian-kit to update. Eigene Ablage neben src/vendor/kit/, weil diese Module `obsidian` importieren und check:pure src/vendor/kit/ pauschal prueft."
+  "version": "0.35.0",
+  "sha": "e7e3e19",
+  "vendored": "folder-suggest.ts, settings_walker.ts, stream-area.ts",
+  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. Eigene Ablage neben src/vendor/kit/, weil diese Module \"obsidian\" importieren. endpoint-list.ts wird bewusst NICHT vendoriert (Bruch, siehe AGENTS.md § UI-Abweichungen)."
 }

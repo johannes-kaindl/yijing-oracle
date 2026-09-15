@@ -1,5 +1,4 @@
-// uebernommen aus obsidian-kit/src/pure/callout.ts, 2026-08-20
-// Verbatim (Kit 0.27.0). Nie von Hand editieren — bei Bedarf neu aus dem Kit ziehen.
+// vendored from obsidian-kit@0.35.0, src/pure/callout.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Obsidian-Callout aus Titel + Body bauen (`> [!type]<marker> Titel` plus zeilen-geprefixter
  *  Rumpf) — obsidian-frei, in Node testbar (PROF-OBS-03/04).
  *
