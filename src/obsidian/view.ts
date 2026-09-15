@@ -31,6 +31,7 @@ import { ComfyProgressSocket } from "./comfy-progress";
 import { comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
 import { authHeaders } from "../core/llm/auth";
 import { normalizeEndpoint, resolveActiveEndpoint } from "../vendor/kit/endpoint";
+import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
@@ -77,8 +78,14 @@ export class OracleView extends ItemView {
   private streaming = false;
   private generatingImage = false;
   private abortCtrl: AbortController | null = null;
-  private answerEl: HTMLElement | null = null;
-  private reasoningEl: HTMLElement | null = null;
+  /** Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea`). Wird
+   *  bei jedem Anstrich in {@link renderInterpretationArea} waehrend `this.streaming` neu
+   *  gebaut (Bauart 4, Voll-Rerender) — {@link updateStreamDom} patcht ihn danach ohne
+   *  Re-Render, bis der naechste volle Anstrich kommt. */
+  private streamArea: StreamArea | null = null;
+  /** Klapp-Zustand des Gedankenblocks — ueberlebt den Re-Render, damit ein Nutzer, der ihn
+   *  zuklappt, ihn nicht bei jedem Token wieder aufklappen sieht. */
+  private reasoningOpen = true;
   /** Fortschritt der laufenden Bildgenerierung (nur ComfyUI liefert Schritt-Meldungen). */
   private imageProgress: { value: number; max: number } | null = null;
   /** Der Fortschritts-Socket kam nicht zustande — fuer diesen Lauf kommt kein Zaehler
@@ -266,8 +273,7 @@ export class OracleView extends ItemView {
 
   /** Deutungs-Bereich: eigener Klapp-Kasten mit Auslöse-Button, Live-Stream oder Ergebnis. */
   private renderInterpretationArea(root: HTMLElement, c: CurrentCast): void {
-    this.answerEl = null;
-    this.reasoningEl = null;
+    this.streamArea = null;
     const box = root.createEl("details", { cls: "yijing-interpretation" });
     box.open = this.interpretationOpen;
     box.addEventListener("toggle", () => {
@@ -277,13 +283,19 @@ export class OracleView extends ItemView {
     const area = box.createDiv({ cls: "yijing-interpretation-inner" });
 
     if (this.streaming) {
-      const det = area.createEl("details", { cls: "yijing-reasoning" });
-      det.open = true;
-      det.createEl("summary", { text: t("view.reasoningHead") });
-      this.reasoningEl = det.createDiv({ cls: "yijing-reasoning-body" });
-      this.reasoningEl.setText(c.interpretation?.reasoning ?? "");
-      this.answerEl = area.createDiv({ cls: "yijing-interpretation-body" });
-      this.answerEl.setText(c.interpretation?.answer ?? "");
+      // Baut je Anstrich neu (Bauart 4) — `reasoningOpen` kommt aus dem Modell, nicht aus
+      // einem Startwert des Bausteins selbst (UI-STANDARD §8, Streaming-Antwortbereich).
+      const streamArea = buildStreamArea(area, {
+        strings: { reasoning: t("view.reasoningHead") },
+        cls: "yijing-stream",
+        reasoningOpen: this.reasoningOpen,
+        onReasoningToggle: (open) => {
+          this.reasoningOpen = open;
+        },
+      });
+      if (c.interpretation?.reasoning) streamArea.setReasoning(c.interpretation.reasoning);
+      streamArea.setTail(c.interpretation?.answer ?? "");
+      this.streamArea = streamArea;
       const row = area.createDiv({ cls: "yijing-actions" });
       new ButtonComponent(row).setButtonText(t("view.cancel")).onClick(() => this.abortCtrl?.abort());
       return;
@@ -516,10 +528,14 @@ export class OracleView extends ItemView {
     if (this.imageProgressBlocked) this.imageProgressEl.setText(t("view.imageProgressBlocked"));
   }
 
-  /** Leichtes Live-Update der Stream-Container ohne vollständigen Re-Render (kein Flackern). */
+  /** Leichtes Live-Update des Stream-Bereichs ohne vollständigen Re-Render (kein Flackern).
+   *  Verhaltenswechsel gegenüber dem Eigenbau (CHANGELOG Unreleased): der Scroll folgt nur,
+   *  wenn der Nutzer nicht selbst hochgescrollt hat (`followTail`, Default-Schwelle 40 px). */
   private updateStreamDom(c: CurrentCast): void {
-    if (this.answerEl) this.answerEl.setText(c.interpretation?.answer ?? "");
-    if (this.reasoningEl) this.reasoningEl.setText(c.interpretation?.reasoning ?? "");
+    if (!this.streamArea) return;
+    if (c.interpretation?.reasoning) this.streamArea.setReasoning(c.interpretation.reasoning);
+    this.streamArea.setTail(c.interpretation?.answer ?? "");
+    this.streamArea.followTail();
   }
 
   private renderHistory(root: HTMLElement): void {

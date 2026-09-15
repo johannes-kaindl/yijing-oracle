@@ -6,6 +6,15 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Streaming answer area now uses the shared `obsidian-kit` component (`buildStreamArea`)**
+  instead of the hand-rolled one. Two visible behavior changes: the thinking block stays open
+  for the whole duration of a stream (it used to be forced open too, but is now driven by the
+  same shared logic other plugins use), and auto-scroll now only follows the stream while you
+  are at the bottom — scroll up during a long answer and it stays put instead of yanking you
+  back down.
+
 ## [0.5.2] — 2026-09-03
 
 ### Security

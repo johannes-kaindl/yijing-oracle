@@ -196,6 +196,34 @@
   overflow-y: auto;
 }
 
+/* ── Streaming-Antwortbereich (UI-STANDARD §8) ─────────────────────
+   Vendored aus obsidian-kit@0.35.0 (src/obsidian/stream-area.ts, STREAM_AREA_CSS) —
+   das Kit injiziert kein CSS, der Block gehoert laut Vertrag hierhin. Nie von Hand
+   editieren, nachziehen via tools/sync-kit.sh + manuellem Kopieren dieses Blocks. */
+.okit-stream { display: flex; flex-direction: column; min-height: 0; gap: var(--size-4-2); }
+.okit-stream-body {
+  flex: 1 1 auto; min-height: 0; overflow-y: auto;
+  font-size: var(--font-ui-small); line-height: var(--line-height-normal);
+}
+.okit-stream--host-scroll .okit-stream-body { flex: 0 0 auto; min-height: auto; overflow-y: visible; }
+.okit-stream-block > :first-child { margin-top: 0; }
+.okit-stream-block > :last-child { margin-bottom: 0; }
+.okit-stream-tail { white-space: pre-wrap; color: var(--text-muted); }
+.okit-stream-status {
+  flex: 0 0 auto;
+  display: flex; align-items: center; gap: var(--size-4-1);
+  font-size: var(--font-ui-smaller); color: var(--text-muted);
+}
+.okit-stream-reasoning {
+  flex: 0 0 auto;
+  font-size: var(--font-ui-smaller); color: var(--text-muted);
+}
+.okit-stream-reasoning > summary { cursor: var(--cursor); color: var(--text-faint); }
+.okit-stream-reasoning > pre {
+  max-height: 12em; overflow-y: auto; white-space: pre-wrap;
+  background: var(--background-secondary); padding: var(--size-4-2);
+}
+
 /* ── Bildmeditation ─────────────────────────────────────────────── */
 .yijing-artwork-inner {
   padding: 0.25em 0;
