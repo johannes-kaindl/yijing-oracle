@@ -214,9 +214,14 @@ async function openSettingsTab(cdp: Cdp, port: number): Promise<SettingsUi | nul
     return true;
   `);
 
+  // Erkennung ODER statt UND: `.yijing-ep-status` markiert den LOKALEN Endpunkt-Editor, der
+  // bei installiertem LLM Endpoint Manager durch buildEndpointSourceSection ersetzt wird und
+  // dann fehlt (Abschnitt M) — der Plugin-Name im Tab-Text ist in beiden Faellen da.
+  const marker = `Boolean(root.querySelector(".yijing-ep-status")) || Boolean(root.textContent && root.textContent.includes(${JSON.stringify(PLUGIN_NAME)}))`;
+
   // Fall 1 (bis 1.12): Modal im selben Fenster.
   const alsModal = await cdp.evaluate<boolean>(
-    `return Boolean(document.querySelector(".modal.mod-settings .yijing-ep-status"));`,
+    `const root = document.querySelector(".modal.mod-settings"); return Boolean(root) && (${marker});`,
   );
   if (alsModal) return { cdp, praefix: ".modal.mod-settings ", eigenesFenster: false };
 
@@ -224,7 +229,7 @@ async function openSettingsTab(cdp: Cdp, port: number): Promise<SettingsUi | nul
   // lokalisiert), sondern die Sache: kein Workspace, aber unsere Sektion im DOM.
   const zweit = await attachTo("settings", port, PLUGIN_ID);
   if (!zweit) return null;
-  const da = await zweit.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-ep-status"));`);
+  const da = await zweit.evaluate<boolean>(`const root = document; return ${marker};`);
   if (!da) {
     zweit.close();
     return null;
@@ -868,6 +873,260 @@ async function abschnittSpeichern(cdp: Cdp, aufraeumen: string[]): Promise<void>
   }
 }
 
+// --- M · LLM Endpoint Manager (optionale Fremd-Quelle) ------------------------------
+// uebernommen aus lingotuner/scripts/gui-smoke.ts (Commits 2d32e53, 1899b68, 66bd0be),
+// 2026-09-16 — Selektoren und Aufruf-Konstrukte auf yijing-oracle zugeschnitten
+// (.yijing-oracle-Panel statt .lt-*, resolveLlmEndpoint()/generateInterpretation() statt
+// tune(), M2b prueft ueber settings.llm.choice statt settings.choice).
+
+const MANAGER_PLUGIN_ID = "llm-endpoint-manager";
+const MANAGER_DEFAULT_MODEL = "smoke-manager-model";
+const LOCAL_FALLBACK_MODEL = "smoke-lokal-modell";
+
+interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null }
+
+/** Eigener Mini-HTTP-Server statt eines echten LLM-Servers oder des echten Manager-Plugins —
+ *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in
+ *  view.ts), nicht den Manager selbst. Sammelt den Request-Body VOLLSTAENDIG ein, bevor
+ *  geantwortet wird (kein Race gegen die eigene Antwort — Fund aus lingotuner 66bd0be). */
+async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint> {
+  const { createServer } = await import("node:http");
+  let chatCalls = 0;
+  let lastModel: string | null = null;
+  const server = createServer((req, res) => {
+    // Der Renderer laeuft unter app://obsidian.md — ohne CORS-Header blockt der Browser den
+    // Preflight (OPTIONS) und die eigentliche Anfrage sieht der Server nie.
+    res.setHeader("Access-Control-Allow-Origin", "*");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
+    if (req.url?.includes("/v1/models") === true) {
+      res.writeHead(200, { "Content-Type": "application/json" });
+      res.end(JSON.stringify({ data: [{ id: modelId, object: "model" }] }));
+      return;
+    }
+    if (req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
+      let body = "";
+      req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
+      req.on("end", () => {
+        chatCalls += 1;
+        try { lastModel = (JSON.parse(body) as { model?: unknown }).model as string ?? null; } catch { lastModel = null; }
+        res.writeHead(200, { "Content-Type": "text/event-stream" });
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "ok" }, finish_reason: null }], model: modelId })}\n\n`);
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }], model: modelId })}\n\n`);
+        res.write("data: [DONE]\n\n");
+        res.end();
+      });
+      return;
+    }
+    res.writeHead(404);
+    res.end();
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const address = server.address();
+  const port = typeof address === "object" && address ? address.port : 0;
+  return {
+    url: `http://127.0.0.1:${port}`,
+    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
+    chatCalls: () => chatCalls,
+    lastModel: () => lastModel,
+  };
+}
+
+/** Injiziert eine FAKE `llm-endpoint-manager`-API — `findEndpointManager()` prueft nur die
+ *  FORM (version===1 + alle Methoden als Funktion), keine Herkunft. `config.model` (nicht nur
+ *  `defaultModel`) ist gesetzt, weil der ECHTE Manager beides setzt — ohne das Feld wuerde ein
+ *  Fehler wie lingotuners C1 (config.model ueberschreibt eine getroffene Modellwahl) hier
+ *  nicht reproduziert. Sichert einen vorher vorhandenen Eintrag statt ihn zu ueberschreiben
+ *  (`window.__smokeVorherManager`, IM Renderer geparkt — ein echtes Plugin-Objekt traegt
+ *  Methoden, die eine CDP-Rundreise ueber Node nicht ueberlebt). */
+async function installFakeManager(cdp: Cdp, url: string): Promise<void> {
+  await cdp.evaluate(`
+    if (!("__smokeVorherManager" in window)) {
+      window.__smokeVorherManager = app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] ?? null;
+    }
+    const ep = { id: "fake-mgr-ep", label: "Fake Manager Endpoint", url: ${JSON.stringify(url)}, provider: "openai", capabilities: ["chat"], defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)}, enabled: true, hasSecret: false };
+    const api = {
+      version: 1,
+      list: (filter) => [ep],
+      get: (id) => (id === ep.id ? ep : null),
+      resolve: async (capability, opts) => ({ id: ep.id, label: ep.label, config: { url: ${JSON.stringify(url)}, model: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }, defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }),
+      materialize: async (id, opts) => (id === ep.id ? { id: ep.id, label: ep.label, config: { url: ${JSON.stringify(url)}, model: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }, defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} } : { error: "not-found" }),
+      models: async (id) => (id === ep.id ? [${JSON.stringify(MANAGER_DEFAULT_MODEL)}] : { error: "not-found" }),
+      importEndpoints: async (eps, capability) => ({ added: [], merged: [], skipped: eps.map((e) => e.url) }),
+      on: (event, cb) => (() => {}),
+    };
+    app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] = { api };
+    return { ok: true };
+  `);
+}
+
+/** Stellt den VOR `installFakeManager()` vorgefundenen Eintrag wieder her, statt ihn zu
+ *  loeschen — idempotent bei einem Aufruf ohne vorheriges `installFakeManager()`. */
+async function removeFakeManager(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    if ("__smokeVorherManager" in window) {
+      const vorher = window.__smokeVorherManager;
+      if (vorher === null) delete app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}];
+      else app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] = vorher;
+      delete window.__smokeVorherManager;
+    } else {
+      delete app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}];
+    }
+    return { ok: true };
+  `);
+}
+
+const MANAGED_TEXT = ["Endpunkte kommen vom LLM Endpoint Manager", "Endpoints come from the LLM Endpoint Manager"];
+
+/** Ein Wurf + Deutungslauf: braucht das offene Panel, wirft neu (das Ergebnis selbst ist fuer
+ *  M irrelevant) und klickt danach den Deuten-Knopf — der ist der einzige Knopf in
+ *  `.yijing-interpretation-inner .yijing-actions`, solange keine Deutung vorliegt. */
+async function laufeDeutung(cdp: Cdp): Promise<boolean> {
+  const offen = await openPanel(cdp);
+  if (!offen) return false;
+  await cdp.evaluate(`
+    const q = document.querySelector(".yijing-oracle .yijing-question");
+    if (q) { q.value = "Smoke M: Endpunkt-Manager"; q.dispatchEvent(new Event("input")); }
+    return true;
+  `);
+  const geworfen = await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+  if (!geworfen) return false;
+  await schlaf(500);
+  const geklickt = await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+  if (!geklickt) return false;
+  const fertig = await pollUntil<boolean>(
+    cdp,
+    `const body = document.querySelector(".yijing-interpretation-body");
+     return Boolean(body && body.textContent && body.textContent.trim().length > 0) ? true : null;`,
+    15000,
+    300,
+  );
+  return Boolean(fertig);
+}
+
+/** M1-M3 (+M2b): Manager an → Settings zeigen den Baustein statt der lokalen Liste, ein Lauf
+ *  geht an den Manager-Endpunkt mit dem korrekten Modell; eine Modellwahl gegenueber dem
+ *  Manager gewinnt gegen dessen Default (M2b, Regression aus lingotuner C1); Manager aus →
+ *  beides faellt auf lokal zurueck. Ein einziger aeusserer try/finally raeumt Fake-Server und
+ *  injizierte API auf, egal wo es abbricht. */
+async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
+  console.log("\nM · LLM Endpoint Manager (optionale Fremd-Quelle)");
+  let fake: FakeChatEndpoint | null = null;
+  let localFake: FakeChatEndpoint | null = null;
+  let ui: SettingsUi | null = null;
+  let vorherEndpoints: unknown = null;
+  const NAMEN = [
+    "M1 Settings zeigen den Manager statt der lokalen Liste",
+    "M2 Lauf nutzt den Manager-Endpunkt und das Default-Modell",
+    "M2b Manager-Lauf nutzt gewaehltes Modell, nicht den Endpunkt-Default (C1)",
+    "M3 Manager aus → lokale Liste in Settings und im Lauf",
+  ];
+  try {
+    fake = await startFakeChatEndpoint(MANAGER_DEFAULT_MODEL);
+    console.log(`  Fake-Manager-Endpunkt: ${fake.url}`);
+    await installFakeManager(cdp, fake.url);
+
+    // M1 — Settings zeigen den Manager-Baustein (managed-Text), keine .yijing-ep-status-Zeile
+    // (der Marker des lokalen Listen-Editors).
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { for (const n of NAMEN) skipped(n, "Settings-Oberflaeche nicht gefunden"); return; }
+    const body = await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
+    const managed = MANAGED_TEXT.some((s) => body.includes(s));
+    const localRows = await zeilenZahlSelector(ui, ".yijing-ep-status");
+    record(NAMEN[0]!, managed && localRows === 0, `managed-Text ${managed ? "da" : "fehlt"}, ${localRows} lokale Endpunkt-Zeilen`);
+    await closeSettings(cdp, ui);
+    ui = null;
+
+    // M2 — ein Lauf nutzt den Manager-Endpunkt und das Default-Modell (kein choice.model
+    // gesetzt → modelOf() faellt auf defaultModel).
+    const okM2 = await laufeDeutung(cdp);
+    const callsM2 = fake.chatCalls();
+    const modellM2 = fake.lastModel();
+    record(NAMEN[1]!, okM2 && callsM2 > 0 && modellM2 === MANAGER_DEFAULT_MODEL,
+      okM2 ? `Fake-Server sah ${callsM2} POST /v1/chat/completions, Modell ${JSON.stringify(modellM2)} (erwartet ${JSON.stringify(MANAGER_DEFAULT_MODEL)})`
+           : "Deutungslauf lieferte kein Ergebnis");
+
+    // M2b — Regression C1: eine im Panel/Settings getroffene Modellwahl (settings.llm.choice)
+    // darf NICHT vom Endpunkt-Default ueberschrieben werden. resolveLlmEndpoint() liest
+    // choice.model bereits mit hoechster Prioritaet (src/vendor/kit/endpoint-source.ts
+    // modelOf()) — dieser Punkt beweist es gegen den Fake-Server, nicht nur am Code.
+    const gewaehltesModell = `${MANAGER_DEFAULT_MODEL}-CHOICE`;
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.llm.choice = { ...(p.settings.llm.choice ?? {}), model: ${JSON.stringify(gewaehltesModell)} };
+      await p.saveSettings();
+      return { ok: true };
+    `);
+    const okM2b = await laufeDeutung(cdp);
+    const modellM2b = fake.lastModel();
+    record(NAMEN[2]!, okM2b && modellM2b === gewaehltesModell,
+      okM2b ? `Fake-Server sah Modell ${JSON.stringify(modellM2b)}, erwartet ${JSON.stringify(gewaehltesModell)}`
+            : "Deutungslauf lieferte kein Ergebnis");
+    // choice zuruecksetzen: sonst liest M3s LOKALER Lauf denselben choice.model.
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.llm.choice = {};
+      await p.saveSettings();
+      return { ok: true };
+    `);
+
+    // M3 — Manager "deaktivieren" (Analog zu disablePlugin) → Settings fallen auf die lokale
+    // Liste zurueck, ein Lauf nutzt wieder den lokalen Fake-Endpunkt (BRAUCHT einen echten
+    // Server, sonst "nichts gemessen" statt still gruen).
+    await removeFakeManager(cdp);
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { skipped(NAMEN[3]!, "Settings-Oberflaeche nach Manager-Entfernung nicht gefunden"); return; }
+    const bodyNach = await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
+    const managedNach = MANAGED_TEXT.some((s) => bodyNach.includes(s));
+    const localRowsNach = await zeilenZahlSelector(ui, ".yijing-ep-status");
+    await closeSettings(cdp, ui);
+    ui = null;
+    const settingsZurueck = !managedNach && localRowsNach > 0;
+
+    localFake = await startFakeChatEndpoint(LOCAL_FALLBACK_MODEL);
+    console.log(`  Fake-Lokal-Endpunkt: ${localFake.url}`);
+    vorherEndpoints = (await cdp.evaluate<{ eps: unknown }>(`return { eps: app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm.endpoints };`)).eps;
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.llm.endpoints = [${JSON.stringify(localFake.url)}];
+      await p.saveSettings();
+      return { ok: true };
+    `);
+    const okLokal = await laufeDeutung(cdp);
+    const lokaleCalls = localFake.chatCalls();
+    const modellLokal = localFake.lastModel();
+    record(NAMEN[3]!, settingsZurueck && okLokal && lokaleCalls > 0,
+      `managed-Text ${managedNach ? "noch da" : "weg"}, ${localRowsNach} lokale Zeilen, lokaler Lauf ${okLokal ? "ok" : "fehlgeschlagen"} (${lokaleCalls} POST /v1/chat/completions, Modell ${JSON.stringify(modellLokal)})`);
+  } catch (e) {
+    for (const n of NAMEN) {
+      skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+    }
+  } finally {
+    if (ui) await closeSettings(cdp, ui);
+    await removeFakeManager(cdp).catch(() => null);
+    if (fake) await fake.close().catch(() => undefined);
+    if (localFake) await localFake.close().catch(() => undefined);
+    if (vorherEndpoints !== null) {
+      await cdp.evaluate(`
+        const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+        p.settings.llm.endpoints = ${JSON.stringify(vorherEndpoints)};
+        await p.saveSettings();
+        return { ok: true };
+      `).catch(() => null);
+    }
+  }
+}
+
+/** Zaehlt Treffer eines Selektors in der Settings-Oberflaeche — Analog zu `zeilenZahl`, aber
+ *  mit eigenem Selektor statt `.setting-item` (fuer den lokalen-Editor-Marker). */
+async function zeilenZahlSelector(ui: SettingsUi, selector: string): Promise<number> {
+  return ui.cdp.evaluate<number>(`
+    const wurzel = ${wurzelAusdruck(ui)};
+    return wurzel ? wurzel.querySelectorAll(${JSON.stringify(selector)}).length : -1;
+  `);
+}
+
 // ─── Hauptlauf ─────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
@@ -955,6 +1214,7 @@ async function main(): Promise<void> {
     await abschnittMigration(cdp);
     await abschnittSettings(cdp, port, workflowFixture);
     await abschnittDeklarativ(cdp, port);
+    if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
 
     if (keinBild) {
       skipped("D Bildlauf", "--kein-bild gesetzt");
