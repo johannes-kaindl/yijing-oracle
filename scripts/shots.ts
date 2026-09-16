@@ -482,7 +482,9 @@ async function main(): Promise<void> {
   await cdp.send("Page.bringToFront");
   await schlaf(3000);
 
-  const sprache = await cdp.evaluate<string>(`return localStorage.getItem("language") || "";`);
+  const sprache = await cdp.evaluate<string>(
+    `return document.documentElement.lang || (window.localStorage && localStorage.getItem("language")) || "en";`,
+  );
   if (sprache && sprache !== "en") {
     console.log(
       `⚠️  Obsidians Oberflaeche steht auf "${sprache}", der Vertrag verlangt Englisch.\n` +
