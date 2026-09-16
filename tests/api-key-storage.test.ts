@@ -15,6 +15,12 @@ class MemoryStore implements SecretStore {
   set(id: string, value: string): void {
     this.values.set(id, value);
   }
+  has(id: string): boolean {
+    return (this.values.get(id) ?? "") !== "";
+  }
+  delete(id: string): void {
+    this.values.delete(id);
+  }
 }
 
 /** Ein Store, der Schreibvorgaenge stillschweigend verwirft — z. B. eine Plattform ohne
@@ -25,6 +31,12 @@ class LeakyStore implements SecretStore {
   }
   set(id: string): void {
     throw new Error(`SecretStorage did not persist ${id}`);
+  }
+  has(): boolean {
+    return false;
+  }
+  delete(): void {
+    // no-op
   }
 }
 

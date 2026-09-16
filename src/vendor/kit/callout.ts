@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.35.0, src/pure/callout.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.37.1, src/pure/callout.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Obsidian-Callout aus Titel + Body bauen (`> [!type]<marker> Titel` plus zeilen-geprefixter
  *  Rumpf) — obsidian-frei, in Node testbar (PROF-OBS-03/04).
  *

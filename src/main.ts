@@ -12,7 +12,7 @@ import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
 import { migrateEndpointList, stripLegacyLlmFields } from "./core/settings/migrate";
 import { loadApiKey, persistApiKey } from "./core/settings/api-key-storage";
-import { obsidianSecretStore } from "./obsidian/secrets";
+import { obsidianSecretStore } from "./vendor/kit-obsidian/secrets";
 import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {

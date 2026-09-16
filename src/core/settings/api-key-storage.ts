@@ -3,16 +3,16 @@
 //
 // Warum zweigleisig: der Floor dieses Plugins ist 1.8.7. Mit Schluesselbund liegt der Wert
 // OS-verschluesselt und je Geraet, data.json traegt einen Leerstring; ohne Schluesselbund
-// bleibt der Wert in data.json wie bis 0.5.1. Die sechs Netzwege lesen weiterhin
+// bleibt der Wert in data.json wie bis 0.5.1. Die Netzwege lesen weiterhin
 // `settings.llm.apiKey` aus dem Speicher — `getSecret` ist synchron, deshalb aendert sich
 // an ihnen nichts, nur an Laden und Speichern.
-
-export interface SecretStore {
-  /** Wert oder `null`, wenn es den Eintrag nicht gibt. */
-  get(id: string): string | null;
-  /** Wirft, wenn der Store den Wert nicht persistiert (Ruecklese-Pruefung im Store). */
-  set(id: string, value: string): void;
-}
+//
+// SecretStore kommt seit 2026-09-16 aus dem Kit-Vendor (vendor/kit/secrets.ts, pure — kein
+// obsidian-Import, `check:pure`-vertraeglich) statt aus einer eigenen, engeren Definition hier:
+// has()/delete() kamen mit dem Kit-Schnitt dazu (Endpunkt-Manager-Migration braucht sie fuer
+// den lokalen Fallback-Pfad), eine zweite lokale Kopie des Interfaces wuerde nur driften.
+import type { SecretStore } from "../../vendor/kit/secrets";
+export type { SecretStore };
 
 /** Feste ID: lowercase-alphanumerisch mit Bindestrichen, wie SecretStorage sie verlangt. */
 export const API_KEY_SECRET_ID = "yijing-oracle-llm-api-key";

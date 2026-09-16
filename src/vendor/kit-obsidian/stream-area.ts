@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.35.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.37.1, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
