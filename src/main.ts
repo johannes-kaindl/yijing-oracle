@@ -31,6 +31,7 @@ import { probeEndpoint } from "./obsidian/http";
 import { authHeaders } from "./core/llm/auth";
 import { normalizeEndpoint } from "./vendor/kit/endpoint";
 import { type EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
+import { onEndpointManagerChanged } from "./vendor/kit-obsidian/endpoint-source";
 
 export default class YijingOraclePlugin extends Plugin implements SettingsHost, OracleHost {
   // Basisklasse deklariert `settings?: unknown` (Obsidian ≥1.13) — hier auf den
@@ -86,7 +87,17 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
       editorCallback: () => void this.castDirect("cursor"),
     });
 
-    this.addSettingTab(new SettingsTab(this.app, this, this));
+    const settingsTab = new SettingsTab(this.app, this, this);
+    this.addSettingTab(settingsTab);
+    // Der Host rendert beim Oeffnen des Tabs die bei addSettingTab gecachten Definitionen
+    // (SettingsTab-Kommentar "Fallstrick 2") — installiert sich der LLM Endpoint Manager erst
+    // NACH diesem Zeitpunkt (Plugin-Ladereihenfolge ist nicht garantiert), bliebe die
+    // Endpunkt-Zeile sonst bis zur naechsten eigenen Werteaenderung veraltet. Erst nach
+    // onLayoutReady abonnieren (Kit-Empfehlung in onEndpointManagerChanged): verringert das
+    // Risiko, den Manager zu verpassen, ohne es ganz auszuschliessen.
+    this.app.workspace.onLayoutReady(() => {
+      onEndpointManagerChanged(this.app, () => settingsTab.refresh());
+    });
   }
 
   resolveReadingLang(): Lang {

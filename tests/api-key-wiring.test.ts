@@ -20,7 +20,12 @@ function keychain(): { values: Map<string, string>; storage: object } {
 }
 
 function plugin(app: object, stored: unknown): YijingOraclePlugin & { gespeichert: () => unknown } {
-  const p = new YijingOraclePlugin(app as never, { id: "yijing-oracle", name: "Yijing", version: "0.0.0" } as never);
+  // workspace.onLayoutReady: main.ts abonniert dort onEndpointManagerChanged — ohne die
+  // Hatch hier wirft onload() an dieser Stelle. Synchroner Aufruf reicht fuer den Test: es
+  // gibt kein app.plugins in dieser Fixture, also loest findEndpointManager() intern auf
+  // null auf und das Abo wird zum No-op, wie im echten Fall ohne installierten Manager.
+  const vollerApp = { ...app, workspace: { onLayoutReady: (cb: () => void) => cb() } };
+  const p = new YijingOraclePlugin(vollerApp as never, { id: "yijing-oracle", name: "Yijing", version: "0.0.0" } as never);
   const daten = { wert: stored, schreibvorgaenge: 0 };
   p.loadData = async () => daten.wert;
   p.saveData = async (d: unknown) => {

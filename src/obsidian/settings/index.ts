@@ -91,8 +91,13 @@ export class SettingsTab extends PluginSettingTab {
     };
   }
 
-  /** Neu zeichnen — ab 1.13 partiell über die native update()-API, darunter voller Rebuild. */
-  private refresh(): void {
+  /** Neu zeichnen — ab 1.13 partiell über die native update()-API, darunter voller Rebuild.
+   *  Öffentlich, weil `main.ts` sie auch von AUSSEN braucht: der Host rendert beim Öffnen des
+   *  Tabs die bei `addSettingTab` gecachten Definitionen (Fallstrick 2 oben) — installiert
+   *  oder entfernt sich der LLM Endpoint Manager, WÄHREND der Tab schon existiert (Plugin-
+   *  Ladereihenfolge ist nicht garantiert), bleibt die Endpunkt-Zeile sonst bis zur nächsten
+   *  eigenen Werteänderung veraltet. */
+  refresh(): void {
     refreshSettingsTab(this, () => {
       this.rebuild();
     });
