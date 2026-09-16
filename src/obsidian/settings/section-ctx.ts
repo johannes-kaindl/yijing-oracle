@@ -1,7 +1,7 @@
 // Gemeinsamer Kontext aller Settings-Sektionen: der schmale Host-Vertrag plus die drei Wege,
 // auf denen eine Zeile etwas bewirkt. Eigene Datei, damit die Sektionen sich nicht gegenseitig
 // importieren müssen (index.ts importiert alle, nicht umgekehrt).
-import { type SettingGroupItem } from "obsidian";
+import { type App, type SettingGroupItem } from "obsidian";
 import { type ControlKey } from "../../core/settings/controls";
 import { type SettingsHost } from "../../core/settings";
 
@@ -12,6 +12,9 @@ export type SettingRow = SettingGroupItem<ControlKey>;
 
 export interface SectionCtx {
   host: SettingsHost;
+  /** Fuer den Endpunkt-Manager-Abschnitt (`findEndpointManager`) — sonst braucht keine
+   *  Sektion `app` direkt. */
+  app: App;
   /** Wert normalisiert schreiben, speichern und — wenn der Schlüssel die Zeilen-Auswahl
    *  ändert — den Tab neu aufbauen. Der Weg für alles, was die Registry kennt. */
   write(key: ControlKey, value: unknown): void;

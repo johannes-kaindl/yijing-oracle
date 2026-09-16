@@ -10,8 +10,13 @@
 // (`migrateEndpointList` migriert nur die URL-Altformen). Ein halb vorhandenes Modul waere die
 // Einladung, ihn beilaeufig anzufangen.
 //
-// Bei einer spaeteren Umstellung auf `EndpointConfig[]` faellt diese Datei weg und das
-// Kit-Modul wird vollstaendig vendoriert.
+// Update 2026-09-16: `endpoint_config.ts` liegt seit der LLM-Endpoint-Manager-Migration
+// vollstaendig vendoriert unter src/vendor/kit/endpoint_config.ts (resolveEndpointSource
+// braucht es). `authHeaders` bleibt hier trotzdem stehen — die bestehenden Aufrufer
+// (http.ts, chat-client.ts, image-client.ts, llm-section.ts) importieren diesen schmalen
+// Ausschnitt, und ein Umstellen aller Importe auf den Vendor-Pfad ist kein Teil dieser
+// Migration (`llm.endpoints` bleibt `string[]`, siehe core/llm/resolve-endpoint.ts). Bei
+// einer spaeteren Umstellung auf `EndpointConfig[]` als Speicherformat faellt diese Datei weg.
 
 /** Auth-Header für einen Endpunkt — die EINZIGE Stelle, an der ein Bearer aus einem
  *  Endpunkt-/Anbieter-Schlüssel gebaut wird. */

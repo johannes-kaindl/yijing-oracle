@@ -86,9 +86,17 @@ Deklaration nach `UI-STANDARD.md` §1a — von einem verbindlichen §8-Baustein 
 erlaubt, stillschweigend abzuweichen nicht.
 
 - **endpoint-list** — Grund: eigenständige, schlankere Re-Implementierung (string[], ein
-  globaler apiKey), kein Kit-Modul; Migration hängt an Plan 3 des LLM Endpoint Managers
-  (`obsidian-plugins/docs/superpowers/plans/2026-09-13-llm-endpoint-manager-3-endpoint-source.md`),
-  siehe Cockpit-Task „Endpunkt-Liste auf Kit-EndpointConfig-Modell migrieren — Bruch aus Welle 2".
+  globaler apiKey), kein Kit-Modul. **Bestand nach der Endpunkt-Manager-Migration (2026-09-16,
+  Plan 3): weiterhin bestehend, nicht behoben.** `resolveEndpointSource()` ist verdrahtet
+  (`src/core/llm/resolve-endpoint.ts`, `src/obsidian/settings/llm-section.ts`
+  `buildEndpointSourceSection`) — bei installiertem LLM Endpoint Manager zeigt die
+  Endpunkt-Zeile dessen Kit-Baustein statt `endpoint-list.ts`. Ohne Manager bleibt
+  `endpoint-list.ts` aber der Fallback-Editor, und der ist unveraendert: die lokale Liste ist
+  weiterhin `string[]` + ein globaler `apiKey`, keine `EndpointConfig[]`
+  (`localEndpointConfigs()` adaptiert nur beim LESEN, das Speicherformat bleibt). Die
+  Migration des Fallback-Editors selbst auf `EndpointConfig[]` ist NICHT Teil dieses Auftrags
+  gewesen und bleibt offen — Cockpit-Task „Endpunkt-Liste auf Kit-EndpointConfig-Modell
+  migrieren — Bruch aus Welle 2".
   — gilt-solange: `src/obsidian/settings/endpoint-list.ts` enthaelt-nicht `EndpointConfig`
 
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.

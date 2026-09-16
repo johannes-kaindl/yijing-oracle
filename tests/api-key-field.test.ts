@@ -16,8 +16,12 @@ import { type SectionCtx } from "../src/obsidian/settings/section-ctx";
 
 function fakeCtx(): SectionCtx {
   const settings = { llm: { ...DEFAULT_LLM_SETTINGS } } as unknown as SectionCtx["host"]["settings"];
+  // Kein LLM Endpoint Manager installiert — findEndpointManager(app) muss damit null liefern,
+  // ohne dass der Test das Fremdplugin kennt.
+  const app = { plugins: { plugins: {} } } as unknown as SectionCtx["app"];
   return {
     host: { settings } as SectionCtx["host"],
+    app,
     write: () => {},
     save: () => {},
     rerender: () => {},

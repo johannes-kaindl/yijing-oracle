@@ -30,7 +30,9 @@ import { ComfyClient } from "../core/comfy/client";
 import { ComfyProgressSocket } from "./comfy-progress";
 import { comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
 import { authHeaders } from "../core/llm/auth";
-import { normalizeEndpoint, resolveActiveEndpoint } from "../vendor/kit/endpoint";
+import { normalizeEndpoint } from "../vendor/kit/endpoint";
+import { resolveLlmEndpoint } from "../core/llm/resolve-endpoint";
+import { findEndpointManager } from "../vendor/kit-obsidian/endpoint-source";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 
@@ -360,28 +362,38 @@ export class OracleView extends ItemView {
     const c = this.current;
     if (!c || this.streaming) return;
     const llm = this.host.settings.llm;
-    // „Aktiv" ist abgeleitet, nicht gespeichert: der erste erreichbare aus der geordneten Liste
-    // gewinnt. Die Probe kostet einen Roundtrip (bzw. bis zu 5 s Timeout je totem Eintrag) —
-    // gegenüber der Generierung selbst vernachlässigbar, und sie deckt den Netzwechsel ab
-    // (localhost am Host vs. LAN-IP unterwegs) ohne Umkonfiguration.
-    const endpoint = await resolveActiveEndpoint(
-      llm.endpoints,
-      async (ep) => (await probeEndpoint(ep, authHeaders(llm.apiKey))).reachable,
+    // Quellenwahl: zuerst der LLM Endpoint Manager (falls installiert und ein Endpunkt
+    // liefert), sonst die lokale Liste — der erste erreichbare gewinnt, wie bisher. Die Probe
+    // kostet einen Roundtrip (bzw. bis zu 5 s Timeout je totem Eintrag) — gegenüber der
+    // Generierung selbst vernachlässigbar, und sie deckt den Netzwechsel ab (localhost am
+    // Host vs. LAN-IP unterwegs) ohne Umkonfiguration.
+    const manager = findEndpointManager(this.app);
+    const resolved = await resolveLlmEndpoint(
+      llm,
+      manager,
+      async (cfg) => (await probeEndpoint(cfg.url, authHeaders(cfg.apiKey))).reachable,
+      "yijing-oracle",
     );
-    if (!endpoint) {
-      new Notice(t("notice.noEndpoint"));
+    if (!resolved.config) {
+      // Ein Fehlschlag mit installiertem Manager verweist auf DESSEN Einstellungen, nicht auf
+      // die (dann evtl. leere/irrelevante) lokale Liste — der Manager entscheidet, es gibt
+      // keinen lokalen Rueckfall bei "kein Endpunkt" (resolveEndpointSource-Vertrag).
+      new Notice(t(resolved.kind === "manager" ? "notice.noEndpointManaged" : "notice.noEndpoint"));
       return;
     }
+    const endpoint = resolved.config.url;
+    const apiKey = resolved.config.apiKey ?? llm.apiKey;
 
-    // Modell auflösen: gesetztes bevorzugen, sonst live das erste verfügbare (deckt den Fall
-    // ab, dass die Settings noch nie geöffnet und so kein Default persistiert wurde).
-    let model = llm.model.trim();
+    // Modell auflösen: gesetztes bevorzugen (choice.model gewinnt bereits in
+    // resolveLlmEndpoint), sonst live das erste verfügbare (deckt den Fall ab, dass die
+    // Settings noch nie geöffnet und so kein Default persistiert wurde).
+    let model = resolved.model.trim();
     if (!model) {
-      const models = await new ChatClient(endpoint, "", httpGet, llm.apiKey).listModels();
+      const models = await new ChatClient(endpoint, "", httpGet, apiKey).listModels();
       model = effectiveModel("", models);
     }
     if (!model) {
-      new Notice(t("notice.noEndpoint"));
+      new Notice(t(resolved.kind === "manager" ? "notice.noEndpointManaged" : "notice.noEndpoint"));
       return;
     }
 
@@ -394,7 +406,7 @@ export class OracleView extends ItemView {
     c.interpretation = { answer: "", reasoning: "", model };
     await this.render();
 
-    const client = new ChatClient(endpoint, model, httpGet, llm.apiKey);
+    const client = new ChatClient(endpoint, model, httpGet, apiKey);
     try {
       const res = await client.stream(
         messages,

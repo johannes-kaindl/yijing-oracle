@@ -78,6 +78,7 @@ export class SettingsTab extends PluginSettingTab {
   private ctx(): SectionCtx {
     return {
       host: this.host,
+      app: this.app,
       write: (key, value) => {
         void this.setControlValue(key, value);
       },

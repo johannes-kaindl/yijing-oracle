@@ -6,8 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Optional integration with the `LLM Endpoint Manager` plugin.** If it is installed, the AI
+  interpretation now uses the endpoints and API keys configured there — pick an endpoint (or
+  leave it on "automatic") and a model in the settings; your local endpoint list stays as a
+  fallback (and can be copied into the manager with one click) but no longer takes priority
+  once the manager is present. Without the manager plugin, nothing changes: the local endpoint
+  list and API key field work exactly as before.
+
 ### Changed
 
+- **API key storage moved to `obsidian-kit`'s `secrets` module** (vendored, floor-adapted for
+  this plugin's `minAppVersion` 1.8.7). Behavior is unchanged; internal only.
 - **Streaming answer area now uses the shared `obsidian-kit` component (`buildStreamArea`)**
   instead of the hand-rolled one. Two visible behavior changes: the thinking block stays open
   for the whole duration of a stream (it used to be forced open too, but is now driven by the

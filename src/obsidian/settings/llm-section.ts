@@ -11,6 +11,8 @@ import { ChatClient } from "../chat-client";
 import { fetchModelContext, httpGet } from "../http";
 import { authHeaders } from "../../core/llm/auth";
 import { buildEndpointList } from "./endpoint-list";
+import { buildEndpointSourceSection, findEndpointManager } from "../../vendor/kit-obsidian/endpoint-source";
+import { localEndpointConfigs } from "../../core/llm/resolve-endpoint";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
 
 export function llmRows(ctx: SectionCtx): SettingRow[] {
@@ -28,19 +30,56 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
       desc: t("set.llmEndpointsDesc"),
       // Der Zeilen-Editor ist eine ganze Liste, keine einzelne Zeile — settingBodyHost macht
       // die Setting-Zeile zum leeren Block-Container, in den er seine Zeilen zeichnet.
+      //
+      // Ist der LLM Endpoint Manager installiert, zeigt buildEndpointSourceSection dessen
+      // Endpunkt-/Modellwahl statt des lokalen Zeilen-Editors (die Fallentscheidung trifft
+      // die Kit-Funktion selbst ueber findEndpointManager); die lokale Liste bleibt als
+      // renderLocalList-Rueckfall erreichbar (Import-Knopf, kein Manager installiert).
       render: (setting: Setting) => {
-        buildEndpointList(settingBodyHost(setting), {
-          list: llm.endpoints,
-          name: t("set.llmEndpoints"),
-          desc: t("set.llmEndpointsDesc"),
-          setList: (next) => {
-            llm.endpoints = next;
-          },
-          probe: (ep) => ctx.host.probeEndpoint(ep),
-          commit: () => {
+        const host = settingBodyHost(setting);
+        const renderLocalList = (): void => {
+          buildEndpointList(host, {
+            list: llm.endpoints,
+            name: t("set.llmEndpoints"),
+            desc: t("set.llmEndpointsDesc"),
+            setList: (next) => {
+              llm.endpoints = next;
+            },
+            probe: (ep) => ctx.host.probeEndpoint(ep),
+            commit: () => {
+              ctx.save();
+              ctx.rerender();
+            },
+          });
+        };
+        buildEndpointSourceSection({
+          app: ctx.app,
+          containerEl: host,
+          capability: "chat",
+          caller: "yijing-oracle",
+          choice: () => llm.choice ?? {},
+          setChoice: async (c) => {
+            llm.choice = c;
             ctx.save();
-            ctx.rerender();
           },
+          local: () => localEndpointConfigs(llm),
+          strings: {
+            managed: t("src.managed"),
+            managedDesc: t("src.managedDesc"),
+            openManager: t("src.openManager"),
+            pickEndpoint: t("src.pickEndpoint"),
+            automatic: t("src.automatic"),
+            model: t("set.llmModel"),
+            importLocal: t("src.importLocal"),
+            imported: (r) => t("src.imported", r.added.length, r.merged.length),
+            importFailed: t("src.importFailed"),
+            modelHint: (key) => t(`src.modelHint.${key}`),
+            savedSuffix: t("src.savedSuffix"),
+            refreshModels: t("src.refreshModels"),
+            saveFailed: t("src.saveFailed"),
+          },
+          renderLocalList,
+          rerender: () => ctx.rerender(),
         });
       },
     },
@@ -67,11 +106,19 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
         });
       },
     },
-    {
-      name: t("set.llmModel"),
-      desc: t("set.llmModelDesc"),
-      render: (setting: Setting) => renderModelField(setting, ctx, llm),
-    },
+    // Bei aktivem Manager sitzt die Modellwahl bereits in der Endpunkt-Zeile oben
+    // (buildEndpointSourceSection) — eine zweite Modell-UI hier waere eine zweite Wahrheit.
+    findEndpointManager(ctx.app)
+      ? {
+          name: t("set.llmModel"),
+          desc: t("src.modelManaged"),
+          render: () => {},
+        }
+      : {
+          name: t("set.llmModel"),
+          desc: t("set.llmModelDesc"),
+          render: (setting: Setting) => renderModelField(setting, ctx, llm),
+        },
     {
       name: t("set.llmPreset"),
       desc: t("set.llmPresetDesc"),
