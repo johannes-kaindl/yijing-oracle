@@ -2,6 +2,7 @@
 // — deren Sektions-Labels leben in core/render.ts und hängen an der Reading-Sprache.
 // registerI18n() wird EINMALIG im onload aufgerufen (vor addCommand/addSettingTab).
 import { defineStrings, type Lang } from "../vendor/kit/i18n";
+import { EXPLAIN_TEXTS } from "../vendor/kit/explain-texts";
 
 /** Die Dicts selbst — exportiert, damit Tests die Abdeckung je Sprache pruefen koennen.
  *  Ueber `t()` ginge das nicht: die Engine faellt DE → EN zurueck, ein fehlender
@@ -89,8 +90,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     "notice.noEndpoint": "No endpoint reachable, or no model — check the settings.",
     "notice.noEndpointManaged": "No endpoint from the LLM Endpoint Manager — check its settings.",
     "notice.llmError": "Interpretation failed — check the endpoint in the settings.",
-    "notice.llmBlocked":
-      "The model server refused the streaming request. Local servers usually block requests coming from Obsidian unless CORS is enabled — in LM Studio, restart it with `lms server start --cors`. The connection test passes regardless, because it takes a different route.",
+    "notice.llmBlocked": EXPLAIN_TEXTS.corsBlocked.en,
     "notice.noInterpretation": "No interpretation received.",
     "notice.imageError": "Image generation failed: {0}",
     "set.llmHead": "AI interpretation",
@@ -114,8 +114,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     "src.refreshModels": "Refresh models",
     "src.saveFailed": "Could not save the choice.",
     "src.modelHint.": "",
-    "src.modelHint.unreachable": "Endpoint unreachable — type the model name.",
-    "src.modelHint.no-list": "The endpoint returns no model list — type the name.",
+    "src.modelHint.unreachable": EXPLAIN_TEXTS.endpointUnreachableKeepsModel.en,
+    "src.modelHint.no-list": EXPLAIN_TEXTS.noModelList.en,
     "src.modelManaged": "Model is chosen in the endpoint row above.",
     "set.llmPreset": "Prompt template",
     "set.llmPresetDesc": "Load a built-in system-prompt template into the fields below (then editable).",
@@ -254,8 +254,7 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     "notice.noEndpoint": "Kein Endpunkt erreichbar oder kein Modell — in den Einstellungen prüfen.",
     "notice.noEndpointManaged": "Kein Endpunkt vom LLM Endpoint Manager — dessen Einstellungen prüfen.",
     "notice.llmError": "Deutung fehlgeschlagen — Endpunkt in den Einstellungen prüfen.",
-    "notice.llmBlocked":
-      "Der Modell-Server hat die Streaming-Anfrage abgewiesen. Lokale Server blockieren Anfragen aus Obsidian meist, solange CORS nicht aktiviert ist — in LM Studio mit `lms server start --cors` neu starten. Der Verbindungstest bleibt davon unberührt, weil er einen anderen Weg nimmt.",
+    "notice.llmBlocked": EXPLAIN_TEXTS.corsBlocked.de,
     "notice.noInterpretation": "Keine Deutung erhalten.",
     "notice.imageError": "Bildgenerierung fehlgeschlagen: {0}",
     "set.llmHead": "KI-Deutung",
@@ -279,8 +278,8 @@ export const STRINGS: Record<Lang, Record<string, string>> = {
     "src.refreshModels": "Modelle neu laden",
     "src.saveFailed": "Die Wahl konnte nicht gespeichert werden.",
     "src.modelHint.": "",
-    "src.modelHint.unreachable": "Endpunkt nicht erreichbar — Modellnamen eintippen.",
-    "src.modelHint.no-list": "Der Endpunkt gibt keine Modell-Liste heraus — Namen eintippen.",
+    "src.modelHint.unreachable": EXPLAIN_TEXTS.endpointUnreachableKeepsModel.de,
+    "src.modelHint.no-list": EXPLAIN_TEXTS.noModelList.de,
     "src.modelManaged": "Das Modell wird oben in der Endpunkt-Zeile gewaehlt.",
     "set.llmPreset": "Prompt-Vorlage",
     "set.llmPresetDesc": "Lädt eine eingebaute System-Prompt-Vorlage in die Felder unten (danach editierbar).",

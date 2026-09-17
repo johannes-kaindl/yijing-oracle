@@ -4,5 +4,13 @@
   "sha": "4cfa746",
   "code_kit_version": "0.6.0",
   "vendored": "callout.ts, filename-template.ts, reasoning.ts, settings.ts, endpoint.ts, sse.ts, think-splitter.ts, model-context.ts, i18n.ts, endpoint_diagnostics.ts, secrets.ts, endpoint_config.ts, model-choice.ts, endpoint-source.ts",
-  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. think-splitter.ts liegt hier unter dem Dateinamen think.ts (Kopfstempel nennt die Kit-Quelle). Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
+  "vendored_mixed_version": [
+    {
+      "file": "explain-texts.ts",
+      "version": "0.38.0",
+      "sha": "4988fa0",
+      "note": "Einzeln vendoriert (git show 0.38.0:src/pure/explain-texts.ts), NICHT ueber tools/sync-kit.sh — das Skript berechnet eine gemeinsame VER fuer PURE_MODULE+OBSIDIAN_MODULE und haette beim Aufnehmen dieser Datei alle 18 anderen ebenfalls auf 0.38.0 gehoben. Datei ist dependenzfrei (keine Kit-internen Importe), Einzel-Vendoring deshalb gefahrlos. Re-vendor manuell mit demselben git-show-Befehl gegen einen neuen Tag; Kopf-Stempel und dieser Eintrag von Hand nachziehen."
+    }
+  ],
+  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \"vendored_mixed_version\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien; \"vendored_mixed_version\" traegt seine Version/SHA je Eintrag selbst. think-splitter.ts liegt hier unter dem Dateinamen think.ts (Kopfstempel nennt die Kit-Quelle). Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
 }

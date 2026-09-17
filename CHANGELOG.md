@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Three explanatory texts reworded to the richer, cross-plugin-consolidated wording from
+  `obsidian-kit`'s `explain-texts` module:** the CORS notice shown when a local server refuses
+  the streaming request (now also mentions the LM Studio GUI toggle and Ollama's
+  `OLLAMA_ORIGINS`, not just the CLI flag), and the two "no model list" / "endpoint
+  unreachable" hints shown next to the model field when the LLM Endpoint Manager plugin is
+  active — the "unreachable" hint now correctly says the saved model value is kept (the field
+  is locked to it), instead of the previous, inaccurate "type the model name" (that only
+  applies to the "no model list" case). Wording only; no behavior change beyond the corrected
+  "unreachable" text.
+
 ## [0.6.0] — 2026-09-16
 
 ### Added
