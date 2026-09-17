@@ -1187,7 +1187,7 @@ async function main(): Promise<void> {
   // Auch der Schluesselbund-Eintrag ist Zustand des Wirts: B8 und F8 schreiben ihn, und die
   // data.json-Ruecksicherung allein liesse den Smoke-Schluessel dort stehen — beim naechsten
   // Laden GEWAENNE er gegen data.json (Schluesselbund hat Vorrang).
-  const originalBund = await schluesselbund(cdp);
+  let originalBund = await schluesselbund(cdp);
   const aufraeumen: string[] = [];
 
   // Ein SIGINT mitten im Lauf ueberspringt das `finally` unten NICHT im try/catch-Sinn,
@@ -1270,6 +1270,27 @@ async function main(): Promise<void> {
     );
 
     await abschnittPanel(cdp);
+
+    // B-1 — ein liegen gebliebener Smoke-Schluessel aus einem VOR diesem Handler
+    // abgebrochenen Vorlauf (SIGKILL/Absturz) waere sonst still gefaehrlich: B6/B8 lesen
+    // `originalBund.wert` als "echten Vorbestand" und schreiben ihn am Ende treu zurueck —
+    // der Testschluessel wuerde sich damit selbst verewigen, UND B6/B8 maessen faelschlich
+    // gegen den eigenen Rest statt gegen einen frischen Ausgangszustand (Master-Fund,
+    // ctrlc-w7b 14:37: die vermeintlich "vorbestehenden" Rot B6/B8 WAREN genau dieser Fall).
+    // Marker: alle Testwerte dieses Treibers tragen das Praefix "smoke-".
+    const kaputterBund = originalBund?.wert?.startsWith("smoke-") === true;
+    record(
+      "B-1 Kein liegen gebliebener Smoke-Schluessel im Schluesselbund aus einem abgebrochenen Vorlauf",
+      !kaputterBund,
+      kaputterBund
+        ? `Schluesselbund trug noch ${JSON.stringify(originalBund!.wert)} — entfernt`
+        : "Ausgangszustand unauffaellig",
+    );
+    if (kaputterBund) {
+      await schluesselbundZuruecksetzen(cdp, null);
+      originalBund = { wert: null };
+    }
+
     await abschnittMigration(cdp);
     await abschnittSettings(cdp, port, workflowFixture);
     await abschnittDeklarativ(cdp, port);
