@@ -1190,6 +1190,65 @@ async function main(): Promise<void> {
   const originalBund = await schluesselbund(cdp);
   const aufraeumen: string[] = [];
 
+  // Ein SIGINT mitten im Lauf ueberspringt das `finally` unten NICHT im try/catch-Sinn,
+  // sondern beendet den Node-Prozess sofort. Vier Zustandssorten ueberleben das sonst:
+  //  · data.json (Migrations-/Testschreibvorgaenge in mehreren Abschnitten).
+  //  · der Schluesselbund-Eintrag (B8/F8 schreiben ihn real).
+  //  · Testdateien in `aufraeumen` (per Referenz von main() aus befuellt, `abschnittSpeichern`
+  //    mutiert dasselbe Array).
+  //  · der gestubbte llm-endpoint-manager-Slot aus `pruefeManager` — als
+  //    `window.__smokeVorherManager` im RENDERER gesichert (nicht als Node-Closure), genau wie
+  //    bei neurovim-obsidian/slide-deck: nur so erreicht ihn ein Handler auf main()-Ebene,
+  //    unabhaengig davon, welcher Abschnitt gerade laeuft. `p.settings.llm.endpoints`
+  //    (pruefeManager()s eigener `vorherEndpoints`) ist Teil DERSELBEN data.json und damit
+  //    durch den vollstaendigen Datei-Restore unten mitabgedeckt — kein separater Pfad noetig.
+  //
+  // Bekannte Falle (Master-Review an vault-crews, ctrlc-w7b): der try-Zweig kann NACH dem
+  // ersten Restore noch weiterlaufen, bis der Event-Loop das Signal zustellt, und erneut in
+  // data.json schreiben. Deshalb NACH dem Reload ein zweites Mal gegen `originalData`
+  // pruefen und im Zweifel ERNEUT schreiben — die Rettungsdatei im Vault bleibt liegen, bis
+  // der Endzustand passt.
+  let signalCleanupRunning = false;
+  const onAbortSignal = (signal: NodeJS.Signals): void => {
+    if (signalCleanupRunning) return;
+    signalCleanupRunning = true;
+    void (async () => {
+      console.log(`\n\nAbbruch durch ${signal} — raeume Vault-Zustand auf...`);
+      if (originalBund) {
+        await schluesselbundZuruecksetzen(cdp, originalBund.wert).catch(() => undefined);
+      }
+      await removeFakeManager(cdp).catch(() => undefined);
+      for (const pfad of aufraeumen) {
+        await cdp.evaluate(`
+          const f = app.vault.getAbstractFileByPath(${JSON.stringify(pfad)});
+          if (f) await app.fileManager.trashFile(f);
+          return true;
+        `).catch(() => undefined);
+      }
+      if (originalData !== null) {
+        await writeVaultFile(cdp, DATA_PATH, originalData).catch(() => undefined);
+        await reloadPlugin(cdp).catch(() => undefined);
+        // Zweiter Vergleich NACH dem Reload — derselbe Fund wie bei vault-crews: der
+        // try-Zweig kann in diesem Zeitfenster erneut geschrieben haben.
+        const nochmal = await readVaultFile(cdp, DATA_PATH).catch(() => null);
+        if (nochmal !== originalData) {
+          await writeVaultFile(cdp, DATA_PATH, originalData).catch(() => undefined);
+          console.log("  data.json erneut zurueckgeschrieben (try lief nach dem Signal weiter)");
+        }
+        const endstand = await readVaultFile(cdp, DATA_PATH).catch(() => null);
+        if (endstand === originalData) {
+          await removeVaultFile(cdp, DATA_RESCUE).catch(() => undefined);
+        } else {
+          console.log(`  ! data.json weicht weiter ab — Rettungsdatei bleibt liegen: ${DATA_RESCUE}`);
+        }
+      }
+      cdp.close();
+      process.exit(130);
+    })();
+  };
+  process.on("SIGINT", onAbortSignal);
+  process.on("SIGTERM", onAbortSignal);
+
   try {
     // Der Guard steht FRUEH IM try — beide Haelften sind noetig und ziehen in
     // verschiedene Richtungen:
@@ -1296,6 +1355,10 @@ async function main(): Promise<void> {
       cdp.close();
       process.exitCode = bestanden === checks.length ? 0 : 1;
     }
+    // Abmelden, sonst haengt ein SPAETES Signal (nach normalem Abschluss, cdp schon zu) den
+    // Prozess in onAbortSignal an einer toten Verbindung auf.
+    process.off("SIGINT", onAbortSignal);
+    process.off("SIGTERM", onAbortSignal);
   }
 }
 
