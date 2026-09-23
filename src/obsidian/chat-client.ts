@@ -1,6 +1,6 @@
 import { streamSSE } from "./sse";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { suppressParams } from "../vendor/kit/reasoning";
+import { isAlwaysOnThinker, suppressParams } from "../vendor/kit/reasoning";
 import { authHeaders } from "../core/llm/auth";
 
 export interface ChatMessage { role: "system" | "user" | "assistant"; content: string; reasoning?: string }
@@ -39,11 +39,12 @@ export class ChatClient {
     signal?: AbortSignal,
     opts?: { model?: string; suppressThinking?: boolean },
   ): Promise<{ content: string; reasoning: string }> {
+    const effectiveModel = opts?.model ?? this.model;
     const body = JSON.stringify({
-      model: opts?.model ?? this.model,
+      model: effectiveModel,
       messages,
       stream: true,
-      ...suppressParams(opts?.suppressThinking ?? false),
+      ...suppressParams((opts?.suppressThinking ?? false) && !isAlwaysOnThinker(effectiveModel)),
     });
     const { content, reasoning } = await streamSSE(
       `${this.endpoint}/v1/chat/completions`,

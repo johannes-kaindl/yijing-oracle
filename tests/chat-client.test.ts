@@ -26,6 +26,7 @@ describe("ChatClient.listModels", () => {
  *  streamSSE.test.ts, den nur der Datenstrom interessiert). */
 class HeaderRecordingXHR {
   static letzte: Record<string, string> = {};
+  static letzterBody = "";
   status = 200;
   responseText = "";
   onprogress: (() => void) | undefined;
@@ -34,7 +35,8 @@ class HeaderRecordingXHR {
   onabort: (() => void) | undefined;
   open(): void { HeaderRecordingXHR.letzte = {}; }
   setRequestHeader(k: string, v: string): void { HeaderRecordingXHR.letzte[k] = v; }
-  send(): void {
+  send(body?: string): void {
+    HeaderRecordingXHR.letzterBody = body ?? "";
     this.responseText = 'data: {"choices":[{"delta":{"content":"x"}}]}\ndata: [DONE]\n';
     this.onprogress?.();
     this.onload?.();
@@ -79,5 +81,38 @@ describe("ChatClient — Authentifizierung", () => {
     } finally {
       if (vorher === undefined) delete g.XMLHttpRequest; else g.XMLHttpRequest = vorher;
     }
+  });
+});
+
+describe("ChatClient — Thinking-Suppression", () => {
+  const mitFakeXHR = async (fn: () => Promise<void>): Promise<void> => {
+    const g = globalThis as unknown as { XMLHttpRequest?: unknown };
+    const vorher = g.XMLHttpRequest;
+    g.XMLHttpRequest = HeaderRecordingXHR;
+    try { await fn(); } finally {
+      if (vorher === undefined) delete g.XMLHttpRequest; else g.XMLHttpRequest = vorher;
+    }
+  };
+
+  it("unterdrückt Thinking bei suppressThinking NICHT für gpt-oss (always-on, lehnt reasoning_effort ab)", async () => {
+    await mitFakeXHR(async () => {
+      const c = new ChatClient("http://h:1234", "m", async () => ({ status: 200, json: null }), "");
+      await c.stream([{ role: "user", content: "hi" }], () => {}, () => {}, undefined, { model: "openai/gpt-oss-20b", suppressThinking: true });
+      const body = JSON.parse(HeaderRecordingXHR.letzterBody) as Record<string, unknown>;
+      expect("reasoning_effort" in body).toBe(false);
+      expect("chat_template_kwargs" in body).toBe(false);
+      expect("reasoning_budget" in body).toBe(false);
+    });
+  });
+
+  it("unterdrückt Thinking bei suppressThinking weiterhin für ein Qwen-Modell", async () => {
+    await mitFakeXHR(async () => {
+      const c = new ChatClient("http://h:1234", "m", async () => ({ status: 200, json: null }), "");
+      await c.stream([{ role: "user", content: "hi" }], () => {}, () => {}, undefined, { model: "qwen/qwen3.6-35b-a3b", suppressThinking: true });
+      const body = JSON.parse(HeaderRecordingXHR.letzterBody) as { reasoning_effort: string; chat_template_kwargs: unknown; reasoning_budget: number };
+      expect(body.reasoning_effort).toBe("none");
+      expect(body.chat_template_kwargs).toEqual({ enable_thinking: false });
+      expect(body.reasoning_budget).toBe(0);
+    });
   });
 });

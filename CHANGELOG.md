@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **`suppressThinking` no longer suppresses thinking on gpt-oss/harmony models** (`chat-client.ts`).
+  These models reject `reasoning_effort`/`chat_template_kwargs`/`reasoning_budget` with HTTP 400
+  instead of ignoring them as a no-op — the request used to fail whenever thinking suppression was
+  active. Guard `isAlwaysOnThinker(effectiveModel)` (already vendored) before `suppressParams`,
+  checked against the model name actually used (`opts.model ?? this.model`).
+
 ### Changed
 
 - **Three explanatory texts reworded to the richer, cross-plugin-consolidated wording from
