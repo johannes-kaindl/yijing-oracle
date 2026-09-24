@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- **`authorUrl` in the manifest points to the GitHub profile again** (`https://github.com/johannes-kaindl`), in line with the return to the Community Store.
 - **Three explanatory texts reworded to the richer, cross-plugin-consolidated wording from
   `obsidian-kit`'s `explain-texts` module:** the CORS notice shown when a local server refuses
   the streaming request (now also mentions the LM Studio GUI toggle and Ollama's
