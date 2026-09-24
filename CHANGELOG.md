@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.6.1] — 2026-09-24
+
 ### Fixed
 
 - **`suppressThinking` no longer suppresses thinking on gpt-oss/harmony models** (`chat-client.ts`).
