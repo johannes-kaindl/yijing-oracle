@@ -1,10 +1,11 @@
 # Yijing Oracle
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://git.jkaindl.de/jkaindl/yijing-oracle/src/branch/main/LICENSE)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/yijing-oracle?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/yijing-oracle/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)
+[![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE-DOCS)
+[![Release](https://img.shields.io/github/v/release/johannes-kaindl/yijing-oracle?label=release)](https://github.com/johannes-kaindl/yijing-oracle/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20desktop%20%26%20mobile-7c3aed)
 
-*Auch auf Deutsch verfügbar: [`README.de.md`](README.de.md).*
+> 🇬🇧 English · [🇩🇪 Deutsch](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.de.md)
 
 Cast the *I Ching* (Yijing) inside Obsidian. A three-coin oracle with the classic
 Richard Wilhelm hexagram texts — and every reading is saved as a **vault note**:
@@ -14,7 +15,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 > [Yijing web/app project](https://git.jkaindl.de/jkaindl/Yijing). Not a port of the
 > whole thing — a focused plugin where the vault is the oracle journal.
 
-<p align="center"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/hero.png" width="600" alt="A saved reading open as a note in Obsidian, the oracle panel beside it showing the same hexagram"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/hero.png" width="600" alt="A saved reading open as a note in Obsidian, the oracle panel beside it showing the same hexagram"></p>
 
 ## Features
 
@@ -34,7 +35,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 - **Meditation image (optional, local)** — generate one image per reading from the
   hexagram's curated motif via a local A1111-compatible image server (Draw Things,
   A1111, Forge, …). Panel preview + note embed. Off until you set an endpoint —
-  see [docs/image-generation.md](docs/image-generation.md) for setup.
+  see [docs/image-generation.md](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md) for setup.
 
 ## Requirements
 
@@ -50,7 +51,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
   takes a different route that sends no `Origin`.
 - **Optional, for meditation images:** an A1111-compatible image server (e.g.
   [Draw Things](https://drawthings.ai) with its API server enabled). See the
-  [setup guide](docs/image-generation.md).
+  [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
 Both optional features stay off until you configure an endpoint. Nothing ever leaves
 your machine.
@@ -65,7 +66,7 @@ Search for **Yijing Oracle** in **Settings → Community plugins → Browse**, t
 ### Manual
 
 Download `main.js`, `manifest.json` and `styles.css` from the
-[latest release](https://git.jkaindl.de/jkaindl/yijing-oracle/releases) and place them in
+[latest release](https://github.com/johannes-kaindl/yijing-oracle/releases) and place them in
 `<vault>/.obsidian/plugins/yijing-oracle/`, then enable the plugin under
 **Settings → Community plugins**.
 
@@ -97,9 +98,9 @@ From there:
 - Past readings are listed below the panel — clicking one **reconstructs the cast**
   from its frontmatter.
 
-<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/panel.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/panel.png" width="380" alt="The oracle panel: question field, cast button, the hexagram as six lines, and the reading preview"></a><br><sub>The panel after a cast — click to enlarge</sub></p>
+<p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/panel.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/panel.png" width="380" alt="The oracle panel: question field, cast button, the hexagram as six lines, and the reading preview"></a><br><sub>The panel after a cast — click to enlarge</sub></p>
 
-<img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/reading-note.png" width="600" alt="A saved reading as a note: the question, the primary hexagram with its trigrams, judgment and image, the changing line, and the resulting hexagram">
+<img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/reading-note.png" width="600" alt="A saved reading as a note: the question, the primary hexagram with its trigrams, judgment and image, the changing line, and the resulting hexagram">
 <br><sub>Every cast becomes a note like this — searchable, linkable, yours.</sub>
 
 Two commands skip the panel entirely and cast straight away:
@@ -113,8 +114,8 @@ Two commands skip the panel entirely and cast straight away:
 
 <table>
 <tr>
-<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/interpretation.png" width="408" alt="The AI interpretation box in the panel with a finished reading interpretation and a collapsed reasoning trace"><br><sub>AI interpretation, streamed from a local model</sub></td>
-<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/artwork.png" width="408" alt="The meditation image box in the panel showing a generated image and the scene sentence below it"><br><sub>Meditation image, generated locally</sub></td>
+<td><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/interpretation.png" width="408" alt="The AI interpretation box in the panel with a finished reading interpretation and a collapsed reasoning trace"><br><sub>AI interpretation, streamed from a local model</sub></td>
+<td><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/artwork.png" width="408" alt="The meditation image box in the panel showing a generated image and the scene sentence below it"><br><sub>Meditation image, generated locally</sub></td>
 </tr>
 </table>
 
@@ -128,7 +129,7 @@ Two commands skip the panel entirely and cast straight away:
 | **Note & storage** | Readings folder, filename scheme (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), open-after-save. |
 | **Note content** | Frontmatter on/off plus a renameable key per field, Wilhelm's footnotes, per-section callout wrapping. |
 | **AI interpretation** | Endpoints, model, API key, system prompt (built-in templates or your own), thinking behaviour. |
-| **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](docs/image-generation.md). |
+| **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
 **On endpoints:** list them one per line — the **first reachable one wins**, so the
 order is the priority. That way one config covers every network (localhost at your
@@ -139,7 +140,7 @@ test with a plain-language result.
 (OS-encrypted, per device), not in the vault — so it is never synced or backed up along
 with your notes, and you enter it once on each device. Leave it empty for local servers.
 
-<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
+<p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
 
 ## How it works
 
@@ -160,7 +161,13 @@ npm run gate     # lint + typecheck + test + check:pure + check:bundle
 The oracle core (`src/core/`) never imports `obsidian` (enforced by `check:pure`) and
 is fully unit-tested. The `src/obsidian/` layer holds the view, settings and file I/O.
 
+## Documentation
+
+- [Documentation index](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/README.md) — all guides in one place.
+- [Getting started](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/getting-started.md) — from the install to your first saved reading.
+- [Troubleshooting](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/troubleshooting.md) — the exact message, its cause and the fix.
+
 ## License
 
-Source code: **AGPL-3.0-or-later** (see [`LICENSE`](LICENSE)). The Richard Wilhelm
+Source code: **AGPL-3.0-or-later** (see [`LICENSE`](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)). The Richard Wilhelm
 translation in the bundled data is public domain. © 2026 Johannes Kaindl.

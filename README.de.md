@@ -1,10 +1,13 @@
 # Yijing Oracle
 
-[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://git.jkaindl.de/jkaindl/yijing-oracle/src/branch/main/LICENSE)
-[![Release](https://img.shields.io/gitea/v/release/jkaindl/yijing-oracle?gitea_url=https%3A%2F%2Fgit.jkaindl.de&label=release)](https://git.jkaindl.de/jkaindl/yijing-oracle/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)
+[![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE-DOCS)
+[![Release](https://img.shields.io/github/v/release/johannes-kaindl/yijing-oracle?label=release)](https://github.com/johannes-kaindl/yijing-oracle/releases)
 ![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20Desktop%20%26%20Mobil-7c3aed)
 
-> **Hinweis:** Diese Übersetzung folgt der englischen [`README.md`](README.md).
+> 🇩🇪 Deutsch · [🇬🇧 English](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.md)
+
+> **Hinweis:** Diese Übersetzung folgt der englischen [`README.md`](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.md).
 > Bei Abweichungen gilt die englische Fassung.
 
 Das *I Ging* (Yijing) in Obsidian befragen. Ein Drei-Münzen-Orakel mit den klassischen
@@ -16,7 +19,7 @@ kein Konto.
 > [Yijing-Web-/App-Projekt](https://git.jkaindl.de/jkaindl/Yijing). Keine Portierung des
 > Ganzen — ein fokussiertes Plugin, in dem der Vault das Orakel-Journal ist.
 
-<p align="center"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/hero.png" width="600" alt="Eine gespeicherte Befragung als Notiz in Obsidian, daneben das Orakel-Panel mit demselben Hexagramm"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/hero.png" width="600" alt="Eine gespeicherte Befragung als Notiz in Obsidian, daneben das Orakel-Panel mit demselben Hexagramm"></p>
 
 ## Features
 
@@ -38,7 +41,7 @@ kein Konto.
   Motiv des Hexagramms erzeugen, über einen lokalen A1111-kompatiblen Bild-Server
   (Draw Things, A1111, Forge, …). Vorschau im Panel, Einbettung in der Notiz. Aus, bis
   du einen Endpunkt einträgst — Einrichtung siehe
-  [docs/image-generation.md](docs/image-generation.md).
+  [docs/image-generation.md](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
 ## Voraussetzungen
 
@@ -55,7 +58,7 @@ kein Konto.
   sendet.
 - **Optional, für Meditationsbilder:** ein A1111-kompatibler Bild-Server (z.B.
   [Draw Things](https://drawthings.ai) mit aktiviertem API-Server). Siehe die
-  [Einrichtungsanleitung](docs/image-generation.md).
+  [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
 Beide optionalen Funktionen bleiben aus, bis ein Endpunkt konfiguriert ist. Nichts
 verlässt jemals deinen Rechner.
@@ -70,7 +73,7 @@ dann **Installieren** und **Aktivieren**.
 ### Manuell
 
 `main.js`, `manifest.json` und `styles.css` aus dem
-[neuesten Release](https://git.jkaindl.de/jkaindl/yijing-oracle/releases) herunterladen,
+[neuesten Release](https://github.com/johannes-kaindl/yijing-oracle/releases) herunterladen,
 nach `<vault>/.obsidian/plugins/yijing-oracle/` legen und das Plugin unter
 **Einstellungen → Community-Plugins** aktivieren.
 
@@ -102,9 +105,9 @@ Von dort aus:
 - Frühere Befragungen stehen unter dem Panel — ein Klick darauf **rekonstruiert den
   Wurf** aus ihrem Frontmatter.
 
-<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/panel.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/panel.png" width="380" alt="Das Orakel-Panel: Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien und die Weissagungs-Vorschau"></a><br><sub>Das Panel nach einem Wurf — zum Vergrößern klicken</sub></p>
+<p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/panel.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/panel.png" width="380" alt="Das Orakel-Panel: Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien und die Weissagungs-Vorschau"></a><br><sub>Das Panel nach einem Wurf — zum Vergrößern klicken</sub></p>
 
-<img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/reading-note.png" width="600" alt="Eine gespeicherte Befragung als Notiz: die Frage, das Ausgangs-Hexagramm mit Trigrammen, Urteil und Bild, die wandelnde Linie und das resultierende Hexagramm">
+<img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/reading-note.png" width="600" alt="Eine gespeicherte Befragung als Notiz: die Frage, das Ausgangs-Hexagramm mit Trigrammen, Urteil und Bild, die wandelnde Linie und das resultierende Hexagramm">
 <br><sub>Jeder Wurf wird zu einer Notiz wie dieser — durchsuchbar, verlinkbar, deine.</sub>
 
 Zwei Befehle übergehen das Panel und werfen sofort:
@@ -118,8 +121,8 @@ Zwei Befehle übergehen das Panel und werfen sofort:
 
 <table>
 <tr>
-<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/interpretation.png" width="408" alt="Der Deutungs-Kasten im Panel mit einer fertigen Deutung und der zugeklappten Denkspur"><br><sub>KI-Deutung, gestreamt von einem lokalen Modell</sub></td>
-<td><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/artwork.png" width="408" alt="Der Bildmeditations-Kasten im Panel mit erzeugtem Bild und dem Szenen-Satz darunter"><br><sub>Bildmeditation, lokal erzeugt</sub></td>
+<td><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/interpretation.png" width="408" alt="Der Deutungs-Kasten im Panel mit einer fertigen Deutung und der zugeklappten Denkspur"><br><sub>KI-Deutung, gestreamt von einem lokalen Modell</sub></td>
+<td><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/artwork.png" width="408" alt="Der Bildmeditations-Kasten im Panel mit erzeugtem Bild und dem Szenen-Satz darunter"><br><sub>Bildmeditation, lokal erzeugt</sub></td>
 </tr>
 </table>
 
@@ -133,14 +136,14 @@ Zwei Befehle übergehen das Panel und werfen sofort:
 | **Notiz & Ablage** | Ordner für Befragungen, Dateinamen-Schema (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), nach dem Speichern öffnen. |
 | **Notiz-Inhalt** | Frontmatter an/aus samt umbenennbarem Schlüssel je Feld, Wilhelms Fußnoten, Callout-Rahmen je Abschnitt. |
 | **KI-Deutung** | Endpunkte, Modell, API-Schlüssel, System-Prompt (mitgelieferte Vorlagen oder eigener), Verhalten der Reasoning-Anzeige. |
-| **Bilderzeugung** | Bild-Endpunkt, Stil-Suffix, Negativ-Prompt, Größe. Siehe die [Einrichtungsanleitung](docs/image-generation.md). |
+| **Bilderzeugung** | Bild-Endpunkt, Stil-Suffix, Negativ-Prompt, Größe. Siehe die [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
 **Zu den Endpunkten:** einer pro Zeile — der **erste erreichbare gewinnt**, die
 Reihenfolge ist also die Priorität. So deckt eine Konfiguration jedes Netz ab
 (localhost am Schreibtisch, LAN-IP unterwegs), ohne dass etwas umgestellt werden muss.
 Jede Zeile hat ihren eigenen Verbindungstest mit einem Ergebnis in Klartext.
 
-<p><a href="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/settings.png"><img src="https://git.jkaindl.de/jkaindl/yijing-oracle/raw/branch/main/docs/images/thumbs/settings.png" width="380" alt="Die Plugin-Einstellungen von oben nach unten: Allgemein, Notiz und Ablage, Notiz-Inhalt, KI-Deutung, Bildgenerierung"></a><br><sub>Die vollständige Einstellungsseite — zum Vergrößern klicken</sub></p>
+<p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/settings.png" width="380" alt="Die Plugin-Einstellungen von oben nach unten: Allgemein, Notiz und Ablage, Notiz-Inhalt, KI-Deutung, Bildgenerierung"></a><br><sub>Die vollständige Einstellungsseite — zum Vergrößern klicken</sub></p>
 
 ## Funktionsweise
 
@@ -162,7 +165,13 @@ Der Orakel-Kern (`src/core/`) importiert nie `obsidian` (erzwungen von `check:pu
 und ist vollständig unit-getestet. Die Schicht `src/obsidian/` trägt View, Einstellungen
 und Datei-I/O.
 
+## Dokumentation
+
+- [Dokumentations-Index](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/README.md) — alle Anleitungen an einem Ort (englisch).
+- [Getting started](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/getting-started.md) — von der Installation zur ersten gespeicherten Befragung (englisch).
+- [Troubleshooting](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/troubleshooting.md) — die genaue Meldung, ihre Ursache und die Abhilfe (englisch).
+
 ## Lizenz
 
-Quellcode: **AGPL-3.0-or-later** (siehe [`LICENSE`](LICENSE)). Die Übersetzung von
+Quellcode: **AGPL-3.0-or-later** (siehe [`LICENSE`](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)). Die Übersetzung von
 Richard Wilhelm in den mitgelieferten Daten ist gemeinfrei. © 2026 Johannes Kaindl.
