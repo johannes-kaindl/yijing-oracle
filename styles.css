@@ -197,7 +197,7 @@
 }
 
 /* ── Streaming-Antwortbereich (UI-STANDARD §8) ─────────────────────
-   Vendored aus obsidian-kit@0.35.0 (src/obsidian/stream-area.ts, STREAM_AREA_CSS) —
+   Vendored aus obsidian-kit@0.43.0 (src/obsidian/stream-area.ts, STREAM_AREA_CSS) —
    das Kit injiziert kein CSS, der Block gehoert laut Vertrag hierhin. Nie von Hand
    editieren, nachziehen via tools/sync-kit.sh + manuellem Kopieren dieses Blocks. */
 .okit-stream { display: flex; flex-direction: column; min-height: 0; gap: var(--size-4-2); }
@@ -223,6 +223,9 @@
   max-height: 12em; overflow-y: auto; white-space: pre-wrap;
   background: var(--background-secondary); padding: var(--size-4-2);
 }
+/* Ein leerer Slot bleibt Flex-Item und kostet einen gap — spürbar bei einem Wirt, der die
+   Statuszeile nicht nutzt (Befund aus der ersten Adoption, 2026-09-11). */
+.okit-stream-status:empty, .okit-stream-reasoning-slot:empty { display: none; }
 
 /* ── Bildmeditation ─────────────────────────────────────────────── */
 .yijing-artwork-inner {

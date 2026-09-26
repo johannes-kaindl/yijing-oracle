@@ -184,17 +184,18 @@ PY
 
 mkdir -p src/vendor/kit src/vendor/kit-obsidian
 
-# Pure Module (kein obsidian-Import), Dateiname = Kit-Quellname. think.ts heisst im Kit
-# think-splitter.ts — dieses Repo behaelt seinen eigenen Dateinamen (siehe Umbenennung unten),
-# damit die bestehenden Importe (src/obsidian/sse.ts, tests/think.test.ts) unangetastet bleiben.
+# Pure Module (kein obsidian-Import), Dateiname = Kit-Quellname. Seit dem Chat-Client-Tausch
+# (Welle 11) liegt think-splitter unter seinem Kit-Namen: chat-client.ts importiert
+# `../kit/think-splitter`, und die frueher abweichende Ablage `think.ts` haette den Import
+# ins Leere zeigen lassen.
 # secrets/endpoint_config/model-choice/endpoint-source seit 2026-09-16 (LLM-Endpoint-Manager-
 # Migration, Plan 3): secrets fuer den lokalen Schluesselbund-Fallback, der Rest fuer
 # resolveEndpointSource() (Manager-first, lokale Liste als Fallback).
-PURE_MODULE="callout filename-template reasoning settings endpoint sse think-splitter model-context i18n endpoint_diagnostics secrets endpoint_config model-choice endpoint-source"
+PURE_MODULE="callout filename-template reasoning settings endpoint sse think-splitter error_body model-context i18n endpoint_diagnostics secrets endpoint_config model-choice sampling-profiles endpoint-source"
 # Gekoppelte Schicht (importiert `obsidian`). endpoint-list.ts und stable-writer.ts sind hier
 # BEWUSST NICHT gelistet: endpoint-list.ts ist ein Bruch (siehe AGENTS.md § UI-Abweichungen),
 # stable-writer.ts gilt nur fuer Push-Bauart mit Markdown-Anspruch (dieses Repo ist Bauart 4).
-OBSIDIAN_MODULE="folder-suggest settings_walker stream-area secrets model-picker endpoint-source"
+OBSIDIAN_MODULE="chat-client chat-transport clock folder-suggest settings_walker stream-area secrets model-picker endpoint-source"
 
 liste() { for m in $1; do printf '%s.ts, ' "$m"; done | sed 's/, $//'; }
 
@@ -212,8 +213,7 @@ for m in $PURE_MODULE; do
   quelle=$(printf '%s' "$fund" | cut -d'|' -f3)
   rel=$(printf '%s' "$fund" | cut -d'|' -f4)
   ver=$(printf '%s' "$fund" | cut -d'|' -f5)
-  # think-splitter → think.ts (Umbenennung, s.o.), sonst identisch.
-  ziel="$m"; [ "$m" = "think-splitter" ] && ziel="think"
+  ziel="$m"
   hole "$repo" "$ref" "$rel" "src/vendor/kit/$ziel.ts" || {
     echo "FEHLER: $ref:$rel nicht lesbar in $repo" >&2; exit 2; }
   # endpoint-source.ts (obsidian-kit/src/pure/) traegt einen Querimport auf code-kit, dessen
@@ -228,7 +228,7 @@ for m in $OBSIDIAN_MODULE; do
     echo "FEHLER: $VER:src/obsidian/$m.ts nicht lesbar" >&2; exit 2; }
   # secrets.ts, model-picker.ts und endpoint-source.ts tragen Querimporte auf ../pure/ bzw.
   # ../vendor/code-kit/{pure,web}/. Ein pauschaler Aufruf waere wirkungslos, aber irrefuehrend.
-  case "$m" in secrets|model-picker|endpoint-source) relayer "src/vendor/kit-obsidian/$m.ts" ;; esac
+  case "$m" in chat-client|secrets|model-picker|endpoint-source) relayer "src/vendor/kit-obsidian/$m.ts" ;; esac
   stamp "src/vendor/kit-obsidian/$m.ts" "src/obsidian/$m.ts"
   echo "vendored obsidian-kit@$VER/obsidian/$m.ts"
 done
@@ -259,7 +259,7 @@ cat > src/vendor/kit/VENDOR.json <<JSON
       "note": "Einzeln vendoriert (git show 0.38.0:src/pure/explain-texts.ts), NICHT ueber tools/sync-kit.sh — das Skript berechnet eine gemeinsame VER fuer PURE_MODULE+OBSIDIAN_MODULE und haette beim Aufnehmen dieser Datei alle 18 anderen ebenfalls auf 0.38.0 gehoben. Datei ist dependenzfrei (keine Kit-internen Importe), Einzel-Vendoring deshalb gefahrlos. Re-vendor manuell mit demselben git-show-Befehl gegen einen neuen Tag; Kopf-Stempel und dieser Eintrag von Hand nachziehen."
     }
   ],
-  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \\"vendored_mixed_version\\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \\"vendored\\" gelisteten Dateien; \\"vendored_mixed_version\\" traegt seine Version/SHA je Eintrag selbst. think-splitter.ts liegt hier unter dem Dateinamen think.ts (Kopfstempel nennt die Kit-Quelle). Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
+  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \\"vendored_mixed_version\\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \\"vendored\\" gelisteten Dateien; \\"vendored_mixed_version\\" traegt seine Version/SHA je Eintrag selbst. Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
 }
 JSON
 

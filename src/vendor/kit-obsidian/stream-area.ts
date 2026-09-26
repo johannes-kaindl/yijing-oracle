@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.37.1, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.43.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -101,6 +101,12 @@ export interface StreamAreaOptions {
   /** Ab wie vielen Pixeln Abstand zum Ende „der Nutzer hat hochgescrollt" gilt. Default 40
    *  (Wert aus `vault-rag/src/chat_view.ts:203`). */
   followThreshold?: number;
+  /** Zusatzklasse am Body, z. B. `markdown-rendered` für Obsidians eigene Markdown-Optik.
+   *  Default keine — der erste Consumer (lingotuner) verlor sie bei der Übernahme still,
+   *  weil sie vorher am eigenen Body-Element hing (Befund aus der ersten Adoption,
+   *  2026-09-11). Kein Rezept-Satz, weil ein Satz beim nächsten Consumer wieder überlesen
+   *  wird (CORE-META-17) — die Option ändert den Default nicht. */
+  bodyCls?: string;
 }
 
 export interface StreamArea {
@@ -114,12 +120,18 @@ export interface StreamArea {
   readonly statusEl: HTMLElement;
   /** Woran `followTail` hängt — der Body, oder das per `scrollEl` übergebene Element. */
   readonly scrollEl: HTMLElement;
-  /** Gedanken anhängen (Push-Konsumenten). Legt den Block beim ersten Aufruf an. */
+  /** Gedanken anhängen (Push-Konsumenten). Legt den Block beim ersten Aufruf an und folgt
+   *  danach selbst (`followTail()`), symmetrisch zu `createStableWriter.push()`. */
   appendReasoning(text: string): void;
   /** Gedanken ersetzen (Snapshot-Konsumenten). Legt den Block beim ersten Aufruf an. */
   setReasoning(text: string): void;
   /** Aktueller Gedankentext ("" solange keiner kam). */
   reasoningText(): string;
+  /** Die `<summary>`-Zeile des Gedankenblocks live fortschreiben (z. B. ein Token-Zähler
+   *  „Denkt … N Token"). Erzwingt den Block NICHT — ohne einen vorherigen `appendReasoning`/
+   *  `setReasoning` bleibt er lazy (s. Dateikopf); der Text wird dann für den nächsten
+   *  entstehenden Block vorgemerkt. `reset()` setzt auf `strings.reasoning` zurück. */
+  setReasoningSummary(text: string): void;
   /** Den laufenden Absatz setzen. */
   setTail(text: string): void;
   tailText(): string;
@@ -145,6 +157,7 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
   // ihn per `empty()`, statt sich auf den Elternbezug eines Einzelknotens zu verlassen.
   const reasonSlot = rootEl.createDiv({ cls: "okit-stream-reasoning-slot" });
   const bodyEl = rootEl.createDiv({ cls: "okit-stream-body" });
+  if (opts.bodyCls !== undefined && opts.bodyCls !== "") bodyEl.addClass(opts.bodyCls);
   const scrollEl = opts.scrollEl ?? bodyEl;
   if (scrollEl !== bodyEl) rootEl.addClass("okit-stream--host-scroll");
   const tailEl = bodyEl.createDiv({ cls: "okit-stream-tail" });
@@ -152,6 +165,8 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
 
   let reasonPre: HTMLElement | null = null;
   let reasonRaw = "";
+  let reasonSummaryEl: HTMLElement | null = null;
+  let reasonSummaryText = opts.strings.reasoning;
 
   /** Legt den Gedankenblock einmalig an. Lazy, weil ein leeres `<details>` vor dem ersten
    *  Gedanken sichtbarer Ballast ist. */
@@ -159,7 +174,7 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
     if (reasonPre !== null) return reasonPre;
     const det = reasonSlot.createEl("details", { cls: "okit-stream-reasoning" });
     det.open = openByDefault;
-    det.createEl("summary", { text: opts.strings.reasoning });
+    reasonSummaryEl = det.createEl("summary", { text: reasonSummaryText });
     reasonPre = det.createEl("pre");
     const cb = opts.onReasoningToggle;
     if (cb !== undefined) det.addEventListener("toggle", () => { cb(det.open); });
@@ -182,6 +197,11 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       const pre = ensureReasoning();
       reasonRaw += text;
       pre.setText(reasonRaw);
+      // Symmetrisch zu push() im StableMarkdownWriter, das selbst followTail() ruft — sonst
+      // schiebt ein lange denkendes Modell den Strom unter die Kante, ohne dass etwas folgt
+      // (Befund aus der ersten Adoption, 2026-09-11: lingotuner rief followTail() bisher
+      // selbst nach appendReasoning auf, um genau das auszugleichen).
+      this.followTail();
     },
     setReasoning(text: string): void {
       const pre = ensureReasoning();
@@ -189,6 +209,10 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       pre.setText(reasonRaw);
     },
     reasoningText(): string { return reasonRaw; },
+    setReasoningSummary(text: string): void {
+      reasonSummaryText = text;
+      reasonSummaryEl?.setText(text);
+    },
 
     setTail(text: string): void { tailEl.setText(text); },
     tailText(): string { return tailEl.textContent ?? ""; },
@@ -208,6 +232,8 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       reasonSlot.empty();
       reasonPre = null;
       reasonRaw = "";
+      reasonSummaryEl = null;
+      reasonSummaryText = opts.strings.reasoning;
     },
   };
 }
@@ -240,4 +266,7 @@ export const STREAM_AREA_CSS = `
   max-height: 12em; overflow-y: auto; white-space: pre-wrap;
   background: var(--background-secondary); padding: var(--size-4-2);
 }
+/* Ein leerer Slot bleibt Flex-Item und kostet einen gap — spürbar bei einem Wirt, der die
+   Statuszeile nicht nutzt (Befund aus der ersten Adoption, 2026-09-11). */
+.okit-stream-status:empty, .okit-stream-reasoning-slot:empty { display: none; }
 `;

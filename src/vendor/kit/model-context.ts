@@ -1,4 +1,4 @@
-// vendored from code-kit@0.6.0, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.7.0, src/ts/pure/model-context.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 export interface ModelContext {
   maxContextLength?: number;
   loadedContextLength?: number;
