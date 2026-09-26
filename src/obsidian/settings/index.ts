@@ -25,6 +25,7 @@ import {
   noteContentRows,
   noteStorageRows,
 } from "./note-section";
+import { helpDefinition } from "./help-row";
 import { llmRows } from "./llm-section";
 import { imageRows } from "./image-section";
 import { type SectionCtx } from "./section-ctx";
@@ -51,6 +52,7 @@ export class SettingsTab extends PluginSettingTab {
   getSettingDefinitions(): SettingDefinitionItem<ControlKey>[] {
     const ctx = this.ctx();
     return [
+      helpDefinition(),
       { type: "group", heading: t("set.secGeneral"), items: generalRows() },
       { type: "group", heading: t("set.secNoteStorage"), items: noteStorageRows() },
       { type: "group", heading: t("set.fmHead"), items: frontmatterRows(ctx) },

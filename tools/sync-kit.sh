@@ -22,6 +22,14 @@ for paar in "$KIT|$VER" "$CODE_KIT|$CODE_VER"; do
 done
 SHA=$(git -C "$KIT" rev-parse --short "$VER^{commit}")
 
+# Eigener Pin, Absicht: help-setting.ts (Hilfe-Zeile, UI-STANDARD 8) kam mit Kit 0.43.0 und haengt an
+# keinem anderen Modul — die uebrigen Module bleiben auf KIT_REF (Vorlage epub-exporter 877eb2c).
+KIT_HELP_REF="${KIT_HELP_REF:-0.43.0}"
+git -C "$KIT" cat-file -e "$KIT_HELP_REF:src/obsidian/help-setting.ts" 2>/dev/null \
+  || { echo "FEHLER: src/obsidian/help-setting.ts fehlt in Ref $KIT_HELP_REF (KIT_HELP_REF setzen)." >&2; exit 2; }
+HELP_VER=$(git -C "$KIT" describe --tags --abbrev=0 "$KIT_HELP_REF")
+HELP_SHA=$(git -C "$KIT" rev-parse --short "$KIT_HELP_REF^{commit}")
+
 # Ein pures Modul kann in drei Schichten liegen. Statt fester Zuordnung wird gesucht.
 # Ausgabe: <repo>|<ref>|<quelle>|<quell-relativer-pfad>|<version>
 quelle_fuer() {
@@ -225,10 +233,17 @@ for m in $OBSIDIAN_MODULE; do
   echo "vendored obsidian-kit@$VER/obsidian/$m.ts"
 done
 
+hole "$KIT" "$KIT_HELP_REF" "src/obsidian/help-setting.ts" "src/vendor/kit-obsidian/help-setting.ts" || {
+  echo "FEHLER: $KIT_HELP_REF:src/obsidian/help-setting.ts nicht lesbar" >&2; exit 2; }
+stamp "src/vendor/kit-obsidian/help-setting.ts" "src/obsidian/help-setting.ts" obsidian-kit "$HELP_VER"
+echo "vendored obsidian-kit@$HELP_VER/obsidian/help-setting.ts"
+
 # 1.8.7-Floor-Anpassung fuer secrets.ts — NACH stamp, damit der Kopfstempel die Kit-Herkunft
 # nennt und die Anpassung selbst als zweite, benannte Abweichung obendrauf sichtbar bleibt.
 adapt_secrets_floor
 
+# vendored_mixed_version (explain-texts.ts) ist ein Einzel-Vendoring ausserhalb dieses Skripts und
+# wird hier mitgeschrieben — sonst loescht jeder Lauf den Eintrag aus der VENDOR.json.
 cat > src/vendor/kit/VENDOR.json <<JSON
 {
   "source": "obsidian-kit",
@@ -236,16 +251,25 @@ cat > src/vendor/kit/VENDOR.json <<JSON
   "sha": "$SHA",
   "code_kit_version": "$CODE_VER",
   "vendored": "$(liste "$PURE_MODULE")",
-  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit. Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \"vendored\" gelisteten Dateien. think-splitter.ts liegt hier unter dem Dateinamen think.ts (Kopfstempel nennt die Kit-Quelle). Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
+  "vendored_mixed_version": [
+    {
+      "file": "explain-texts.ts",
+      "version": "0.38.0",
+      "sha": "4988fa0",
+      "note": "Einzeln vendoriert (git show 0.38.0:src/pure/explain-texts.ts), NICHT ueber tools/sync-kit.sh — das Skript berechnet eine gemeinsame VER fuer PURE_MODULE+OBSIDIAN_MODULE und haette beim Aufnehmen dieser Datei alle 18 anderen ebenfalls auf 0.38.0 gehoben. Datei ist dependenzfrei (keine Kit-internen Importe), Einzel-Vendoring deshalb gefahrlos. Re-vendor manuell mit demselben git-show-Befehl gegen einen neuen Tag; Kopf-Stempel und dieser Eintrag von Hand nachziehen."
+    }
+  ],
+  "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Never hand-edit (Ausnahme: \\"vendored_mixed_version\\"-Eintraege, die per Definition ausserhalb von tools/sync-kit.sh liegen). Re-vendor via tools/sync-kit.sh. version/sha gelten AUSSCHLIESSLICH fuer die unter \\"vendored\\" gelisteten Dateien; \\"vendored_mixed_version\\" traegt seine Version/SHA je Eintrag selbst. think-splitter.ts liegt hier unter dem Dateinamen think.ts (Kopfstempel nennt die Kit-Quelle). Konsolidiert 2026-09-15 (Welle 2) von vier nebeneinander gefuehrten Pins (0.16.0/0.26.1/0.27.0/0.29.0) auf einen."
 }
 JSON
+
 cat > src/vendor/kit-obsidian/VENDOR.json <<JSON
 {
   "source": "obsidian-kit",
   "version": "$VER",
   "sha": "$SHA",
-  "vendored": "$(liste "$OBSIDIAN_MODULE")",
-  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. Eigene Ablage neben src/vendor/kit/, weil diese Module \"obsidian\" importieren. endpoint-list.ts wird bewusst NICHT vendoriert (Bruch, siehe AGENTS.md § UI-Abweichungen)."
+  "vendored": "$(liste "$OBSIDIAN_MODULE"), help-setting.ts (Kit $HELP_VER, $HELP_SHA)",
+  "note": "Verbatim snapshot. Never hand-edit. Re-vendor via tools/sync-kit.sh. help-setting.ts hat einen eigenen Pin (KIT_HELP_REF); version/sha oben gelten fuer die uebrigen Dateien. Eigene Ablage neben src/vendor/kit/, weil diese Module \"obsidian\" importieren. endpoint-list.ts wird bewusst NICHT vendoriert (Bruch, siehe AGENTS.md § UI-Abweichungen)."
 }
 JSON
 echo "VENDOR.json -> $VER ($SHA)"

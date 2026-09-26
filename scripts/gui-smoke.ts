@@ -561,6 +561,7 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     gruppen: number;
     leereGruppen: number;
     uebernommen: number | null;
+    alle: number;
     fmMitFeldern: number;
     fmOhneFelder: number;
   } | null>(`
@@ -576,8 +577,12 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     const ohne = (fmGruppe(tab.getSettingDefinitions()).items || []).length;
     p.settings.includeFrontmatter = vorher;
 
-    const d = tab.getSettingDefinitions();
+    // Erstes Element ist die Hilfe-Zeile (F9), keine Gruppe: Gruppen getrennt zaehlen, der Host
+    // uebernimmt aber ALLE Elemente.
+    const alle = tab.getSettingDefinitions();
+    const d = alle.filter((g) => g.type === "group");
     return {
+      alle: alle.length,
       hatApi: true,
       hatUpdate: typeof tab.update === "function",
       gruppen: d.length,
@@ -597,8 +602,8 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
 
   record(
     "F1 Tab liefert deklarative Definitionen",
-    defs.gruppen > 0 && defs.leereGruppen === 0 && defs.uebernommen === defs.gruppen,
-    `${defs.gruppen} Gruppen, keine leer, vom Host uebernommen: ${String(defs.uebernommen)}`,
+    defs.gruppen > 0 && defs.leereGruppen === 0 && defs.uebernommen === defs.alle,
+    `${defs.gruppen} Gruppen + Hilfe-Zeile, keine leer, vom Host uebernommen: ${String(defs.uebernommen)} von ${defs.alle}`,
   );
 
   // Genau der Fallstrick, an dem zwei Nachbar-Plugins haengen geblieben sind: bedingte
@@ -630,10 +635,28 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     `Zeilen ${zeilenVorher} → ${zeilenAus} → ${zeilenWieder} (erwartete Differenz ${erwarteteDifferenz})`,
   );
 
+  // F9 — die Hilfe-Zeile (UI-STANDARD §8) ist die ERSTE Zeile oben im gezeichneten Tab, mit Text-Knopf
+  // und `bug`-Knopf. Gemessen am DOM, nicht an den Definitionen: der Host kann umsortieren.
+  // Geklickt wird nicht (der Klick oeffnete einen Browser); die URLs deckt tests/help-row.test.ts.
+  const hilfe = await ui.cdp.evaluate<{ erste: string | null; knopf: string | null; bug: string | null }>(`
+    const wurzel = ${wurzelAusdruck(ui)};
+    const z = wurzel ? wurzel.querySelector(".setting-item") : null;
+    return {
+      erste: z?.querySelector(".setting-item-name")?.textContent?.trim() ?? null,
+      knopf: z?.querySelector("button")?.textContent?.trim() ?? null,
+      bug: z?.querySelector(".extra-setting-button")?.getAttribute("aria-label") ?? null,
+    };
+  `);
+  record(
+    "F9 die Hilfe-Zeile steht als erste Zeile oben im Settings-Tab",
+    (hilfe.erste === "Help" || hilfe.erste === "Hilfe") && !!hilfe.knopf && !!hilfe.bug,
+    `erste Zeile „${hilfe.erste}“, Knopf „${hilfe.knopf}“, bug-Tooltip „${hilfe.bug}“`,
+  );
+
   // Der eigentliche Gewinn der Umstellung. Der Suchbegriff kommt aus der eigenen Definition,
   // nicht aus einer festen Zeichenkette — sonst misst der Treiber die UI-Sprache.
   const begriff = await cdp.evaluate<string>(`
-    const d = app.setting.activeTab.getSettingDefinitions();
+    const d = app.setting.activeTab.getSettingDefinitions().filter((g) => g.type === "group");
     return d[0].items[0].name;
   `);
   const treffer = await sucheInEinstellungen(ui, begriff);
