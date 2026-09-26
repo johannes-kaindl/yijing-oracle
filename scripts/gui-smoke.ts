@@ -1005,7 +1005,7 @@ const MANAGED_TEXT = ["Endpunkte kommen vom LLM Endpoint Manager", "Endpoints co
 /** Ein Wurf + Deutungslauf: braucht das offene Panel, wirft neu (das Ergebnis selbst ist fuer
  *  M irrelevant) und klickt danach den Deuten-Knopf — der ist der einzige Knopf in
  *  `.yijing-interpretation-inner .yijing-actions`, solange keine Deutung vorliegt. */
-async function laufeDeutung(cdp: Cdp): Promise<boolean> {
+async function laufeDeutung(cdp: Cdp, wartenMs = 15000): Promise<boolean> {
   const offen = await openPanel(cdp);
   if (!offen) return false;
   await cdp.evaluate(`
@@ -1022,7 +1022,7 @@ async function laufeDeutung(cdp: Cdp): Promise<boolean> {
     cdp,
     `const body = document.querySelector(".yijing-interpretation-body");
      return Boolean(body && body.textContent && body.textContent.trim().length > 0) ? true : null;`,
-    15000,
+    wartenMs,
     300,
   );
   return Boolean(fertig);
@@ -1138,6 +1138,52 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
         return { ok: true };
       `).catch(() => null);
     }
+  }
+}
+
+/** Ein bereits GELADENES Chat-Modell auf dem lokalen LM-Studio-Endpunkt, sonst `null`. Bewusst nur
+ *  ein geladenes: eine Anfrage an ein nicht geladenes Modell loest ein JIT-Laden aus und
+ *  verdraengt das Modell, an dem eine andere Sitzung gerade arbeitet. */
+async function geladenesModell(url: string): Promise<string | null> {
+  try {
+    const res = await fetch(`${url}/api/v0/models`, { signal: AbortSignal.timeout(3000) });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: Array<{ id: string; state?: string; type?: string }> };
+    return (body.data ?? []).find((m) => m.state === "loaded" && (m.type === "llm" || m.type === "vlm"))?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** M4: die Deutung gegen einen ECHTEN Endpunkt — der eigentliche Beleg des Kit-Chat-Clients
+ *  (M2/M3 laufen gegen einen Fake-Server mit einem Chunk). Ohne geladenes Modell "nichts gemessen". */
+async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
+  console.log("\nM4 · Deutung gegen einen echten Endpunkt");
+  const name = "M4 Deutung streamt gegen den echten Endpunkt";
+  const url = "http://127.0.0.1:1234";
+  const modell = await geladenesModell(url);
+  if (modell === null) { skipped(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht — nichts gemessen (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
+  const vorher = await cdp.evaluate<{ eps: unknown; model: unknown; choice: unknown; thinking: unknown }>(`
+    const l = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm;
+    return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, thinking: l.requestThinking };`);
+  try {
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      p.settings.llm.endpoints = [${JSON.stringify(url)}]; p.settings.llm.model = ${JSON.stringify(modell)};
+      p.settings.llm.choice = {}; p.settings.llm.requestThinking = false;
+      await p.saveSettings();
+      return true;`);
+    const ok = await laufeDeutung(cdp, 150_000); // ein echtes Modell denkt vor der ersten Antwort
+    const laenge = await cdp.evaluate<number>(`return (document.querySelector(".yijing-interpretation-body")?.textContent ?? "").trim().length;`);
+    record(name, ok && laenge > 0, ok ? `${laenge} Zeichen Deutung von ${modell}` : "Deutungslauf lieferte kein Ergebnis");
+  } finally {
+    await cdp.evaluate(`
+      const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+      const v = ${JSON.stringify(vorher)};
+      p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model; p.settings.llm.requestThinking = v.thinking;
+      if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+      await p.saveSettings();
+      return true;`).catch(() => null);
   }
 }
 
@@ -1318,6 +1364,7 @@ async function main(): Promise<void> {
     await abschnittSettings(cdp, port, workflowFixture);
     await abschnittDeklarativ(cdp, port);
     if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
+    await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {
       skipped("D Bildlauf", "--kein-bild gesetzt");

@@ -1,6 +1,7 @@
-import type { ChatMessage } from "../../obsidian/chat-client";
 import type { RenderedReading } from "../render";
 import { type Lang } from "../data";
+
+export interface ChatMessage { role: "system" | "user" | "assistant"; content: string; reasoning?: string }
 
 const USER_LABEL: Record<Lang, { intro: string; question: string; ask: string }> = {
   de: { intro: "Hier ist der Wurf:", question: "Frage:", ask: "Bitte deute diesen Wurf." },

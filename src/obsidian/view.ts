@@ -24,7 +24,9 @@ import { t } from "../vendor/kit/i18n";
 import { buildSdPrompt, composeImageRequest, hashString } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
-import { ChatClient } from "./chat-client";
+import { listModels, streamInterpretation } from "./llm-call";
+import { createChatClient, type ChatClient } from "../vendor/kit-obsidian/chat-client";
+import { requestUrlTransport, xhrSseTransport } from "../vendor/kit-obsidian/chat-transport";
 import { Txt2ImgClient } from "./image-client";
 import { ComfyClient } from "../core/comfy/client";
 import { ComfyProgressSocket } from "./comfy-progress";
@@ -78,6 +80,10 @@ export class OracleView extends ItemView {
   private current: CurrentCast | null = null;
   private questionValue = "";
   private streaming = false;
+  /** Der Kit-Client merkt sich je Instanz, dass der Endpunkt den Stream verweigert hat — nach
+   *  einem Endpunktwechsel also neu erzeugen (MIGRATION 0.42.0 Punkt 2). */
+  private chatClient: ChatClient | null = null;
+  private chatClientKey = "";
   private generatingImage = false;
   private abortCtrl: AbortController | null = null;
   /** Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea`). Wird
@@ -389,7 +395,7 @@ export class OracleView extends ItemView {
     // Settings noch nie geöffnet und so kein Default persistiert wurde).
     let model = resolved.model.trim();
     if (!model) {
-      const models = await new ChatClient(endpoint, "", httpGet, apiKey).listModels();
+      const models = await listModels(endpoint, httpGet, apiKey);
       model = effectiveModel("", models);
     }
     if (!model) {
@@ -406,37 +412,50 @@ export class OracleView extends ItemView {
     c.interpretation = { answer: "", reasoning: "", model };
     await this.render();
 
-    const client = new ChatClient(endpoint, model, httpGet, apiKey);
     try {
-      const res = await client.stream(
+      const res = await streamInterpretation(this.chatClientFor(endpoint, apiKey), {
+        endpoint: { url: endpoint, apiKey },
+        model,
         messages,
-        (tok) => {
+        suppressThinking: !llm.requestThinking,
+        onContent: (tok) => {
           if (c.interpretation) { c.interpretation.answer += tok; this.updateStreamDom(c); }
         },
-        (tok) => {
+        onReasoning: (tok) => {
           if (c.interpretation) { c.interpretation.reasoning += tok; this.updateStreamDom(c); }
         },
-        this.abortCtrl.signal,
-        { suppressThinking: !llm.requestThinking },
-      );
-      if (!res.content.trim()) {
+        signal: this.abortCtrl.signal,
+      });
+      if (!res.ok) {
+        c.interpretation = null;
+        if (res.kind !== "aborted") {
+          // Der Servergrund (`detail`) steht hinter dem eigenen Satz, nicht an seiner Stelle.
+          new Notice(`${t("notice.llmError")} ${res.detail}`);
+          console.error("[yijing-oracle]", res.kind, res.detail);
+        }
+      } else if (!res.content.trim()) {
         c.interpretation = null;
         new Notice(t("notice.noInterpretation"));
       }
     } catch (e) {
-      const name = (e as Error)?.name;
+      // Der Kit-Client wirft nicht; das hier faengt nur Fehler in den eigenen Callbacks.
       c.interpretation = null;
-      if (name !== "AbortError") {
-        // Ein blockierter Renderer-Request ist kein Endpunkt-Problem — der Endpunkt
-        // antwortet dem Verbindungstest ja. Der Rat muss deshalb ein anderer sein.
-        new Notice(t(name === "NetworkError" ? "notice.llmBlocked" : "notice.llmError"));
-        console.error("[yijing-oracle]", e);
-      }
+      new Notice(t("notice.llmError"));
+      console.error("[yijing-oracle]", e);
     } finally {
       this.streaming = false;
       this.abortCtrl = null;
       await this.render();
     }
+  }
+
+  private chatClientFor(endpoint: string, apiKey: string): ChatClient {
+    const key = `${endpoint}\n${apiKey}`;
+    if (this.chatClient === null || key !== this.chatClientKey) {
+      this.chatClient = createChatClient({ transport: xhrSseTransport, fallbackTransport: requestUrlTransport });
+      this.chatClientKey = key;
+    }
+    return this.chatClient;
   }
 
   /** Baut Szene+Prompt deterministisch aus dem Wurf und holt das Bild vom Server. */
