@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-26
+
 ### Changed
 
 - **Interpretation: Kit chat client instead of a local one** (`obsidian-kit` 0.43.0, `chat-client` + `chat-transport`). Visible effects: (1) A silent server now ends the request after 120 s without data instead of hanging forever; a long, healthy answer is not cut off. (2) An HTTP error shows the server's reason (for example "model not loaded") instead of "Chat HTTP 400". (3) If the server refuses the stream (origin/CORS check), the client retries once without streaming instead of reporting "blocked"; the separate "blocked by the endpoint" notice is gone because that case is now handled. (4) Failures other than a user abort always show the notice with the reason appended. No sampling values are sent, as before.
