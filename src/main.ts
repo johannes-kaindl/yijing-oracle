@@ -12,7 +12,7 @@ import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
 import { migrateEndpointList, stripLegacyLlmFields } from "./core/settings/migrate";
 import { loadApiKey, persistApiKey } from "./core/settings/api-key-storage";
-import { obsidianSecretStore } from "./obsidian/secret-store";
+import { obsidianSecretStore } from "./vendor/kit-obsidian/secrets";
 import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {
@@ -54,10 +54,10 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
     // mergeSettings ist shallow — auch das image-Objekt gegen neue Defaults auffüllen.
     this.settings.image = { ...DEFAULT_IMAGE_SETTINGS, ...(this.settings.image ?? {}) };
     this.settings.callouts = mergeCallouts(this.settings.callouts);
-    // Der API-Schluessel gehoert in Obsidians Schluesselbund (seit 1.11.4), nicht in data.json
-    // (Klartext, wandert mit jedem Vault-Sync). Ein Altwert aus data.json wird beim ersten
-    // Laden hinuebergeschrieben und dort geleert; im Speicher steht er weiterhin, damit die
-    // Netzwege ihn wie bisher unter `settings.llm.apiKey` finden.
+    // Der API-Schluessel gehoert in Obsidians Schluesselbund (garantiert ab minAppVersion
+    // 1.11.4), nicht in data.json (Klartext, wandert mit jedem Vault-Sync). Ein Altwert aus
+    // data.json wird beim ersten Laden hinuebergeschrieben und dort geleert; im Speicher steht
+    // er weiterhin, damit die Netzwege ihn wie bisher unter `settings.llm.apiKey` finden.
     const apiKeyLoad = loadApiKey(this.settings.llm.apiKey, obsidianSecretStore(this.app));
     this.settings.llm.apiKey = apiKeyLoad.apiKey;
     if (apiKeyLoad.migrate) await this.saveSettings();
@@ -106,8 +106,8 @@ export default class YijingOraclePlugin extends Plugin implements SettingsHost, 
 
   async saveSettings(): Promise<void> {
     // Schluessel in den Schluesselbund, data.json ohne ihn — das Speicherobjekt bleibt
-    // unangetastet (die Netzwege lesen daraus). Ohne Schluesselbund (< 1.11.4) oder wenn er
-    // den Wert verwirft, liefert persistApiKey den Wert fuer data.json zurueck wie bis 0.5.1.
+    // unangetastet (die Netzwege lesen daraus). Verwirft der Schluesselbund den Wert
+    // stillschweigend, liefert persistApiKey den Wert fuer data.json zurueck wie bis 0.5.1.
     const storedApiKey = persistApiKey(this.settings.llm.apiKey, obsidianSecretStore(this.app), (m) => console.warn(m));
     await this.saveData({ ...this.settings, llm: { ...this.settings.llm, apiKey: storedApiKey } });
   }

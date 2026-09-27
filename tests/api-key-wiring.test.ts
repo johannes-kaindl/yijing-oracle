@@ -63,12 +63,4 @@ describe("API-Schluessel: Verdrahtung in main.ts", () => {
     expect(kc.values.get(API_KEY_SECRET_ID)).toBe("sk-neu");
     expect((p.gespeichert() as { llm: { apiKey: string } }).llm.apiKey).toBe("");
   });
-
-  it("ohne Schluesselbund (< 1.11.4) bleibt alles wie bis 0.5.1", async () => {
-    const p = plugin({}, { llm: { apiKey: "sk-alt" } });
-    await p.onload();
-    expect(p.settings.llm.apiKey).toBe("sk-alt");
-    await p.saveSettings();
-    expect((p.gespeichert() as { llm: { apiKey: string } }).llm.apiKey).toBe("sk-alt");
-  });
 });

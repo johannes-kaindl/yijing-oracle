@@ -27,7 +27,7 @@
       "dir": "src/vendor/kit-obsidian",
       "source": "obsidian-kit",
       "from": "src/obsidian",
-      "modules": [{ "name": "chat-client", "ref": "0.44.0" }, "chat-transport", "clock", "folder-suggest", "settings_walker", "stream-area", "model-picker", "endpoint-source", "help-setting"],
+      "modules": [{ "name": "chat-client", "ref": "0.44.0" }, "chat-transport", "clock", "folder-suggest", "settings_walker", "stream-area", "model-picker", "endpoint-source", "help-setting", "secrets"],
       "rewrite": [["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"], ["../pure/", "../kit/"]]
     }
   ]

@@ -12,6 +12,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- Requires Obsidian 1.11.4 or newer (was 1.8.7). API keys are always stored in the system keychain via Obsidian's secret storage now — the plain-text `data.json` fallback for hosts without it is gone.
 - Kit chat client 0.44.0 (no user-visible change)
 
 ## [0.8.0] — 2026-09-26
