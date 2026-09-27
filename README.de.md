@@ -3,7 +3,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE-DOCS)
 [![Release](https://img.shields.io/github/v/release/johannes-kaindl/yijing-oracle?label=release)](https://github.com/johannes-kaindl/yijing-oracle/releases)
-![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20Desktop%20%26%20Mobil-7c3aed)
+![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20·%20Desktop%20%26%20Mobil-7c3aed)
 
 > 🇩🇪 Deutsch · [🇬🇧 English](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.md)
 
@@ -45,7 +45,7 @@ kein Konto.
 
 ## Voraussetzungen
 
-- **Obsidian 1.8.7+** (Desktop oder Mobil).
+- **Obsidian 1.11.4+** (Desktop oder Mobil).
 - Sonst nichts für das Orakel selbst — die Hexagramm-Daten sind mitgeliefert, das
   Werfen funktioniert vollständig offline.
 - **Optional, für die KI-Deutung:** ein OpenAI-kompatibler lokaler Server (z.B.

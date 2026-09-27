@@ -3,7 +3,7 @@
 [![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE)
 [![Docs: CC BY-SA 4.0](https://img.shields.io/badge/docs-CC%20BY--SA%204.0-lightgrey.svg)](https://github.com/johannes-kaindl/yijing-oracle/blob/main/LICENSE-DOCS)
 [![Release](https://img.shields.io/github/v/release/johannes-kaindl/yijing-oracle?label=release)](https://github.com/johannes-kaindl/yijing-oracle/releases)
-![Platform](https://img.shields.io/badge/platform-Obsidian%201.8.7%2B%20·%20desktop%20%26%20mobile-7c3aed)
+![Platform](https://img.shields.io/badge/platform-Obsidian%201.11.4%2B%20·%20desktop%20%26%20mobile-7c3aed)
 
 > 🇬🇧 English · [🇩🇪 Deutsch](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.de.md)
 
@@ -39,7 +39,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 
 ## Requirements
 
-- **Obsidian 1.8.7+** (desktop or mobile).
+- **Obsidian 1.11.4+** (desktop or mobile).
 - Nothing else for the oracle itself — the hexagram data is bundled, and casting
   works fully offline.
 - **Optional, for AI interpretation:** an OpenAI-compatible local server (e.g.
@@ -136,9 +136,9 @@ order is the priority. That way one config covers every network (localhost at yo
 desk, LAN IP on the go) without switching anything. Each row has its own connection
 test with a plain-language result.
 
-**On the API key:** on Obsidian 1.11.4 or newer it is kept in Obsidian's keychain
-(OS-encrypted, per device), not in the vault — so it is never synced or backed up along
-with your notes, and you enter it once on each device. Leave it empty for local servers.
+**On the API key:** it is kept in Obsidian's keychain (OS-encrypted, per device), not in the
+vault — so it is never synced or backed up along with your notes, and you enter it once on
+each device. Leave it empty for local servers.
 
 <p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
 
