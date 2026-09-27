@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { App } from "obsidian";
-import { obsidianSecretStore } from "../src/vendor/kit-obsidian/secrets";
+import { obsidianSecretStore } from "../src/obsidian/secret-store";
 
 /** Attrappe fuer `app.secretStorage` — das Kit-Mock kennt den Schluesselbund nicht. */
 function fakeApp(opts: { persist: boolean; withStorage?: boolean }): App {

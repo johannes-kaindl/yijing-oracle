@@ -1,7 +1,6 @@
-// vendored from obsidian-kit@0.43.0, src/obsidian/secrets.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
-// ONE mechanical deviation from verbatim: kit-internal imports (../pure/ and ../vendor/code-kit/{pure,web}/) → ../kit/ (vendor layout); reproduce on every re-vendor, nothing else may differ.
+// uebernommen aus obsidian-kit/src/obsidian/secrets.ts@0.43.0, 2026-09-27 — angepasst: KeychainLike-Cast und null-Rückgabe, weil minAppVersion 1.8.7 < 1.11.4 (app.secretStorage)
 import type { App } from "obsidian";
-import { stripCrLf, type SecretStore } from "../kit/secrets";
+import { stripCrLf, type SecretStore } from "../vendor/kit/secrets";
 
 /** Strukturelle Sicht auf `app.secretStorage`, bewusst NICHT der Obsidian-Typ: der
  *  Store-Scanner (`no-unsupported-api`) rechnet den Typ `SecretStorage` gegen minAppVersion

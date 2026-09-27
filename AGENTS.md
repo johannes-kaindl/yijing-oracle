@@ -70,15 +70,27 @@ Prüfpunkte F1–F4 im GUI-Smoke messen genau das.
 **Der API-Schlüssel liegt im Schlüsselbund, nicht in `data.json`** (seit 2026-09-03). Die
 sechs Netzwege lesen weiterhin `settings.llm.apiKey` aus dem Speicher — `getSecret` ist synchron,
 deshalb ändert sich an ihnen nichts. Verteilt wird nur beim Laden und Speichern
-(`src/core/settings/api-key-storage.ts`, rein; `src/obsidian/secrets.ts`, übernommen aus
-calendar-notes): `saveSettings` schreibt `data.json` **ohne** den Schlüssel, `onload` migriert
-einen Altwert. Unter 1.11.4 gibt es keinen Schlüsselbund, dann bleibt alles wie bis 0.5.1 — der
-Feature-Check läuft über einen **lokalen strukturellen Typ**, weil `no-unsupported-api` den
-Obsidian-Typ `SecretStorage` gegen den Floor 1.8.7 rechnet. Das eigene maskierte Feld bleibt;
-Obsidians `SecretComponent` ist ein Verweis auf einen Eintrag, kein Passwortfeld (REGISTRY
-§ Zugangsdaten im Schlüsselbund). Wer den Smoke fährt: B8 misst den Ladepfad, F8 den
-Speicherpfad über das echte Feld, und das `finally` setzt den Schlüsselbund-Eintrag zurück —
-sonst gewänne der Smoke-Schlüssel beim nächsten Laden gegen `data.json`.
+(`src/core/settings/api-key-storage.ts`, rein; `src/obsidian/secret-store.ts`, aus dem
+Kit-Vendoring gelöst seit Welle 12 — s. u.): `saveSettings` schreibt `data.json` **ohne** den
+Schlüssel, `onload` migriert einen Altwert. Unter 1.11.4 gibt es keinen Schlüsselbund, dann
+bleibt alles wie bis 0.5.1 — der Feature-Check läuft über einen **lokalen strukturellen Typ**,
+weil `no-unsupported-api` den Obsidian-Typ `SecretStorage` gegen den Floor 1.8.7 rechnet. Das
+eigene maskierte Feld bleibt; Obsidians `SecretComponent` ist ein Verweis auf einen Eintrag,
+kein Passwortfeld (REGISTRY § Zugangsdaten im Schlüsselbund). Wer den Smoke fährt: B8 misst den
+Ladepfad, F8 den Speicherpfad über das echte Feld, und das `finally` setzt den
+Schlüsselbund-Eintrag zurück — sonst gewänne der Smoke-Schlüssel beim nächsten Laden gegen
+`data.json`.
+
+**`src/obsidian/secret-store.ts` ist eigener Code, kein Kit-Vendoring** (seit Welle 12,
+2026-09-27) — gilt-solange: `minAppVersion` < `1.11.4`. Die Datei war bis dahin
+`src/vendor/kit-obsidian/secrets.ts`, trug aber einen strukturellen Umbau
+(`KeychainLike`-Cast statt Direktzugriff auf `app.secretStorage`, weil `no-unsupported-api`
+den Obsidian-Typ `SecretStorage` gegen `minAppVersion` 1.8.7 rechnet), den `kit-sync`s
+`rewrite`-Mechanismus (einfache Import-Umschreibung) nicht abbilden kann. Kit-Änderungen an
+`obsidian-kit/src/obsidian/secrets.ts` werden deshalb beim Heben von Hand übernommen (Diff
+gegen den neuen Tag lesen, Anpassung erneut aufsetzen), solange diese Bedingung gilt. Hebt das
+Repo `minAppVersion` auf ≥ `1.11.4`, entfällt der Grund für die Abweichung — dann kann die
+Datei regulär über `kit-sync` laufen wie der Rest von `src/vendor/kit-obsidian/`.
 
 ## UI-Abweichungen
 
