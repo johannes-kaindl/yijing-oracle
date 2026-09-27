@@ -2,6 +2,6 @@
   "source": "obsidian-kit",
   "version": "0.43.0",
   "sha": "bcd1805",
-  "vendored": "chat-client.ts, chat-transport.ts, clock.ts, folder-suggest.ts, settings_walker.ts, stream-area.ts, model-picker.ts, endpoint-source.ts, help-setting.ts",
+  "vendored": "chat-client.ts (obsidian-kit@0.44.0, 127c3a8), chat-transport.ts, clock.ts, folder-suggest.ts, settings_walker.ts, stream-area.ts, model-picker.ts, endpoint-source.ts, help-setting.ts",
   "note": "Verbatim snapshot. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit. Eigene Ablage neben src/vendor/kit/, weil diese Module \"obsidian\" importieren. endpoint-list.ts wird bewusst NICHT vendoriert (Bruch, siehe AGENTS.md § UI-Abweichungen). secrets.ts ist seit Welle 12 kein Vendoring mehr — die Hand-Anpassung (app.secretStorage-Feature-Check, minAppVersion 1.8.7 < 1.11.4) macht sie zu eigenem Code, siehe src/obsidian/secret-store.ts."
 }
