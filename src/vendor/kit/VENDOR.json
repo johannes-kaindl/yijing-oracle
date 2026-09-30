@@ -2,7 +2,7 @@
   "source": "code-kit",
   "version": "0.7.0",
   "sha": "f999dd4",
-  "vendored": "filename-template.ts, reasoning.ts, settings.ts, endpoint.ts, sse.ts (code-kit@0.8.0, fdffb9d), think-splitter.ts, error_body.ts, model-context.ts, i18n.ts, endpoint_diagnostics.ts, endpoint_config.ts, model-choice.ts, sampling-profiles.ts",
+  "vendored": "filename-template.ts, reasoning.ts, settings.ts, endpoint.ts, sse.ts (code-kit@0.8.0, fdffb9d), think-splitter.ts, error_body.ts, model-context.ts, i18n.ts, endpoint_diagnostics.ts, endpoint_config.ts, model-choice.ts, sampling-profiles.ts, capabilities.ts (code-kit@0.8.0, fdffb9d), clipboard.ts (code-kit@0.8.0, fdffb9d)",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit.",
   "obsidian_kit_version": "0.43.0",
   "obsidian_kit_sha": "bcd1805",
