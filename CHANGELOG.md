@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.10.0] — 2026-09-30
+
 ### Added
 
 - **Request section under AI interpretation** (sampling profiles, `obsidian-kit` 0.45.1 `request-section`, `code-kit` 0.8.0 `capabilities`). It shows which model family and backend the interpretation runs on, which sampling values are sent (temperature, top_p, top_k, min_p, presence penalty, thinking effort) and whether they are known to work on that backend. You can override any value per model family, reset it, see the last request sent this session (copyable) and any deviation the server answered with. The fields are filled from the shared profile table for the mode "creative" instead of the server's own defaults.
