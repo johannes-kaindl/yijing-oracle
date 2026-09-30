@@ -16,7 +16,6 @@
 import { type App, type Plugin, PluginSettingTab, type SettingDefinitionItem } from "obsidian";
 import { t } from "../../vendor/kit/i18n";
 import { refreshSettingsTab, renderSettingDefinitions } from "../../vendor/kit-obsidian/settings_walker";
-import { type SettingsHost } from "../../core/settings";
 import { type ControlKey, readControl, writeControl } from "../../core/settings/controls";
 import {
   calloutRows,
@@ -29,6 +28,7 @@ import { helpDefinition } from "./help-row";
 import { llmRows } from "./llm-section";
 import { imageRows } from "./image-section";
 import { type SectionCtx } from "./section-ctx";
+import { type RequestHost } from "./request-section";
 
 // Import-Pfade der Bestands-Aufrufer (main.ts, view.ts) unverändert halten.
 export { DEFAULT_SETTINGS, resolveReadingLang } from "../../core/settings";
@@ -43,7 +43,7 @@ export class SettingsTab extends PluginSettingTab {
   constructor(
     app: App,
     plugin: Plugin,
-    private readonly host: SettingsHost,
+    private readonly host: RequestHost,
   ) {
     super(app, plugin);
   }

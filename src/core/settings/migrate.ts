@@ -31,5 +31,8 @@ export function migrateEndpointList(raw: string | string[] | undefined): string[
  *  @example stripLegacyLlmFields({ endpoints: [], activeEndpoint: "x" }) // → { endpoints: [] } */
 export function stripLegacyLlmFields<T extends object>(llm: T): T {
   delete (llm as Record<string, unknown>).activeEndpoint;
+  // Bis 0.9.0 ein Toggle; seit den Sampling-Profilen traegt `request.thinking.creative` die
+  // Stufe (Migration in loadRequestSettings, vor diesem strip).
+  delete (llm as Record<string, unknown>).requestThinking;
   return llm;
 }

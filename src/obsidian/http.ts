@@ -5,6 +5,8 @@ import { arrayBufferToBase64, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { parseLmStudioContext, type ModelContext } from "../vendor/kit/model-context";
 import { type ComfyTransport } from "../core/comfy/client";
+import { probeBaseUrl, probeEndpoint as probeBackend, type CapabilityFetch } from "../vendor/kit/capabilities";
+import { type BackendId } from "../vendor/kit/sampling-profiles";
 
 /** Passt zu `HttpGet` in chat-client.ts. `headers` traegt den Authorization-Header, wenn
  *  ein API-Schluessel konfiguriert ist (authHeaders in core/llm/auth.ts). */
@@ -158,4 +160,27 @@ export function comfyTransport(): ComfyTransport {
     sleep: (ms) => new Promise((r) => window.setTimeout(r, ms)),
     now: () => Date.now(),
   };
+}
+
+// Backend-Erkennung fuer die Sampling-Profile (Spec § 3.1). Form uebernommen aus
+// lingotuner/src/obsidian/http.ts (cachedProbe), 2026-09-30.
+// `throw: false`: ein 401/403 soll als Nicht-2xx durchkommen statt als Ausnahme — sonst ginge
+// ein Endpunkt mit Schluessel als „kein Endpunkt" unter (REGISTRY: Anfrage-Profile).
+const fetchJsonAdapter: CapabilityFetch = async (req) => {
+  const res = await requestUrl({ url: req.url, method: req.method ?? "GET", headers: req.headers, body: req.body, throw: false });
+  if (res.status < 200 || res.status >= 300) return null;
+  try { return { json: JSON.parse(res.text) as unknown }; } catch { return null; }
+};
+
+const BACKEND_CACHE_MS = 30_000;
+let backendCache: { url: string; backend: BackendId; at: number } | null = null;
+
+/** Welches Backend hinter einer URL steckt — 30 s je URL zwischengespeichert (dieselbe Regel
+ *  wie der Modelllisten-Cache), bei Aenderung der URL verworfen. */
+export async function cachedProbe(url: string, model: string): Promise<BackendId | null> {
+  const now = Date.now();
+  if (backendCache && backendCache.url === url && now - backendCache.at < BACKEND_CACHE_MS) return backendCache.backend;
+  const { backend } = await probeBackend(fetchJsonAdapter, probeBaseUrl(url), model);
+  backendCache = { url, backend, at: now };
+  return backend;
 }

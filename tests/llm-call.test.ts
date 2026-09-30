@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { createChatClient, type SseTransport } from "../src/vendor/kit-obsidian/chat-client";
 import type { ClockPort } from "../src/vendor/kit-obsidian/clock";
-import { interpretationParams, listModels, streamInterpretation } from "../src/obsidian/llm-call";
+import { listModels, streamInterpretation } from "../src/obsidian/llm-call";
 
 /* Was der Kit-Client selbst kann (Abbruch, Fristen, Fehlerkoerper, Fallback ohne Stream) ist im
    Kit abgedeckt (MIGRATION 0.42.0, Punkt 5). Hier steht, was DIESES Plugin daraus macht: die
@@ -54,7 +54,7 @@ describe("listModels", () => {
 // Das Feld "API-Key" wurde bis 2026-09-02 gespeichert und NIE gesendet (401 ohne Hinweis) —
 // deshalb gehoert der Bearer am Chat-Stream in die Regressionsliste.
 describe("streamInterpretation — Anfrage", () => {
-  const base = { messages: [{ role: "user" as const, content: "hi" }], suppressThinking: false, onContent: () => {}, onReasoning: () => {} };
+  const base = { messages: [{ role: "user" as const, content: "hi" }], params: {}, onContent: () => {}, onReasoning: () => {} };
 
   it("sendet den Schluessel als Bearer am Chat-Stream", async () => {
     const { seen, client } = recording();
@@ -81,12 +81,11 @@ describe("streamInterpretation — Anfrage", () => {
     expect(rsn).toBe("grübel");
   });
 
-  it("schickt keine eigenen Sampling-Werte (Alt-Verhalten: nur Suppress-Felder)", async () => {
+  it("reicht die uebergebenen Sampling-Parameter unveraendert in den Body (Wrapper-Test: request-golden)", async () => {
     const { seen, client } = recording();
-    await streamInterpretation(client, { ...base, endpoint: { url: "http://h", apiKey: "" }, model: "m" });
-    expect(seen.body).not.toHaveProperty("temperature");
+    await streamInterpretation(client, { ...base, params: { temperature: 0.7, top_p: 0.95 }, endpoint: { url: "http://h", apiKey: "" }, model: "m" });
+    expect(seen.body).toMatchObject({ model: "m", stream: true, temperature: 0.7, top_p: 0.95 });
     expect(seen.body).not.toHaveProperty("max_tokens");
-    expect(seen.body).toMatchObject({ model: "m", stream: true });
   });
 
   it("meldet den Servergrund bei einem HTTP-Fehler", async () => {
@@ -94,23 +93,5 @@ describe("streamInterpretation — Anfrage", () => {
     const res = await streamInterpretation(client, { ...base, endpoint: { url: "http://h", apiKey: "" }, model: "m" });
     expect(res).toMatchObject({ ok: false, kind: "http" });
     if (!res.ok) expect(res.detail).toContain("model not loaded");
-  });
-});
-
-describe("interpretationParams — Thinking-Suppression", () => {
-  it("unterdrückt Thinking bei suppressThinking NICHT für gpt-oss (always-on, lehnt reasoning_effort ab)", () => {
-    const p = interpretationParams("openai/gpt-oss-20b", true);
-    expect("reasoning_effort" in p).toBe(false);
-    expect("chat_template_kwargs" in p).toBe(false);
-    expect("reasoning_budget" in p).toBe(false);
-  });
-  it("unterdrückt Thinking bei suppressThinking weiterhin für ein Qwen-Modell", () => {
-    const p = interpretationParams("qwen/qwen3.6-35b-a3b", true);
-    expect(p.reasoning_effort).toBe("none");
-    expect(p.chat_template_kwargs).toEqual({ enable_thinking: false });
-    expect(p.reasoning_budget).toBe(0);
-  });
-  it("sendet ohne suppressThinking keine Suppress-Felder", () => {
-    expect(interpretationParams("qwen/qwen3.6-35b-a3b", false)).toEqual({});
   });
 });

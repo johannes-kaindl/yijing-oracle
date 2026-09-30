@@ -3,7 +3,7 @@
 // importieren müssen (index.ts importiert alle, nicht umgekehrt).
 import { type App, type SettingGroupItem } from "obsidian";
 import { type ControlKey } from "../../core/settings/controls";
-import { type SettingsHost } from "../../core/settings";
+import { type RequestHost } from "./request-section";
 
 /** Eine Zeile in einer Sektion. Der Generic bindet jeden `control.key` an einen Schlüssel,
  *  den die Registry kennt — ein Tippfehler bricht den Build, statt zur Laufzeit eine Zeile
@@ -11,7 +11,7 @@ import { type SettingsHost } from "../../core/settings";
 export type SettingRow = SettingGroupItem<ControlKey>;
 
 export interface SectionCtx {
-  host: SettingsHost;
+  host: RequestHost;
   /** Fuer den Endpunkt-Manager-Abschnitt (`findEndpointManager`) — sonst braucht keine
    *  Sektion `app` direkt. */
   app: App;

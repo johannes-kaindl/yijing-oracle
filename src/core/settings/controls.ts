@@ -30,7 +30,6 @@ export type ControlKey =
   | "llm.model"
   | "llm.systemPromptDe"
   | "llm.systemPromptEn"
-  | "llm.requestThinking"
   | "llm.thinkingInNote"
   | "image.backend"
   | "image.endpoint"
@@ -142,12 +141,6 @@ export const SETTING_CONTROLS: Record<ControlKey, ControlSpec> = {
     get: (s) => s.llm.systemPromptEn,
     set: (s, v) => {
       s.llm.systemPromptEn = asText(v);
-    },
-  },
-  "llm.requestThinking": {
-    get: (s) => s.llm.requestThinking,
-    set: (s, v) => {
-      s.llm.requestThinking = Boolean(v);
     },
   },
   "llm.thinkingInNote": {

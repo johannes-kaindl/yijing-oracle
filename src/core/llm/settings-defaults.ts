@@ -21,8 +21,6 @@ export interface LlmSettings {
   systemPromptDe: string;
   /** Leer → DEFAULT_SYSTEM_PROMPT.en. */
   systemPromptEn: string;
-  /** Thinking beim Modell anfordern (steuert suppressParams). */
-  requestThinking: boolean;
   /** Wie Reasoning in die gespeicherte Note wandert. */
   thinkingInNote: ThinkingInNote;
 }
@@ -42,6 +40,5 @@ export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   model: "",
   systemPromptDe: "",
   systemPromptEn: "",
-  requestThinking: true,
   thinkingInNote: "closed-callout",
 };

@@ -1,9 +1,13 @@
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import type { EndpointConfig } from "../vendor/kit/endpoint_config";
-import { isAlwaysOnThinker, suppressParams } from "../vendor/kit/reasoning";
+import {
+  resolveRequestParams,
+  type BackendId, type FamilyId, type FieldId, type ResolvedRequest, type ThinkingLevel,
+} from "../vendor/kit/sampling-profiles";
 import type { ChatClient, ChatResult } from "../vendor/kit-obsidian/chat-client";
 import { authHeaders } from "../core/llm/auth";
 import type { ChatMessage } from "../core/llm/prompt";
+import { MODE } from "../core/llm/request-settings";
 
 /** Zweiter Parameter sind Request-Header. Optional, damit ein Aufrufer ohne Auth
  *  (Bild-Backends, Tests) die Signatur unveraendert erfuellt. */
@@ -21,21 +25,30 @@ export async function listModels(endpoint: string, httpGet: HttpGet, apiKey: str
   } catch { return []; }
 }
 
-/** Felder der Deutungs-Anfrage neben Modell und Nachrichten. Bewusst KEINE eigenen
- *  Sampling-Werte: der Client hat nie welche gesendet, das Modell nutzt seine Server-Defaults.
- *  Thinking unterdruecken nur, wo das Modell es kann — gpt-oss/harmony lehnt die Felder mit
- *  HTTP 400 ab (0.6.1), deshalb der Guard gegen den tatsaechlich gesendeten Modellnamen. */
-export function interpretationParams(model: string, suppressThinking: boolean): Record<string, unknown> {
-  return suppressParams(suppressThinking && !isAlwaysOnThinker(model));
+/** Die Request-Bau-Funktion DES PLUGINS (Rezept 8): nur sie kennt yijings festen Modus. Die
+ *  goldenen Requests laufen dagegen, nicht gegen resolveRequestParams direkt — sonst pruefte
+ *  der Test das Kit statt das Plugin. gpt-oss/harmony lehnt Thinking-Felder mit HTTP 400 ab
+ *  (0.6.1); das entscheidet die Familien-Tabelle (`canTurnOff`), nicht mehr ein Namens-Guard. */
+export function buildInterpretationParams(input: {
+  family: FamilyId | null;
+  backend: BackendId;
+  thinking: ThinkingLevel;
+  overrides?: Partial<Record<FieldId, number | string>>;
+}): ResolvedRequest {
+  return resolveRequestParams({
+    family: input.family, mode: MODE, backend: input.backend, thinking: input.thinking,
+    ...(input.overrides ? { overrides: input.overrides } : {}),
+  });
 }
 
 export function streamInterpretation(
   client: ChatClient,
   req: {
     endpoint: EndpointConfig;
+    /** Modell, wie es tatsaechlich gesendet wird (nach `aliasOf`-Aufloesung). */
     model: string;
     messages: readonly ChatMessage[];
-    suppressThinking: boolean;
+    params: Record<string, number | string>;
     onContent: (t: string) => void;
     onReasoning: (t: string) => void;
     signal?: AbortSignal;
@@ -45,7 +58,7 @@ export function streamInterpretation(
     endpoint: req.endpoint,
     model: req.model,
     messages: req.messages,
-    params: interpretationParams(req.model, req.suppressThinking),
+    params: req.params,
     onToken: req.onContent,
     onReasoning: req.onReasoning,
     ...(req.signal ? { signal: req.signal } : {}),

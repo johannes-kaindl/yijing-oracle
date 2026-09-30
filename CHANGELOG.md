@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+
+- **Request section under AI interpretation** (sampling profiles, `obsidian-kit` 0.45.1 `request-section`, `code-kit` 0.8.0 `capabilities`). It shows which model family and backend the interpretation runs on, which sampling values are sent (temperature, top_p, top_k, min_p, presence penalty, thinking effort) and whether they are known to work on that backend. You can override any value per model family, reset it, see the last request sent this session (copyable) and any deviation the server answered with. The fields are filled from the shared profile table for the mode "creative" instead of the server's own defaults.
+
+### Changed
+
+- **The interpretation now sends sampling values.** Until now it sent none except the thinking switch, so the model used the server's defaults. With a known model family (LM Studio, Open WebUI and similar) it now sends temperature 0.7 plus the family's recommended top_p/top_k and a thinking effort (default: medium). With an unknown family it sends only the temperature. gpt-oss still never gets the fields it rejects (HTTP 400, 0.6.1).
+- The **Request thinking** toggle is replaced by the **Thinking level** dropdown in the new section (off / low / medium / high). Your old choice moves over once: on becomes "medium", off stays "off". The "Level picker in chat" switch in that section has no effect in this plugin (there is no chat button).
+- The model is sent under the spelling the endpoint knows (alias resolved by the LLM Endpoint Manager), not always under the name shown in the list.
+
 ## [0.9.0] — 2026-09-27
 
 ### Added

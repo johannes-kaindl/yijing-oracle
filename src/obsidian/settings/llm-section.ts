@@ -2,7 +2,6 @@
 import { type Setting, getLanguage } from "obsidian";
 import { pickLang, t } from "../../vendor/kit/i18n";
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
-import { isAlwaysOnThinker } from "../../vendor/kit/reasoning";
 import { settingBodyHost } from "../../vendor/kit-obsidian/settings_walker";
 import { PROMPT_PRESETS } from "../../core/llm/prompt-presets";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/llm/defaults";
@@ -14,15 +13,11 @@ import { buildEndpointList } from "./endpoint-list";
 import { buildEndpointSourceSection, findEndpointManager } from "../../vendor/kit-obsidian/endpoint-source";
 import { localEndpointConfigs } from "../../core/llm/resolve-endpoint";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
+import { renderRequestSection } from "./request-section";
 
 export function llmRows(ctx: SectionCtx): SettingRow[] {
   const llm: LlmSettings = ctx.host.settings.llm;
   const uiLang = pickLang(getLanguage());
-
-  // Always-on-Reasoner (R1 & Co.) ignorieren Suppress — der Toggle zeigte hier bis 0.3.0
-  // fälschlich "aus" an. Ein Regler, der nichts bewirkt, ist ein Versprechen ohne Deckung:
-  // deshalb in diesem Fall eine deaktivierte Hatch statt eines echten Controls.
-  const always = isAlwaysOnThinker(llm.model);
 
   return [
     {
@@ -142,19 +137,14 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
     },
     promptRow(ctx, t("set.llmSysDe"), "llm.systemPromptDe", () => llm.systemPromptDe, DEFAULT_SYSTEM_PROMPT.de),
     promptRow(ctx, t("set.llmSysEn"), "llm.systemPromptEn", () => llm.systemPromptEn, DEFAULT_SYSTEM_PROMPT.en),
-    always ?
-      {
-        name: t("set.llmThinking"),
-        desc: t("set.llmThinkingAlways"),
-        render: (setting: Setting) => {
-          setting.addToggle((tg) => tg.setValue(true).setDisabled(true));
-        },
-      }
-    : {
-        name: t("set.llmThinking"),
-        desc: t("set.llmThinkingDesc"),
-        control: { type: "toggle", key: "llm.requestThinking" },
-      },
+    {
+      // Ersetzt den Toggle „Denken anfordern“ (bis 0.9.0): Denkstufe, Temperatur & Co. je Modus
+      // creative stehen jetzt im Abschnitt „Anfrage“. Die Zeile traegt `aliases`, weil ihr Inhalt
+      // in der Einstellungs-Suche sonst unauffindbar waere (Hatch ohne lesbaren Wert).
+      name: t("request.title"),
+      aliases: [t("request.thinkingLevel"), t("request.field.temperature"), "temperature", "thinking", "sampling"],
+      render: (setting: Setting) => { renderRequestSection(setting, ctx.host, () => { ctx.rerender(); }); },
+    },
     {
       name: t("set.llmThinkNote"),
       desc: t("set.llmThinkNoteDesc"),

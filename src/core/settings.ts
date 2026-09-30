@@ -9,6 +9,7 @@ import { DEFAULT_FILENAME_TEMPLATE } from "./filename";
 import { type CalloutConfig, DEFAULT_CALLOUTS } from "./note-callouts";
 import { type LlmSettings, DEFAULT_LLM_SETTINGS } from "./llm/settings-defaults";
 import { type ImageSettings, DEFAULT_IMAGE_SETTINGS } from "./image-settings";
+import { type RequestSettings, DEFAULT_REQUEST_SETTINGS } from "../vendor/kit/sampling-profiles";
 
 export type OutputMode = "note" | "cursor";
 
@@ -27,6 +28,9 @@ export interface PluginSettings {
   frontmatterFields: FrontmatterField[];
   /** LLM-Deutungs-Konfiguration. */
   llm: LlmSettings;
+  /** Sampling-Profile (Modus creative): Ueberschreibungen, Denkstufe. Nie frei im Code — die
+   *  Werte loest `resolveRequestParams` aus der Kit-Tabelle auf. */
+  request: RequestSettings;
   /** Bildgenerierung (Bildmeditation). */
   image: ImageSettings;
   /** Callout-Wrapping der Wilhelm-Abschnitte in der Note. */
@@ -49,6 +53,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   includeFrontmatter: true,
   frontmatterFields: DEFAULT_FRONTMATTER_FIELDS,
   llm: DEFAULT_LLM_SETTINGS,
+  request: DEFAULT_REQUEST_SETTINGS,
   image: DEFAULT_IMAGE_SETTINGS,
   callouts: DEFAULT_CALLOUTS,
   showNotes: true,

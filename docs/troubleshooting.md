@@ -36,7 +36,7 @@ Local servers almost always need a port, for example `http://127.0.0.1:1234`. Wi
 
 **Cause:** the model finished without any text — a reasoning model that spent its whole budget on thinking, or an empty answer.
 
-**Fix:** switch **Request thinking** off under **AI interpretation**, or choose another model, and press **Interpret with AI** again.
+**Fix:** set the thinking level to **off** in the **Request** section under **AI interpretation**, or choose another model, and press **Interpret with AI** again.
 
 ## Reading saved as a new note instead
 

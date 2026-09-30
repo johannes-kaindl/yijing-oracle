@@ -906,7 +906,7 @@ const MANAGER_PLUGIN_ID = "llm-endpoint-manager";
 const MANAGER_DEFAULT_MODEL = "smoke-manager-model";
 const LOCAL_FALLBACK_MODEL = "smoke-lokal-modell";
 
-interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null }
+interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null }
 
 /** Eigener Mini-HTTP-Server statt eines echten LLM-Servers oder des echten Manager-Plugins —
  *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in
@@ -916,6 +916,7 @@ async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint>
   const { createServer } = await import("node:http");
   let chatCalls = 0;
   let lastModel: string | null = null;
+  let lastBody: Record<string, unknown> | null = null;
   const server = createServer((req, res) => {
     // Der Renderer laeuft unter app://obsidian.md — ohne CORS-Header blockt der Browser den
     // Preflight (OPTIONS) und die eigentliche Anfrage sieht der Server nie.
@@ -933,7 +934,7 @@ async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint>
       req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
       req.on("end", () => {
         chatCalls += 1;
-        try { lastModel = (JSON.parse(body) as { model?: unknown }).model as string ?? null; } catch { lastModel = null; }
+        try { lastBody = JSON.parse(body) as Record<string, unknown>; lastModel = (lastBody.model as string | undefined) ?? null; } catch { lastBody = null; lastModel = null; }
         res.writeHead(200, { "Content-Type": "text/event-stream" });
         res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "ok" }, finish_reason: null }], model: modelId })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }], model: modelId })}\n\n`);
@@ -953,6 +954,7 @@ async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint>
     close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
     chatCalls: () => chatCalls,
     lastModel: () => lastModel,
+    lastBody: () => lastBody,
   };
 }
 
@@ -1141,6 +1143,115 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
   }
 }
 
+/** N1-N6: Sampling-Profile (Modus creative, Abschnitt „Anfrage“). Gegen einen Fake-Endpunkt mit
+ *  Qwen-Modellnamen (Familie wird aus dem Namen erkannt), lokaler Pfad ohne Manager. Die Werte
+ *  stehen NICHT hier, sondern an der Quelle: Temperatur 0.7 und Denkstufe medium sind die
+ *  Modus-Defaults aus `code-kit` sampling-profiles (MODES.creative) — der Body-Punkt N3 misst
+ *  den tatsaechlich GESENDETEN Body, nicht die Anzeige. Zwei Bearbeitungen hintereinander (N2),
+ *  weil ein Einklappen nach der ersten im Pilot nur so sichtbar wurde (Nachtrag 6). */
+const ANFRAGE_MODELL = "qwen/qwen3.6-35b-a3b";
+
+async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
+  console.log("\nN · Sampling-Profile (Abschnitt „Anfrage“, Modus creative)");
+  const NAMEN = [
+    "N1 Abschnitt „Anfrage“ klappt auf und zeigt die Felder des Modus",
+    "N2 Zwei Bearbeitungen hintereinander (Temperatur, Denkstufe) speichern und lassen den Abschnitt offen",
+    "N3 Gesendeter Body traegt die Modus-Defaults (Temperatur 0.7, Denkstufe medium)",
+    "N4 Gesendeter Body folgt den Einstellungen (Ueberschreibung 0.9, Denken aus → reasoning_effort none)",
+    "N5 Zuruecksetzen entfernt die Ueberschreibung und laesst den Abschnitt offen",
+    "N6 „Letzte Anfrage“ zeigt beim Oeffnen des Tabs den gesendeten Body",
+  ];
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  let fake: FakeChatEndpoint | null = null;
+  let ui: SettingsUi | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    fake = await startFakeChatEndpoint(ANFRAGE_MODELL);
+    console.log(`  Fake-Endpunkt: ${fake.url} (Modell ${ANFRAGE_MODELL})`);
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, request: ${P}.settings.request };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [${JSON.stringify(fake.url)}]; p.settings.llm.model = ${JSON.stringify(ANFRAGE_MODELL)}; p.settings.llm.choice = {};
+      p.settings.request = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
+      await p.saveSettings();
+      return true;`);
+
+    // N3 — Lauf mit Modus-Defaults, Body am Fake-Server gemessen.
+    const ok1 = await laufeDeutung(cdp);
+    const body1 = fake.lastBody();
+    record(NAMEN[2]!, ok1 && body1?.temperature === 0.7 && body1?.reasoning_effort === "medium",
+      ok1 ? `Body: temperature=${JSON.stringify(body1?.temperature)}, reasoning_effort=${JSON.stringify(body1?.reasoning_effort)}, Modell ${JSON.stringify(body1?.model)}` : "Deutungslauf lieferte kein Ergebnis");
+
+    // N1 — Tab oeffnen, Abschnitt aufklappen. `.okit-collapsible-header` ist hier die EINZIGE
+    // einklappbare Sektion (die Einstellungs-Gruppen sind nicht einklappbar).
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { for (const n of NAMEN.filter((_, i) => i !== 2)) skipped(n, "Settings-Oberflaeche nicht gefunden"); return; }
+    const w = wurzelAusdruck(ui);
+    const vorKlick = await ui.cdp.evaluate<string | null>(`return (${w}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded") ?? null;`);
+    await ui.cdp.evaluate(`(${w}).querySelector(".okit-collapsible-header")?.click(); return true;`);
+    const felder = await pollUntil<number>(ui.cdp, `const n = (${w}).querySelectorAll('.okit-collapsible-body input[data-field]').length; return n > 0 ? n : null;`, 4000, 200);
+    const nachKlick = await ui.cdp.evaluate<string | null>(`return (${w}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded") ?? null;`);
+    record(NAMEN[0]!, vorKlick === "false" && nachKlick === "true" && (felder ?? 0) >= 2,
+      `aria-expanded ${String(vorKlick)} → ${String(nachKlick)}, ${String(felder)} Eingabefelder`);
+
+    // N6 — „Letzte Anfrage“ stammt aus dem Lauf N3 und steht beim Oeffnen schon da.
+    const letzte = await ui.cdp.evaluate<string>(`return (${w}).querySelector(".okit-request-last")?.textContent ?? "";`);
+    record(NAMEN[5]!, letzte.includes('"temperature": 0.7') && letzte.includes('"reasoning_effort": "medium"'),
+      letzte ? `Anzeige: ${letzte.replace(/\s+/g, " ").slice(0, 120)}` : "kein .okit-request-last im Tab");
+
+    // N2 — Bearbeitung 1: Temperatur 0.9 (Blur speichert), Bearbeitung 2: Denkstufe aus.
+    await ui.cdp.evaluate(`
+      const i = (${w}).querySelector('input[data-field="temperature"]');
+      i.value = "0.9"; i.dispatchEvent(new Event("input", { bubbles: true })); i.dispatchEvent(new Event("blur"));
+      return true;`);
+    const ov = await pollUntil<boolean>(cdp, `return ${P}.settings.request.overrides?.creative?.["qwen3.6"]?.temperature === 0.9 ? true : null;`, 4000, 200);
+    const offen1 = await pollUntil<string>(ui.cdp, `const a = (${w}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded"); return a === "true" ? a : null;`, 2000, 200);
+    await ui.cdp.evaluate(`
+      const sel = [...(${w}).querySelectorAll(".okit-collapsible-body select")].find((s) => [...s.options].some((o) => o.value === "off"));
+      sel.value = "off"; sel.dispatchEvent(new Event("change", { bubbles: true }));
+      return true;`);
+    const stufe = await pollUntil<boolean>(cdp, `return ${P}.settings.request.thinking?.creative === "off" ? true : null;`, 4000, 200);
+    const offen2 = await pollUntil<string>(ui.cdp, `const a = (${w}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded"); return a === "true" ? a : null;`, 2000, 200);
+    record(NAMEN[1]!, ov === true && offen1 === "true" && stufe === true && offen2 === "true",
+      `Ueberschreibung ${ov ? "gespeichert" : "fehlt"}, Stufe ${stufe ? "off" : "nicht gesetzt"}, Abschnitt nach Bearbeitung 1: ${String(offen1 ?? "zu")}, nach 2: ${String(offen2 ?? "zu")}`);
+    await closeSettings(cdp, ui);
+    ui = null;
+
+    // N4 — zweiter Lauf: der Body folgt den Einstellungen.
+    const ok2 = await laufeDeutung(cdp);
+    const body2 = fake.lastBody();
+    record(NAMEN[3]!, ok2 && body2?.temperature === 0.9 && body2?.reasoning_effort === "none",
+      ok2 ? `Body: temperature=${JSON.stringify(body2?.temperature)}, reasoning_effort=${JSON.stringify(body2?.reasoning_effort)}` : "Deutungslauf lieferte kein Ergebnis");
+
+    // N5 — Zuruecksetzen der Temperatur ueber den Knopf der Zeile.
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { skipped(NAMEN[4]!, "Settings-Oberflaeche nicht gefunden"); return; }
+    const w2 = wurzelAusdruck(ui);
+    await ui.cdp.evaluate(`
+      const zeile = (${w2}).querySelector('input[data-field="temperature"]')?.closest(".setting-item");
+      zeile?.querySelector(".extra-setting-button")?.click();
+      return true;`);
+    const weg = await pollUntil<boolean>(cdp, `const t = ${P}.settings.request.overrides?.creative?.["qwen3.6"]?.temperature; return t === undefined ? true : null;`, 4000, 200);
+    const offen3 = await pollUntil<string>(ui.cdp, `const a = (${w2}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded"); return a === "true" ? a : null;`, 2000, 200);
+    record(NAMEN[4]!, weg === true && offen3 === "true", `Ueberschreibung ${weg ? "entfernt" : "noch da"}, Abschnitt ${offen3 === "true" ? "offen" : "zugeklappt"}`);
+  } catch (e) {
+    for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    if (ui) await closeSettings(cdp, ui);
+    if (fake) await fake.close().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.settings.request = v.request;
+        await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
 /** Ein bereits GELADENES Chat-Modell auf dem lokalen LM-Studio-Endpunkt, sonst `null`. Bewusst nur
  *  ein geladenes: eine Anfrage an ein nicht geladenes Modell loest ein JIT-Laden aus und
  *  verdraengt das Modell, an dem eine andere Sitzung gerade arbeitet. */
@@ -1165,12 +1276,13 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
   if (modell === null) { skipped(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht — nichts gemessen (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
   const vorher = await cdp.evaluate<{ eps: unknown; model: unknown; choice: unknown; thinking: unknown }>(`
     const l = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm;
-    return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, thinking: l.requestThinking };`);
+    const r = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.request;
+    return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, thinking: r.thinking.creative ?? null };`);
   try {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       p.settings.llm.endpoints = [${JSON.stringify(url)}]; p.settings.llm.model = ${JSON.stringify(modell)};
-      p.settings.llm.choice = {}; p.settings.llm.requestThinking = false;
+      p.settings.llm.choice = {}; p.settings.request.thinking.creative = "off";
       await p.saveSettings();
       return true;`);
     const ok = await laufeDeutung(cdp, 150_000); // ein echtes Modell denkt vor der ersten Antwort
@@ -1180,7 +1292,8 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = ${JSON.stringify(vorher)};
-      p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model; p.settings.llm.requestThinking = v.thinking;
+      p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+      if (v.thinking === null) delete p.settings.request.thinking.creative; else p.settings.request.thinking.creative = v.thinking;
       if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
       await p.saveSettings();
       return true;`).catch(() => null);
@@ -1364,6 +1477,7 @@ async function main(): Promise<void> {
     await abschnittSettings(cdp, port, workflowFixture);
     await abschnittDeklarativ(cdp, port);
     if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
+    await pruefeAnfrage(cdp, port);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {

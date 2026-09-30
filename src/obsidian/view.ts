@@ -24,13 +24,17 @@ import { t } from "../vendor/kit/i18n";
 import { buildSdPrompt, composeImageRequest, hashString } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
-import { listModels, streamInterpretation } from "./llm-call";
+import { buildInterpretationParams, listModels, streamInterpretation } from "./llm-call";
+import { MODE } from "../core/llm/request-settings";
+import { type RequestSession } from "../vendor/kit-obsidian/request-session";
+import { type EndpointSourceResult } from "../vendor/kit/endpoint-source";
+import { checkResponse, thinkingFor, type ResponseFacts } from "../vendor/kit/sampling-profiles";
 import { createChatClient, type ChatClient } from "../vendor/kit-obsidian/chat-client";
 import { requestUrlTransport, xhrSseTransport } from "../vendor/kit-obsidian/chat-transport";
 import { Txt2ImgClient } from "./image-client";
 import { ComfyClient } from "../core/comfy/client";
 import { ComfyProgressSocket } from "./comfy-progress";
-import { comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
+import { cachedProbe, comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
 import { authHeaders } from "../core/llm/auth";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
 import { resolveLlmEndpoint } from "../core/llm/resolve-endpoint";
@@ -43,6 +47,10 @@ export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
 export interface OracleHost {
   settings: PluginSettings;
   resolveReadingLang(): Lang;
+  /** Sampling-Profile: letzte Anfrage und Abweichungen der Sitzung. */
+  requestSession: RequestSession;
+  /** Merkt das Ergebnis der Endpunkt-Aufloesung fuer den Abschnitt „Anfrage“. */
+  recordEndpointSource(r: EndpointSourceResult): void;
 }
 
 interface Interpretation {
@@ -379,7 +387,9 @@ export class OracleView extends ItemView {
       manager,
       async (cfg) => (await probeEndpoint(cfg.url, authHeaders(cfg.apiKey))).reachable,
       "yijing-oracle",
+      (cfg) => cachedProbe(cfg.url, cfg.model || llm.model),
     );
+    this.host.recordEndpointSource(resolved);
     if (!resolved.config) {
       // Ein Fehlschlag mit installiertem Manager verweist auf DESSEN Einstellungen, nicht auf
       // die (dann evtl. leere/irrelevante) lokale Liste — der Manager entscheidet, es gibt
@@ -403,6 +413,18 @@ export class OracleView extends ItemView {
       return;
     }
 
+    // Sampling-Profile (Modus creative): Werte kommen aus der Kit-Tabelle, nie aus dem Code.
+    // Gesendet wird das Modell in der Schreibweise, die der Endpunkt kennt (`sentModel`); beim
+    // Rueckfall auf die Live-Liste (oben) gibt es keine Alias-Aufloesung, dort gilt `model`.
+    const sentModel = resolved.model.trim() ? resolved.sentModel : model;
+    const request = this.host.settings.request;
+    const level = thinkingFor(request, MODE);
+    const { params } = buildInterpretationParams({
+      family: resolved.family, backend: resolved.backend, thinking: level,
+      overrides: request.overrides[MODE]?.[resolved.family ?? "unknown"] ?? {},
+    });
+    this.host.requestSession.recordRequest(params);
+
     const lang = c.lang;
     const systemPrompt = (lang === "de" ? llm.systemPromptDe : llm.systemPromptEn).trim() || DEFAULT_SYSTEM_PROMPT[lang];
     const messages = buildInterpretationMessages({ rendered: c.rendered, question: c.question, lang, systemPrompt });
@@ -415,9 +437,9 @@ export class OracleView extends ItemView {
     try {
       const res = await streamInterpretation(this.chatClientFor(endpoint, apiKey), {
         endpoint: { url: endpoint, apiKey },
-        model,
+        model: sentModel,
         messages,
-        suppressThinking: !llm.requestThinking,
+        params,
         onContent: (tok) => {
           if (c.interpretation) { c.interpretation.answer += tok; this.updateStreamDom(c); }
         },
@@ -426,6 +448,13 @@ export class OracleView extends ItemView {
         },
         signal: this.abortCtrl.signal,
       });
+      // Nur eine echte Server-Antwort ist pruefbar; Abbruch und Netzfehler haben keinen Status.
+      if (res.ok || res.status !== undefined) {
+        const facts: ResponseFacts = res.ok
+          ? { status: 200, finishReason: res.finishReason ?? null, content: res.content, reasoning: res.reasoning, ...(res.model !== undefined ? { responseModel: res.model } : {}) }
+          : { status: res.status ?? 0, errorText: res.body ?? res.detail, finishReason: null, content: res.partial, reasoning: res.reasoning };
+        this.host.requestSession.report(checkResponse({ family: resolved.family, thinking: level }, facts));
+      }
       if (!res.ok) {
         c.interpretation = null;
         if (res.kind !== "aborted") {

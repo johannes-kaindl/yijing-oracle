@@ -10,6 +10,7 @@ import {
   type EndpointSourceResult,
   type LlmEndpointManagerApi,
 } from "../../vendor/kit/endpoint-source";
+import { type BackendId } from "../../vendor/kit/sampling-profiles";
 import { type LlmSettings } from "./settings-defaults";
 
 /** Die lokale `string[]`-Liste (UI-Abweichung `endpoint-list`, siehe AGENTS.md) als
@@ -31,6 +32,9 @@ export async function resolveLlmEndpoint(
   manager: LlmEndpointManagerApi | null,
   ping: (cfg: EndpointConfig) => Promise<boolean>,
   caller: string,
+  /** Erkennt das Backend hinter einem lokalen Endpunkt (Sampling-Profile). Injiziert, weil der
+   *  Netzweg `requestUrl` braucht und diese Datei pure bleibt (`check:pure`). */
+  backendOf?: (cfg: EndpointConfig) => Promise<BackendId | null>,
 ): Promise<EndpointSourceResult> {
   const choice: EndpointChoice | undefined = llm.choice;
   return resolveEndpointSource(
@@ -41,6 +45,7 @@ export async function resolveLlmEndpoint(
       capability: "chat",
       choice,
       caller,
+      ...(backendOf ? { backendOf } : {}),
     },
     ping,
   );

@@ -128,7 +128,7 @@ Two commands skip the panel entirely and cast straight away:
 | **General** | Reading language (or follow Obsidian), register (classic / gender-neutral), default output (new note / at cursor). |
 | **Note & storage** | Readings folder, filename scheme (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), open-after-save. |
 | **Note content** | Frontmatter on/off plus a renameable key per field, Wilhelm's footnotes, per-section callout wrapping. |
-| **AI interpretation** | Endpoints, model, API key, system prompt (built-in templates or your own), thinking behaviour. |
+| **AI interpretation** | Endpoints, model, API key, system prompt (built-in templates or your own), the **Request** section (temperature and thinking level per model family). |
 | **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
 **On endpoints:** list them one per line — the **first reachable one wins**, so the

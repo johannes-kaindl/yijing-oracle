@@ -33,7 +33,7 @@ function fakeCtx(withManager: boolean): SectionCtx {
     },
   } as unknown as SectionCtx["app"];
   return {
-    host: { settings, saveSettings: async () => {}, probeEndpoint: async () => ({ kind: "ok" }) as never } as SectionCtx["host"],
+    host: { settings, saveSettings: async () => {}, probeEndpoint: async () => ({ kind: "ok" }) as never } as unknown as SectionCtx["host"],
     app,
     write: () => {},
     save: () => {},
