@@ -16,4 +16,4 @@ The [README](https://github.com/johannes-kaindl/yijing-oracle/blob/main/README.m
 
 ---
 
-`SMOKE.md` and `superpowers/` hold maintainer material (the GUI smoke checklist, design specs) and are not user documentation.
+`SMOKE.md` holds maintainer material (the GUI smoke checklist) and is not user documentation.
