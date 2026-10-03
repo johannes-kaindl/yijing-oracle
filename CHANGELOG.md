@@ -207,35 +207,36 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
-- **Einklappbare Einstellungs-Sektionen**: die Einstellungen sind jetzt in fünf Bereiche
-  gegliedert (Allgemein · Notiz & Ablage · Notiz-Inhalt · KI-Deutung · Bildmeditation)
-  statt einer langen flachen Liste. „Allgemein" ist offen, der Rest eingeklappt; der
-  Auf-/Zu-Zustand wird gemerkt. Bedienbar auch per Tastatur (Enter/Leertaste).
-- **Endpunkt-Editor für die KI-Deutung**: eine Zeile je Endpunkt statt eines Textfelds —
-  mit Verbindungstest **pro Zeile** (grüner Haken / rotes X samt Klartext-Erklärung),
-  Ein-Klick-Buttons für LM Studio und Ollama, Papierkorb pro Zeile und nicht-blockierenden
-  Hinweisen bei zweifelhaften Adressen (fehlendes `http://`, Platzhalter-IP, fehlender Port).
-- **Kontextlänge des Modells** wird am Modell-Feld angezeigt, sofern der Server sie liefert
-  (LM Studio). Andernfalls entfällt die Anzeige stillschweigend.
-- **Verbindungstest für die Bildmeditation**: der Bild-Endpunkt ließ sich bisher gar nicht
-  prüfen.
+- **Collapsible settings sections**: the settings are now divided into five areas
+  (General · Note & storage · Note content · AI interpretation · Image meditation)
+  instead of one long flat list. "General" is open, the rest collapsed; the open/closed
+  state is remembered. Also operable by keyboard (Enter/Space).
+- **Endpoint editor for the AI interpretation**: one row per endpoint instead of a text
+  field — with a connection test **per row** (green tick / red cross with a plain-language
+  explanation), one-click buttons for LM Studio and Ollama, a trash button per row and
+  non-blocking hints for doubtful addresses (missing `http://`, placeholder IP, missing
+  port).
+- **Context length of the model** is shown at the model field, provided the server
+  delivers it (LM Studio). Otherwise the display silently disappears.
+- **Connection test for the image meditation**: the image endpoint could not be checked at
+  all until now.
 
 ### Changed
 
-- **Der aktive KI-Endpunkt wird jetzt ermittelt statt ausgewählt**: das Dropdown „Aktiver
-  Endpunkt" entfällt — der erste erreichbare Endpunkt aus der Liste gewinnt, die
-  Reihenfolge ist damit die Priorität. Wer zwischen Netzen wechselt (localhost am Rechner,
-  LAN-IP unterwegs), muss nichts mehr umstellen. Bestehende Einstellungen werden beim
-  Update automatisch übernommen.
-- **„Wilhelms Fußnoten"** steht jetzt unter „Notiz-Inhalt" statt unter „Frontmatter".
+- **The active AI endpoint is now determined instead of selected**: the "Active endpoint"
+  dropdown is gone — the first reachable endpoint in the list wins, so the order is the
+  priority. If you switch between networks (localhost on the computer, LAN IP on the go),
+  you no longer have to change anything. Existing settings are adopted automatically on
+  update.
+- **"Wilhelm's footnotes"** now sits under "Note content" instead of under "Frontmatter".
 
 ### Fixed
 
-- **Thinking-Schalter bei Modellen, die immer denken** (DeepSeek-R1 & Co.): der Schalter
-  zeigte „aus", obwohl die Einstellung dort wirkungslos ist. Er ist jetzt ausgegraut und
-  benennt den Grund.
-- **Endpunkt-Meldungen erscheinen in der eingestellten Sprache**: der Verbindungstest
-  antwortete bisher auch bei englischer Oberfläche auf Deutsch.
+- **Thinking switch for models that always think** (DeepSeek-R1 & co.): the switch showed
+  "off" although the setting has no effect there. It is now greyed out and states the
+  reason.
+- **Endpoint messages appear in the configured language**: the connection test used to
+  answer in German even with an English interface.
 
 ## [0.2.0] — 2026-07-15
 
@@ -243,33 +244,34 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
-- **Weissagungs-Vorschau scrollt wieder**: das Voll-Höhen-Flex-Layout hing an einer
-  View-Höhenkette, die im Sidebar-DOM nicht bindet — die Vorschau bekam keine obere
-  Schranke und ließ sich weder auf Desktop noch mobil scrollen. Wieder auf eine definite
-  `max-height` umgestellt (der Kasten dehnt sich nicht mehr über die volle Panel-Höhe).
+- **Divination preview scrolls again**: the full-height flex layout hung on a view height
+  chain that does not bind in the sidebar DOM — the preview got no upper bound and could
+  be scrolled neither on desktop nor on mobile. Switched back to a definite `max-height`
+  (the box no longer stretches over the full panel height).
 
 ### Changed
 
-- **„Neue Frage" leert das Frage-Feld**: nach einem Wurf bleibt kein alter Fragetext mehr
-  im Eingabefeld stehen.
+- **"New question" clears the question field**: after a cast, no old question text remains
+  in the input field.
 
 ## [0.1.0] — 2026-07-13
 
 ### Added
 
-- **Drei-Münzen-Orakel als Obsidian-Plugin**: Wurf im Sidebar-Panel, jede Befragung wird
-  eine durchsuchbare, verlinkbare Vault-Note (statt localStorage). Zweisprachig DE/EN,
-  Register `neutral` als Default; nativ, lokal-first.
-- **Reading-Note mit rotem Faden**: Frage → Überblick (beide Hexagramme + „maßgeblich nach
-  Tradition") → KI-Deutung → Ursprungsbild mit wandelnden Linien → Zielbild → Anmerkungen.
-- **Zhu-Xi-Regel-Hinweis**: zeigt je nach Anzahl wandelnder Linien, welcher Text maßgeblich
-  ist (Note, Panel und LLM-Prompt); die maßgebliche Linie wird markiert.
-- **LLM-Deutung** über lokale OpenAI-kompatible Modelle: Panel-Streaming (Reasoning +
-  Antwort) und Einbettung als Abschnitt in die Note; Prompt-Presets
-  (default/literarisch/C.G.Jung/knapp), konfigurierbarer System-Prompt, Endpoint-Verwaltung.
-- **Konfigurierbares Notiz-Layout**: pro Abschnitt Callout an/aus + Typ; konfigurierbares
-  Frontmatter + Dateiname-Schema; Wilhelms Fußnoten als optionaler Anmerkungen-Abschnitt.
-- **History im Panel**: frühere Befragungen anklicken → Wurf wird aus dem Frontmatter
-  rekonstruiert.
-- **Voll-Höhen-Panel-Layout**: Weissagung füllt den freien Platz (scrollt intern),
-  gedeckelte Deutungs-/Reasoning-Kästen, History standardmäßig eingeklappt am unteren Rand.
+- **Three-coin oracle as an Obsidian plugin**: cast in the sidebar panel, every
+  consultation becomes a searchable, linkable vault note (instead of localStorage).
+  Bilingual DE/EN, register `neutral` as default; native, local-first.
+- **Reading note with a common thread**: question → overview (both hexagrams + "decisive
+  according to tradition") → AI interpretation → original image with changing lines →
+  target image → remarks.
+- **Zhu Xi rule hint**: shows, depending on the number of changing lines, which text is
+  decisive (note, panel and LLM prompt); the decisive line is marked.
+- **LLM interpretation** via local OpenAI-compatible models: panel streaming (reasoning +
+  answer) and embedding as a section in the note; prompt presets
+  (default/literary/C.G. Jung/concise), configurable system prompt, endpoint management.
+- **Configurable note layout**: per section callout on/off + type; configurable
+  frontmatter + file name scheme; Wilhelm's footnotes as an optional remarks section.
+- **History in the panel**: click earlier consultations → the cast is reconstructed from
+  the frontmatter.
+- **Full-height panel layout**: the divination fills the free space (scrolls internally),
+  capped interpretation/reasoning boxes, history collapsed by default at the bottom edge.
