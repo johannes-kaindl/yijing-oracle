@@ -54,7 +54,13 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
     // Schluessel je Zeile (das Kit ueberfuehrt ihn beim ersten Aufloesen in den Schluesselbund).
     // Der alte Schluesselbund-Eintrag wird nur fuer die ALTE Form gelesen und nie geloescht.
     const rawLlm = raw !== null && typeof raw === "object" ? (raw as { llm?: unknown }).llm : undefined;
-    const llmLoad = migrateLlmSettings(rawLlm, obsidianSecretStore(this.app).get(LEGACY_API_KEY_SECRET_ID) ?? "");
+    const store = obsidianSecretStore(this.app);
+    const llmLoad = migrateLlmSettings(rawLlm, store.get(LEGACY_API_KEY_SECRET_ID) ?? "");
+    // Ein Klartext-Schluessel ohne Zeile: in den Schluesselbund (alter Eintrag), nicht im Klartext lassen.
+    if (llmLoad.strandedKey) {
+      try { store.set(LEGACY_API_KEY_SECRET_ID, llmLoad.strandedKey); }
+      catch (e) { console.warn("[yijing-oracle] API-Schluessel ohne Endpunkt-Zeile konnte nicht gesichert werden:", e); }
+    }
     // Klartext-Schluessel sofort in den Schluesselbund (je Zeile ein Eintrag), nicht erst beim ersten
     // Aufloesen: mit installiertem Manager wird die lokale Liste gar nicht aufgeloest.
     const secured = migrateLocalEndpoints(this.app, this.manifest.id, llmLoad.llm.endpoints);

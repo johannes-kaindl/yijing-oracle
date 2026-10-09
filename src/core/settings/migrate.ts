@@ -15,6 +15,10 @@ export interface LlmMigration {
   migrated: boolean;
   /** Einträge der Endpunkt-Liste, die kein Text/Objekt waren und verworfen wurden (der Aufrufer meldet es). */
   dropped: number;
+  /** Ein Klartext-Schlüssel aus `data.json`, für den es keine Zeile gibt und den der Schlüsselbund (noch)
+   *  nicht trägt: der Aufrufer legt ihn unter {@link LEGACY_API_KEY_SECRET_ID} ab, damit er weder verloren
+   *  geht noch im Klartext in `data.json` bleibt. Sonst "". */
+  strandedKey: string;
 }
 
 /** Die `llm`-Settings aus einer Bestands-`data.json` auf das heutige Schema bringen.
@@ -66,14 +70,14 @@ export function migrateLlmSettings(rawLlm: unknown, legacyStoreKey: string): Llm
     ? checked.list.map((e) => (e.apiKey || e.secretId ? e : { ...e, apiKey: key }))
     : checked.list;
 
-  // Ein Klartext-Schluessel aus data.json, fuer den es keine Zeile gibt, wird NICHT verworfen (er waere
-  // sonst endgueltig weg): `llm.apiKey` bleibt stehen und gilt, sobald eine Zeile entsteht.
-  const keinZiel = endpoints.length === 0 && storedKey.trim() !== "" && !legacyStoreKey;
-  if ("apiKey" in r && !keinZiel) migrated = true;
-  if (!keinZiel) delete r.apiKey;
+  // Ein Klartext-Schluessel aus data.json, fuer den es keine Zeile gibt, darf weder verloren gehen noch im
+  // Klartext stehen bleiben: er wird als `strandedKey` gemeldet und vom Aufrufer in den Schluesselbund gelegt.
+  const strandedKey = endpoints.length === 0 && storedKey.trim() !== "" && !legacyStoreKey ? storedKey.trim() : "";
+  if ("apiKey" in r) migrated = true;
+  delete r.apiKey;
   delete r.activeEndpoint;
   delete r.requestThinking;
   const llm: LlmSettings = { ...DEFAULT_LLM_SETTINGS, ...r, endpoints };
   const dropped = checked.dropped + droppedWhole;
-  return { llm, migrated, dropped };
+  return { llm, migrated, dropped, strandedKey };
 }

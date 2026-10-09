@@ -113,13 +113,16 @@ describe("migrateLlmSettings — zweiter Lauf und Sonderfälle (Gegenlese 2026-1
     expect(llm.endpoints).toEqual(DEFAULT_LLM_SETTINGS.endpoints);
   });
 
-  it("leere Liste plus Klartext-Schluessel in data.json: der Schluessel geht nicht verloren", () => {
-    const { llm } = migrateLlmSettings({ endpoints: [], apiKey: "sk-nur-in-datei" }, "");
-    expect((llm as unknown as Record<string, unknown>).apiKey).toBe("sk-nur-in-datei");
+  it("leere Liste plus Klartext-Schluessel in data.json: als strandedKey gemeldet, nicht im Klartext gelassen", () => {
+    const { llm, strandedKey, migrated } = migrateLlmSettings({ endpoints: [], apiKey: "sk-nur-in-datei" }, "");
+    expect(strandedKey).toBe("sk-nur-in-datei");
+    expect("apiKey" in llm).toBe(false);
+    expect(migrated).toBe(true);
   });
 
-  it("…und gilt, sobald eine Zeile entsteht (naechster Lauf)", () => {
-    const { llm } = migrateLlmSettings({ endpoints: ["http://neu:1"], apiKey: "sk-nur-in-datei" }, "");
-    expect(llm.endpoints).toEqual([{ url: "http://neu:1", apiKey: "sk-nur-in-datei" }]);
+  it("kein strandedKey, wenn eine Zeile den Schluessel traegt oder der Schluesselbund ihn schon hat", () => {
+    expect(migrateLlmSettings({ endpoints: ["http://a:1"], apiKey: "sk" }, "").strandedKey).toBe("");
+    expect(migrateLlmSettings({ endpoints: [], apiKey: "sk" }, "sk-bund").strandedKey).toBe("");
   });
+
 });
