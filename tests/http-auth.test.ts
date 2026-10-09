@@ -1,12 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { requestUrl } from "obsidian";
-import { fetchModelContext, httpGet, probeEndpoint } from "../src/obsidian/http";
+import { fetchModelContext, httpGet } from "../src/obsidian/http";
 
-// Die Erreichbarkeits-Probe ist der Netzweg, der beim Nachruesten einer Authentifizierung
-// am leichtesten vergessen wird — und ihr Vergessen ist das teuerste: ohne Schluessel
-// antwortet ein externer Anbieter mit 401, der Endpunkt gilt damit nie als erreichbar und
-// wird von resolveActiveEndpoint still uebersprungen. Das Feature wirkt tot, ohne Meldung.
-// (Derselbe Punkt ist in vault-rags Spec als der uebersehene markiert.)
+// Die Erreichbarkeits-Probe der LLM-Endpunkte liegt seit der Verbindung im Kit (llm-connection).
+// Hier bleiben die zwei Netzwege des Plugins, die einen Schluessel mitschicken muessen: die
+// LM-Studio-Kontextabfrage der Modell-Zeile und der gemeinsame httpGet.
 
 const mock = requestUrl as unknown as {
   mock: { calls: unknown[][] };
@@ -38,17 +36,6 @@ function letzterAufruf(): { url: string; headers?: Record<string, string> } {
 }
 
 describe("http.ts — Authorization-Header", () => {
-  it("sendet den Schluessel an der Erreichbarkeits-Probe", async () => {
-    await probeEndpoint("http://h:1234", { Authorization: "Bearer sk-geheim" });
-    expect(letzterAufruf().url).toBe("http://h:1234/v1/models");
-    expect(letzterAufruf().headers).toMatchObject({ Authorization: "Bearer sk-geheim" });
-  });
-
-  it("sendet ohne Schluessel keinen Authorization-Header an der Probe", async () => {
-    await probeEndpoint("http://h:1234", {});
-    expect(letzterAufruf().headers ?? {}).not.toHaveProperty("Authorization");
-  });
-
   it("reicht Header durch httpGet durch", async () => {
     await httpGet("http://h:1234/v1/models", { Authorization: "Bearer sk-geheim" });
     expect(letzterAufruf().headers).toMatchObject({ Authorization: "Bearer sk-geheim" });

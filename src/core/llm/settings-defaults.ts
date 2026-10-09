@@ -1,17 +1,14 @@
 import { type ThinkingInNote } from "./interpretation";
 import { type EndpointChoice } from "../../vendor/kit/endpoint-source";
+import { type EndpointConfig } from "../../vendor/kit/endpoint_config";
 
 /** LLM-Deutungs-Konfiguration. Pure (kein obsidian) — von settings.ts re-exportiert. */
 export interface LlmSettings {
-  /** Geordnete Endpunkt-Liste. Die Reihenfolge IST die Priorität: der erste erreichbare
-   *  gewinnt (resolveActiveEndpoint). Ein separates activeEndpoint-Feld gibt es bewusst
-   *  nicht mehr — der Nutzer sortiert um, statt auszuwählen.
-   *  Gilt nur fuer den LOKALEN Fallback-Pfad (kein LLM Endpoint Manager installiert oder vom
-   *  Manager kein Endpunkt geliefert) — seit der Endpunkt-Manager-Migration (2026-09-16). */
-  endpoints: string[];
-  /** Optionaler API-Key (leer für lokale Server). Gilt fuer jede Zeile aus `endpoints`
-   *  (lokaler Pfad); der Manager verwaltet seine eigenen Tokens selbst. */
-  apiKey: string;
+  /** Geordnete Endpunkt-Liste (lokaler Pfad). Die Reihenfolge IST die Priorität: der erste
+   *  erreichbare gewinnt. Der API-Schlüssel steht je Zeile im Obsidian-Schlüsselbund
+   *  (`secretId`), nicht in dieser Datei — das Kit überführt Klartext beim ersten Auflösen.
+   *  Gilt nur ohne LLM Endpoint Manager (oder wenn der Manager keinen Endpunkt liefert). */
+  endpoints: EndpointConfig[];
   /** Zuletzt gewähltes Modell (lokaler Pfad, wenn `choice.model` leer ist). */
   model: string;
   /** Wahl gegenueber dem LLM Endpoint Manager (Endpunkt + Modell) — wirkt nur, wenn der
@@ -35,8 +32,7 @@ export function effectiveModel(current: string, available: string[]): string {
 }
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
-  endpoints: ["http://localhost:1234"],
-  apiKey: "",
+  endpoints: [{ url: "http://localhost:1234" }],
   model: "",
   systemPromptDe: "",
   systemPromptEn: "",

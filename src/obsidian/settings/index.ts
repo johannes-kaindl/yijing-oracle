@@ -28,7 +28,8 @@ import { helpDefinition } from "./help-row";
 import { llmRows } from "./llm-section";
 import { imageRows } from "./image-section";
 import { type SectionCtx } from "./section-ctx";
-import { type RequestHost } from "./request-section";
+import { type SettingsHost } from "../../core/settings";
+import { type LlmConnection } from "../../vendor/kit-obsidian/llm-connection";
 
 // Import-Pfade der Bestands-Aufrufer (main.ts, view.ts) unverändert halten.
 export { DEFAULT_SETTINGS, resolveReadingLang } from "../../core/settings";
@@ -43,7 +44,8 @@ export class SettingsTab extends PluginSettingTab {
   constructor(
     app: App,
     plugin: Plugin,
-    private readonly host: RequestHost,
+    private readonly host: SettingsHost,
+    private readonly llm: LlmConnection,
   ) {
     super(app, plugin);
   }
@@ -72,6 +74,8 @@ export class SettingsTab extends PluginSettingTab {
     // Alles läuft durch die pure Registry: der deklarative Host prüft nur den Control-Typ,
     // nicht unsere Grenzen (Trim, Default-Rückfall, Zahl-Coercion).
     const needsRefresh = writeControl(this.host.settings, key, value);
+    // Die Verbindung merkt sich die Aufloesung samt Modell; ein neues Modell gilt erst nach invalidate().
+    if (key === "llm.model") this.llm.invalidate();
     await this.host.saveSettings();
     if (needsRefresh) this.refresh();
   }
@@ -80,6 +84,7 @@ export class SettingsTab extends PluginSettingTab {
   private ctx(): SectionCtx {
     return {
       host: this.host,
+      llm: this.llm,
       app: this.app,
       write: (key, value) => {
         void this.setControlValue(key, value);
@@ -122,6 +127,7 @@ export class SettingsTab extends PluginSettingTab {
   }
 
   hide(): void {
+    this.llm.hideSettings();
     this.cleanupPrevious();
     this.cleanupPrevious = () => {};
     // Nur der native ≥1.13-Pfad braucht das (Fallstrick 2 oben): dort rendert der Host beim

@@ -36,8 +36,9 @@ function fakeSetting() {
 
 describe("Hilfe-Zeile in den Settings", () => {
   beforeAll(() => { registerI18n(); setLang("en"); });
-  const host = { settings: { ...DEFAULT_SETTINGS }, saveSettings: async () => {}, probeEndpoint: async () => ({}) } as never;
-  const tab = () => new SettingsTab({} as never, {} as never, host);
+  const host = { settings: { ...DEFAULT_SETTINGS }, saveSettings: async () => {} } as never;
+  const llm = { invalidate: () => {}, hideSettings: () => {} } as never;
+  const tab = () => new SettingsTab({} as never, {} as never, host, llm);
 
   it("ist das ERSTE Element von getSettingDefinitions() (Host >= 1.13)", () => {
     const defs = tab().getSettingDefinitions() as unknown as { name?: string; type?: string; render?: unknown }[];

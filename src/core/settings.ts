@@ -2,7 +2,6 @@
 // Render-Schicht lebt in obsidian/settings/ und re-exportiert diese Symbole, damit die
 // bestehenden Import-Pfade (main.ts, view.ts) unverändert bleiben.
 import { pickLang } from "../vendor/kit/i18n";
-import { type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { type Lang, type Register } from "./data";
 import { DEFAULT_FRONTMATTER_FIELDS, type FrontmatterField } from "./frontmatter";
 import { DEFAULT_FILENAME_TEMPLATE } from "./filename";
@@ -70,7 +69,4 @@ export function resolveReadingLang(settings: PluginSettings, uiLocale?: string |
 export interface SettingsHost {
   settings: PluginSettings;
   saveSettings(): Promise<void>;
-  /** Probt EINEN Endpunkt und klassifiziert das Ergebnis (Per-Zeile-Status im Editor).
-   *  Injiziert, damit die Settings-Schicht die Netz-Anbindung nicht selbst kennt. */
-  probeEndpoint(endpoint: string): Promise<EndpointStatus>;
 }

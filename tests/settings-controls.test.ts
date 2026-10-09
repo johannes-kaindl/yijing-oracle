@@ -17,11 +17,11 @@ describe("readControl", () => {
   it("liest flache und verschachtelte Felder über denselben Schlüsselraum", () => {
     const s = fresh();
     s.readingsFolder = "Orakel";
-    s.llm.apiKey = "sk-test";
+    s.llm.model = "qwen";
     s.image.backend = "comfyui";
 
     expect(readControl(s, "readingsFolder")).toBe("Orakel");
-    expect(readControl(s, "llm.apiKey")).toBe("sk-test");
+    expect(readControl(s, "llm.model")).toBe("qwen");
     expect(readControl(s, "image.backend")).toBe("comfyui");
   });
 
@@ -46,11 +46,11 @@ describe("writeControl — Normalisierung", () => {
     expect(s.filenameTemplate).toBe(DEFAULT_FILENAME_TEMPLATE);
   });
 
-  it("trimmt Endpunkt und API-Schlüssel", () => {
+  it("trimmt Endpunkt und Modell", () => {
     const s = fresh();
-    writeControl(s, "llm.apiKey", "  sk-abc  ");
+    writeControl(s, "llm.model", "  qwen  ");
     writeControl(s, "image.endpoint", " http://127.0.0.1:8000 ");
-    expect(s.llm.apiKey).toBe("sk-abc");
+    expect(s.llm.model).toBe("qwen");
     expect(s.image.endpoint).toBe("http://127.0.0.1:8000");
   });
 
@@ -78,8 +78,8 @@ describe("writeControl — Normalisierung", () => {
 
   it("macht aus einem Objekt keinen Text — es würde sonst als „[object Object]“ gespeichert", () => {
     const s = fresh();
-    writeControl(s, "llm.apiKey", { nope: true });
-    expect(s.llm.apiKey).toBe("");
+    writeControl(s, "llm.model", { nope: true });
+    expect(s.llm.model).toBe("");
   });
 
   it("hält die Bildgröße als Zahl, obwohl das Dropdown Strings liefert", () => {

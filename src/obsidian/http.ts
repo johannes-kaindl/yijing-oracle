@@ -5,11 +5,9 @@ import { arrayBufferToBase64, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
 import { parseLmStudioContext, type ModelContext } from "../vendor/kit/model-context";
 import { type ComfyTransport } from "../core/comfy/client";
-import { probeBaseUrl, probeEndpoint as probeBackend, type CapabilityFetch } from "../vendor/kit/capabilities";
-import { type BackendId } from "../vendor/kit/sampling-profiles";
 
 /** Passt zu `HttpGet` in chat-client.ts. `headers` traegt den Authorization-Header, wenn
- *  ein API-Schluessel konfiguriert ist (authHeaders in core/llm/auth.ts). */
+ *  ein API-Schluessel konfiguriert ist (`authHeaders` aus vendor/kit/endpoint_config). */
 export async function httpGet(url: string, headers?: Record<string, string>): Promise<{ status: number; json: unknown }> {
   const r = await requestUrl({ url, headers, throw: false });
   let json: unknown = undefined;
@@ -35,40 +33,6 @@ export async function httpPostJson(url: string, body: unknown, timeoutMs = 18000
     ]);
     if (raced === "__timeout__") throw new Error(`timeout after ${timeoutMs} ms`);
     return raced;
-  } finally {
-    if (timer) window.clearTimeout(timer);
-  }
-}
-
-/** Erreichbarkeits-Probe (GET <baseUrl>/v1/models) mit Klartext-Diagnose. baseUrl normalisiert.
- *  Eigener Timeout via Promise.race, weil requestUrl weder timeout noch Abort kennt.
- *
- *  `headers` ist hier NICHT optional im Sinne von "kann man weglassen": ohne den
- *  Authorization-Header antwortet ein externer Anbieter mit 401, der Endpunkt gilt nie als
- *  erreichbar und wird von resolveActiveEndpoint still uebersprungen — das Feature wirkt
- *  tot, ohne Meldung. Deshalb ist der Parameter PFLICHT und steht vor dem Timeout: ein
- *  vergessener Netzweg soll am Compiler auffallen, nicht an einem Nutzer, dessen Endpunkt
- *  grundlos als unerreichbar gilt. Wer keinen Schluessel hat, uebergibt authHeaders("") = {}. */
-export async function probeEndpoint(baseUrl: string, headers: Record<string, string>, timeoutMs = 5000): Promise<EndpointStatus> {
-  const url = `${baseUrl}/v1/models`;
-  let timer: number | undefined;
-  const timeout = new Promise<"__timeout__">(resolve => {
-    timer = window.setTimeout(() => resolve("__timeout__"), timeoutMs);
-  });
-  try {
-    const raced = await Promise.race([
-      requestUrl({ url, headers, throw: false }).then(r => {
-        let body: unknown = undefined;
-        try { body = r.json; } catch { /* nicht-JSON → body bleibt undefined */ }
-        return { status: r.status, body } as const;
-      }),
-      timeout,
-    ]);
-    if (raced === "__timeout__") return classifyEndpointStatus({ kind: "timeout" });
-    return classifyEndpointStatus({ kind: "response", status: raced.status, body: raced.body });
-  } catch (e) {
-    const message = String((e as { message?: string })?.message ?? e);
-    return classifyEndpointStatus({ kind: "error", message });
   } finally {
     if (timer) window.clearTimeout(timer);
   }
@@ -160,27 +124,4 @@ export function comfyTransport(): ComfyTransport {
     sleep: (ms) => new Promise((r) => window.setTimeout(r, ms)),
     now: () => Date.now(),
   };
-}
-
-// Backend-Erkennung fuer die Sampling-Profile (Spec § 3.1). Form uebernommen aus
-// lingotuner/src/obsidian/http.ts (cachedProbe), 2026-09-30.
-// `throw: false`: ein 401/403 soll als Nicht-2xx durchkommen statt als Ausnahme — sonst ginge
-// ein Endpunkt mit Schluessel als „kein Endpunkt" unter (REGISTRY: Anfrage-Profile).
-const fetchJsonAdapter: CapabilityFetch = async (req) => {
-  const res = await requestUrl({ url: req.url, method: req.method ?? "GET", headers: req.headers, body: req.body, throw: false });
-  if (res.status < 200 || res.status >= 300) return null;
-  try { return { json: JSON.parse(res.text) as unknown }; } catch { return null; }
-};
-
-const BACKEND_CACHE_MS = 30_000;
-let backendCache: { url: string; backend: BackendId; at: number } | null = null;
-
-/** Welches Backend hinter einer URL steckt — 30 s je URL zwischengespeichert (dieselbe Regel
- *  wie der Modelllisten-Cache), bei Aenderung der URL verworfen. */
-export async function cachedProbe(url: string, model: string): Promise<BackendId | null> {
-  const now = Date.now();
-  if (backendCache && backendCache.url === url && now - backendCache.at < BACKEND_CACHE_MS) return backendCache.backend;
-  const { backend } = await probeBackend(fetchJsonAdapter, probeBaseUrl(url), model);
-  backendCache = { url, backend, at: now };
-  return backend;
 }

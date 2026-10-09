@@ -1,19 +1,15 @@
-// KI-Deutung: Endpunkte (Zeilen-Editor), Modell + Kontextlänge, Prompts, Thinking.
+// KI-Deutung: Verbindung (Quelle, Endpunkte, Anfrage), Modell + Kontextlänge, Prompts, Thinking.
 import { type Setting, getLanguage } from "obsidian";
-import { pickLang, t } from "../../vendor/kit/i18n";
+import { getLang, pickLang, t } from "../../vendor/kit/i18n";
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { settingBodyHost } from "../../vendor/kit-obsidian/settings_walker";
 import { PROMPT_PRESETS } from "../../core/llm/prompt-presets";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/llm/defaults";
 import { type LlmSettings, effectiveModel } from "../../core/llm/settings-defaults";
-import { listModels } from "../llm-call";
-import { fetchModelContext, httpGet } from "../http";
-import { authHeaders } from "../../core/llm/auth";
-import { buildEndpointList } from "./endpoint-list";
-import { buildEndpointSourceSection, findEndpointManager } from "../../vendor/kit-obsidian/endpoint-source";
-import { localEndpointConfigs } from "../../core/llm/resolve-endpoint";
+import { fetchModelContext } from "../http";
+import { authHeaders } from "../../vendor/kit/endpoint_config";
+import { findEndpointManager } from "../../vendor/kit-obsidian/endpoint-source";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
-import { renderRequestSection } from "./request-section";
 
 export function llmRows(ctx: SectionCtx): SettingRow[] {
   const llm: LlmSettings = ctx.host.settings.llm;
@@ -23,82 +19,16 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
     {
       name: t("set.llmEndpoints"),
       desc: t("set.llmEndpointsDesc"),
-      // Der Zeilen-Editor ist eine ganze Liste, keine einzelne Zeile — settingBodyHost macht
-      // die Setting-Zeile zum leeren Block-Container, in den er seine Zeilen zeichnet.
-      //
-      // Ist der LLM Endpoint Manager installiert, zeigt buildEndpointSourceSection dessen
-      // Endpunkt-/Modellwahl statt des lokalen Zeilen-Editors (die Fallentscheidung trifft
-      // die Kit-Funktion selbst ueber findEndpointManager); die lokale Liste bleibt als
-      // renderLocalList-Rueckfall erreichbar (Import-Knopf, kein Manager installiert).
+      // Ein maskiertes Feld (API-Schlüssel je Endpunkt) ist schwerer wiederzufinden als ein
+      // beschriftetes: der Wert ist unlesbar, es bleibt die Beschriftung — und die hängt an der
+      // UI-Sprache. Diese Begriffe sind bewusst NICHT übersetzt: sie sind in beiden Sprachen die,
+      // unter denen gesucht wird. Dazu die Begriffe des Abschnitts „Anfrage“ (er gehört zur Verbindung).
+      aliases: ["api key", "api-key", "apikey", "token", "bearer", "schluessel", "schlüssel", "temperature", "thinking", "sampling"],
+      // Die Verbindung zeichnet Quelle (Manager oder lokal), Endpunkt-Liste und den Abschnitt
+      // „Anfrage“ in einem Zug. Sie leert ihren Container beim Neuzeichnen — deshalb ein eigener
+      // Host (die Zeile selbst, zum Block-Container gemacht), nie der Tab.
       render: (setting: Setting) => {
-        const host = settingBodyHost(setting);
-        const renderLocalList = (): void => {
-          buildEndpointList(host, {
-            list: llm.endpoints,
-            name: t("set.llmEndpoints"),
-            desc: t("set.llmEndpointsDesc"),
-            setList: (next) => {
-              llm.endpoints = next;
-            },
-            probe: (ep) => ctx.host.probeEndpoint(ep),
-            commit: () => {
-              ctx.save();
-              ctx.rerender();
-            },
-          });
-        };
-        buildEndpointSourceSection({
-          app: ctx.app,
-          containerEl: host,
-          capability: "chat",
-          caller: "yijing-oracle",
-          choice: () => llm.choice ?? {},
-          setChoice: async (c) => {
-            llm.choice = c;
-            ctx.save();
-          },
-          local: () => localEndpointConfigs(llm),
-          strings: {
-            managed: t("src.managed"),
-            managedDesc: t("src.managedDesc"),
-            openManager: t("src.openManager"),
-            pickEndpoint: t("src.pickEndpoint"),
-            automatic: t("src.automatic"),
-            model: t("set.llmModel"),
-            importLocal: t("src.importLocal"),
-            imported: (r) => t("src.imported", r.added.length, r.merged.length),
-            importFailed: t("src.importFailed"),
-            modelHint: (key) => t(`src.modelHint.${key}`),
-            savedSuffix: t("src.savedSuffix"),
-            refreshModels: t("src.refreshModels"),
-            saveFailed: t("src.saveFailed"),
-          },
-          renderLocalList,
-          rerender: () => ctx.rerender(),
-        });
-      },
-    },
-    {
-      name: t("set.llmApiKey"),
-      desc: t("set.llmApiKeyDesc"),
-      // Ein maskiertes Feld ist schwerer wiederzufinden als ein beschriftetes: der Wert ist
-      // unlesbar, es bleibt die Beschriftung — und die haengt an der UI-Sprache. Diese
-      // Begriffe sind bewusst NICHT uebersetzt: sie sind in beiden Sprachen die, unter denen
-      // gesucht wird.
-      aliases: ["api key", "api-key", "apikey", "token", "bearer", "schluessel", "schlüssel"],
-      // Hatch statt Control, weil Obsidians deklarative API keinen Passwort-Typ kennt:
-      // `SettingTextControl` traegt genau `type: 'text'` und `placeholder` (gemessen an
-      // obsidian.d.ts 1.13.1). Maskieren geht nur ueber das inputEl — und daran kommt nur
-      // ein eigener Renderer. Die Auffindbarkeit kostet das nicht: `searchable`/`aliases`
-      // sitzen auf SettingDefinitionBase, von der auch SettingDefinitionRender erbt.
-      render: (setting: Setting) => {
-        setting.addText((tx) => {
-          tx.inputEl.type = "password";
-          tx.setValue(llm.apiKey);
-          // ctx.write speichert nur (setControlValue) und baut den Tab NICHT neu auf —
-          // ein Rerender je Tastendruck wuerde den Fokus aus dem Feld reissen.
-          tx.onChange((v) => ctx.write("llm.apiKey", v));
-        });
+        ctx.llm.renderSettings(settingBodyHost(setting), { lang: getLang() });
       },
     },
     // Bei aktivem Manager sitzt die Modellwahl bereits in der Endpunkt-Zeile oben
@@ -137,14 +67,6 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
     },
     promptRow(ctx, t("set.llmSysDe"), "llm.systemPromptDe", () => llm.systemPromptDe, DEFAULT_SYSTEM_PROMPT.de),
     promptRow(ctx, t("set.llmSysEn"), "llm.systemPromptEn", () => llm.systemPromptEn, DEFAULT_SYSTEM_PROMPT.en),
-    {
-      // Ersetzt den Toggle „Denken anfordern“ (bis 0.9.0): Denkstufe, Temperatur & Co. je Modus
-      // creative stehen jetzt im Abschnitt „Anfrage“. Die Zeile traegt `aliases`, weil ihr Inhalt
-      // in der Einstellungs-Suche sonst unauffindbar waere (Hatch ohne lesbaren Wert).
-      name: t("request.title"),
-      aliases: [t("request.thinkingLevel"), t("request.field.temperature"), "temperature", "thinking", "sampling"],
-      render: (setting: Setting) => { renderRequestSection(setting, ctx.host, () => { ctx.rerender(); }); },
-    },
     {
       name: t("set.llmThinkNote"),
       desc: t("set.llmThinkNoteDesc"),
@@ -195,13 +117,12 @@ function promptRow(
   };
 }
 
-/** Modell — Dropdown live aus listModels(), Fallback Textfeld; dazu die Kontextlänge.
- *  Basis ist der erste Listeneintrag: die Modell-Liste kommt ohnehin nur von einem
- *  erreichbaren Server, und der Zeilen-Editor markiert den aktiven Endpunkt separat. */
+/** Modell — Dropdown live aus der Verbindung, Fallback Textfeld; dazu die Kontextlänge.
+ *  Die Liste kommt von dem Endpunkt, den die Verbindung gerade aufgelöst hat (der erste
+ *  erreichbare), nicht vom ersten Listeneintrag: ein toter erster Eintrag lieferte sonst eine
+ *  leere Liste, obwohl der zweite antwortet. */
 function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettings): void {
-  const primary = llm.endpoints[0] ?? "";
-
-  void listModels(primary, httpGet, llm.apiKey).then((models) => {
+  void Promise.all([ctx.llm.models(), ctx.llm.resolve()]).then(([{ models }, source]) => {
     if (models.length) {
       // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
       // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.
@@ -209,6 +130,7 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
       if (resolved !== llm.model) {
         llm.model = resolved;
         ctx.save();
+        ctx.llm.invalidate();
       }
       const list = models.includes(llm.model) ? models : [llm.model, ...models];
       modelSetting.addDropdown((d) => {
@@ -220,10 +142,13 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
       });
 
       // Kontextlänge — entfällt still, wenn der Server sie nicht liefert (Ollama/MLX/vLLM).
-      void fetchModelContext(normalizeEndpoint(primary), llm.model, authHeaders(llm.apiKey)).then((cx) => {
-        const len = cx?.loadedContextLength ?? cx?.maxContextLength;
-        if (len) modelSetting.setDesc(t("set.llmContext", len.toLocaleString()));
-      });
+      const cfg = source.config;
+      if (cfg) {
+        void fetchModelContext(normalizeEndpoint(cfg.url), llm.model, authHeaders(cfg.apiKey)).then((cx) => {
+          const len = cx?.loadedContextLength ?? cx?.maxContextLength;
+          if (len) modelSetting.setDesc(t("set.llmContext", len.toLocaleString()));
+        });
+      }
     } else {
       modelSetting.setDesc(t("set.llmModelOffline"));
       modelSetting.addText((txt) =>
@@ -232,9 +157,10 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
           // nähme dem Feld den Fokus.
           llm.model = v.trim();
           ctx.save();
+          ctx.llm.invalidate();
         }),
       );
-      modelSetting.addButton((b) => b.setButtonText(t("set.llmLoadModels")).onClick(() => ctx.rerender()));
+      modelSetting.addButton((b) => b.setButtonText(t("set.llmLoadModels")).onClick(() => { ctx.llm.invalidate(); ctx.rerender(); }));
     }
   });
 }

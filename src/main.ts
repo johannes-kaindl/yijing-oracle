@@ -10,19 +10,15 @@ import { cast } from "./core/casting";
 import { buildReading } from "./core/reading";
 import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
-import { migrateEndpointList, stripLegacyLlmFields } from "./core/settings/migrate";
+import { LEGACY_API_KEY_SECRET_ID, migrateLlmSettings } from "./core/settings/migrate";
 import { loadRequestSettings } from "./core/llm/request-settings";
-import { deviationNotice } from "./core/request-text";
-import { createRequestSession, type RequestSession } from "./vendor/kit-obsidian/request-session";
-import { type RequestSectionState } from "./vendor/kit-obsidian/request-section";
-import { type RequestSettings } from "./vendor/kit/sampling-profiles";
-import { loadApiKey, persistApiKey } from "./core/settings/api-key-storage";
+import { type LlmConnection } from "./vendor/kit-obsidian/llm-connection";
 import { obsidianSecretStore } from "./vendor/kit-obsidian/secrets";
+import { migrateLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
 import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {
   DEFAULT_SETTINGS,
-  DEFAULT_LLM_SETTINGS,
   SettingsTab,
   resolveReadingLang,
   type OutputMode,
@@ -31,24 +27,17 @@ import {
 import { OracleView, VIEW_TYPE_YIJING, type OracleHost } from "./obsidian/view";
 import { writeReading } from "./obsidian/reading-writer";
 import { nowStamp } from "./obsidian/clock";
-import { probeEndpoint } from "./obsidian/http";
-import { authHeaders } from "./core/llm/auth";
-import { normalizeEndpoint } from "./vendor/kit/endpoint";
-import { type EndpointStatus } from "./vendor/kit/endpoint_diagnostics";
+import { createOracleConnection } from "./obsidian/connection";
 import { onEndpointManagerChanged } from "./vendor/kit-obsidian/endpoint-source";
-import { type EndpointSourceResult } from "./vendor/kit/endpoint-source";
-import { type RequestHost } from "./obsidian/settings/request-section";
 
-export default class YijingOraclePlugin extends Plugin implements RequestHost, OracleHost {
+export default class YijingOraclePlugin extends Plugin implements OracleHost {
   // Basisklasse deklariert `settings?: unknown` (Obsidian ≥1.13) — hier auf den
   // konkreten Typ verengen, ohne ein eigenes Feld zu emittieren.
   declare settings: PluginSettings;
 
-  /** Letztes Ergebnis der Endpunkt-Aufloesung (Familie/Backend/gesendetes Modell) — fuer den
-   *  Abschnitt „Anfrage“ im Settings-Tab. Vor der ersten Deutung leer. */
-  private lastSource: EndpointSourceResult | null = null;
-  /** Letzte Anfrage und Abweichungen der laufenden Sitzung (nicht gespeichert). */
-  readonly requestSession: RequestSession = createRequestSession({ message: (d) => deviationNotice(d) });
+  /** Die ganze LLM-Anbindung: Endpunkt-Quelle, Modellliste, Anfrage-Parameter, Client und die
+   *  Settings-Abschnitte „Endpunkte“ und „Anfrage“ (Kit `createLlmConnection`). */
+  llm!: LlmConnection;
 
   async onload(): Promise<void> {
     const raw: unknown = await this.loadData();
@@ -56,29 +45,30 @@ export default class YijingOraclePlugin extends Plugin implements RequestHost, O
     // frontmatterFields sind Objekte — mergeSettings klont nur die Array-Ebene, nicht die
     // Elemente. Tief kopieren, damit die Settings-UI nie DEFAULT_FRONTMATTER_FIELDS mutiert.
     this.settings.frontmatterFields = this.settings.frontmatterFields.map((f) => ({ ...f }));
-    // mergeSettings ist shallow — das llm-Objekt separat gegen neue Defaults auffüllen.
-    this.settings.llm = { ...DEFAULT_LLM_SETTINGS, ...(this.settings.llm ?? {}) };
-    // Nach dem Spread steht in `endpoints` entweder noch der alte Textarea-String
-    // (Bestands-data.json bis 0.2.0) oder bereits string[]. migrateEndpointList nimmt beides.
-    this.settings.llm.endpoints = migrateEndpointList(this.settings.llm.endpoints);
-    // mergeSettings erhält unbekannte raw-Felder (Forward-Compat) → das alte `activeEndpoint`
-    // überlebt den Spread und würde als Leiche zurückgeschrieben. Explizit entfernen.
     // Sampling-Profile: request-Block saeubern und das alte `llm.requestThinking` einmalig nach
-    // `request.thinking.creative` migrieren — aus dem ROHEN Bestand, VOR dem strip (der das Feld
-    // loescht). `dropped` wird nach registerI18n gemeldet (Notice braucht t()).
+    // `request.thinking.creative` migrieren — aus dem ROHEN Bestand, BEVOR migrateLlmSettings das
+    // Feld streicht. `dropped` wird nach registerI18n gemeldet (Notice braucht t()).
     const requestLoad = loadRequestSettings(raw);
     this.settings.request = requestLoad.request;
-    stripLegacyLlmFields(this.settings.llm);
+    // Endpunkt-Liste: Textarea-String / string[] + ein globaler Schluessel → EndpointConfig[] mit
+    // Schluessel je Zeile (das Kit ueberfuehrt ihn beim ersten Aufloesen in den Schluesselbund).
+    // Der alte Schluesselbund-Eintrag wird nur fuer die ALTE Form gelesen und nie geloescht.
+    const rawLlm = raw !== null && typeof raw === "object" ? (raw as { llm?: unknown }).llm : undefined;
+    const llmLoad = migrateLlmSettings(rawLlm, obsidianSecretStore(this.app).get(LEGACY_API_KEY_SECRET_ID) ?? "");
+    // Klartext-Schluessel sofort in den Schluesselbund (je Zeile ein Eintrag), nicht erst beim ersten
+    // Aufloesen: mit installiertem Manager wird die lokale Liste gar nicht aufgeloest.
+    const secured = migrateLocalEndpoints(this.app, this.manifest.id, llmLoad.llm.endpoints);
+    this.settings.llm = { ...llmLoad.llm, endpoints: secured.list };
     // mergeSettings ist shallow — auch das image-Objekt gegen neue Defaults auffüllen.
     this.settings.image = { ...DEFAULT_IMAGE_SETTINGS, ...(this.settings.image ?? {}) };
     this.settings.callouts = mergeCallouts(this.settings.callouts);
-    // Der API-Schluessel gehoert in Obsidians Schluesselbund (garantiert ab minAppVersion
-    // 1.11.4), nicht in data.json (Klartext, wandert mit jedem Vault-Sync). Ein Altwert aus
-    // data.json wird beim ersten Laden hinuebergeschrieben und dort geleert; im Speicher steht
-    // er weiterhin, damit die Netzwege ihn wie bisher unter `settings.llm.apiKey` finden.
-    const apiKeyLoad = loadApiKey(this.settings.llm.apiKey, obsidianSecretStore(this.app));
-    this.settings.llm.apiKey = apiKeyLoad.apiKey;
-    if (apiKeyLoad.migrate) await this.saveSettings();
+    this.llm = createOracleConnection({
+      app: this.app,
+      pluginId: this.manifest.id,
+      settings: () => this.settings,
+      save: () => this.saveSettings(),
+    });
+    if (llmLoad.migrated || secured.changed) await this.saveSettings();
 
     registerI18n();
     setLang(pickLang(this.readLocale()));
@@ -86,6 +76,7 @@ export default class YijingOraclePlugin extends Plugin implements RequestHost, O
       new Notice(t("request.dropped", String(requestLoad.dropped.length)));
       console.warn("[yijing-oracle] ungueltige request-Einstellungen verworfen:", requestLoad.dropped);
     }
+    if (llmLoad.dropped > 0) console.warn(`[yijing-oracle] ${llmLoad.dropped} ungueltige Endpunkt-Eintraege verworfen`);
 
     this.registerView(VIEW_TYPE_YIJING, (leaf) => new OracleView(leaf, this));
 
@@ -109,7 +100,7 @@ export default class YijingOraclePlugin extends Plugin implements RequestHost, O
       editorCallback: () => void this.castDirect("cursor"),
     });
 
-    const settingsTab = new SettingsTab(this.app, this, this);
+    const settingsTab = new SettingsTab(this.app, this, this, this.llm);
     this.addSettingTab(settingsTab);
     // Der Host rendert beim Oeffnen des Tabs die bei addSettingTab gecachten Definitionen
     // (SettingsTab-Kommentar "Fallstrick 2") — installiert sich der LLM Endpoint Manager erst
@@ -127,36 +118,14 @@ export default class YijingOraclePlugin extends Plugin implements RequestHost, O
   }
 
   async saveSettings(): Promise<void> {
-    // Schluessel in den Schluesselbund, data.json ohne ihn — das Speicherobjekt bleibt
-    // unangetastet (die Netzwege lesen daraus). Verwirft der Schluesselbund den Wert
-    // stillschweigend, liefert persistApiKey den Wert fuer data.json zurueck wie bis 0.5.1.
-    const storedApiKey = persistApiKey(this.settings.llm.apiKey, obsidianSecretStore(this.app), (m) => console.warn(m));
-    await this.saveData({ ...this.settings, llm: { ...this.settings.llm, apiKey: storedApiKey } });
+    await this.saveData(this.settings);
   }
 
-  /** OracleHost: merkt das Ergebnis der Endpunkt-Aufloesung fuer „Anfrage“. */
-  recordEndpointSource(r: EndpointSourceResult): void { this.lastSource = r; }
-
-  /** RequestHost: Zustand fuer `buildRequestSection`. */
-  requestSectionState(): RequestSectionState {
-    const s = this.lastSource;
-    return {
-      family: s?.family ?? null, familySource: s?.familySource ?? "none",
-      backend: s?.backend ?? "unknown", backendSource: s?.backendSource ?? "none",
-      model: s?.model ?? "", sentModel: s?.sentModel ?? "",
-      ...(s?.defaultModel !== undefined ? { defaultModel: s.defaultModel } : {}),
-    };
-  }
-
-  async saveRequestSettings(next: RequestSettings): Promise<void> {
-    this.settings.request = next;
+  /** OracleHost: ein aus der Modell-Liste gewaehltes Standard-Modell merken (lokaler Pfad). */
+  async persistModel(model: string): Promise<void> {
+    this.settings.llm.model = model;
     await this.saveSettings();
-  }
-
-  /** SettingsHost: Per-Zeile-Probe für den Endpunkt-Editor. Injiziert, damit die
-   *  Settings-Schicht die Netz-Anbindung nicht selbst kennt. */
-  probeEndpoint(endpoint: string): Promise<EndpointStatus> {
-    return probeEndpoint(normalizeEndpoint(endpoint), authHeaders(this.settings.llm.apiKey));
+    this.llm.invalidate();
   }
 
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */

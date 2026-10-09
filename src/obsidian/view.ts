@@ -24,21 +24,13 @@ import { t } from "../vendor/kit/i18n";
 import { buildSdPrompt, composeImageRequest, hashString } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
-import { buildInterpretationParams, listModels, streamInterpretation } from "./llm-call";
-import { MODE } from "../core/llm/request-settings";
-import { type RequestSession } from "../vendor/kit-obsidian/request-session";
-import { type EndpointSourceResult } from "../vendor/kit/endpoint-source";
-import { checkResponse, thinkingFor, type ResponseFacts } from "../vendor/kit/sampling-profiles";
-import { createChatClient, type ChatClient } from "../vendor/kit-obsidian/chat-client";
-import { requestUrlTransport, xhrSseTransport } from "../vendor/kit-obsidian/chat-transport";
+import { type LlmConnection } from "../vendor/kit-obsidian/llm-connection";
+import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
 import { Txt2ImgClient } from "./image-client";
 import { ComfyClient } from "../core/comfy/client";
 import { ComfyProgressSocket } from "./comfy-progress";
-import { cachedProbe, comfyTransport, httpGet, httpPostJson, probeEndpoint } from "./http";
-import { authHeaders } from "../core/llm/auth";
+import { comfyTransport, httpPostJson } from "./http";
 import { normalizeEndpoint } from "../vendor/kit/endpoint";
-import { resolveLlmEndpoint } from "../core/llm/resolve-endpoint";
-import { findEndpointManager } from "../vendor/kit-obsidian/endpoint-source";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 
@@ -47,10 +39,10 @@ export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
 export interface OracleHost {
   settings: PluginSettings;
   resolveReadingLang(): Lang;
-  /** Sampling-Profile: letzte Anfrage und Abweichungen der Sitzung. */
-  requestSession: RequestSession;
-  /** Merkt das Ergebnis der Endpunkt-Aufloesung fuer den Abschnitt „Anfrage“. */
-  recordEndpointSource(r: EndpointSourceResult): void;
+  /** Die LLM-Verbindung (Kit): Quelle, Modellliste, Anfrage-Parameter, Client, Sitzung. */
+  llm: LlmConnection;
+  /** Merkt ein aus der Modell-Liste gewaehltes Standard-Modell (lokaler Pfad, Modell war leer). */
+  persistModel(model: string): Promise<void>;
 }
 
 interface Interpretation {
@@ -88,10 +80,8 @@ export class OracleView extends ItemView {
   private current: CurrentCast | null = null;
   private questionValue = "";
   private streaming = false;
-  /** Der Kit-Client merkt sich je Instanz, dass der Endpunkt den Stream verweigert hat — nach
-   *  einem Endpunktwechsel also neu erzeugen (MIGRATION 0.42.0 Punkt 2). */
-  private chatClient: ChatClient | null = null;
-  private chatClientKey = "";
+  /** Zwischen Klick und Streambeginn (Aufloesen, Modell-Liste): sperrt einen zweiten Start. */
+  private starting = false;
   private generatingImage = false;
   private abortCtrl: AbortController | null = null;
   /** Streaming-Antwortbereich aus obsidian-kit (UI-STANDARD §8, `buildStreamArea`). Wird
@@ -324,7 +314,7 @@ export class OracleView extends ItemView {
         det.createDiv({ text: c.interpretation.reasoning, cls: "yijing-reasoning-body" });
       }
       const body = area.createDiv({ cls: "yijing-interpretation-body" });
-      void MarkdownRenderer.render(this.app, c.interpretation.answer, body, "", this);
+      void MarkdownRenderer.render(this.app, neutralizeModelMarkdown(c.interpretation.answer), body, "", this);
       const row = area.createDiv({ cls: "yijing-actions" });
       new ButtonComponent(row)
         .setButtonText(t("view.saveInterpretation"))
@@ -374,56 +364,51 @@ export class OracleView extends ItemView {
   /** Startet die Deutung: baut Messages, streamt live, hängt Ergebnis an current an. */
   private async generateInterpretation(): Promise<void> {
     const c = this.current;
-    if (!c || this.streaming) return;
+    if (!c || this.streaming || this.starting) return;
+    // Aufloesen, Modell-Liste und Persistieren dauern (bis 5 s je toter Zeile): ein zweiter Klick wuerde
+    // sonst einen parallelen Lauf starten, bevor `streaming` gesetzt ist.
+    this.starting = true;
+    try {
+      await this.generateInterpretationNow(c);
+    } finally {
+      this.starting = false;
+    }
+  }
+
+  private async generateInterpretationNow(c: CurrentCast): Promise<void> {
     const llm = this.host.settings.llm;
-    // Quellenwahl: zuerst der LLM Endpoint Manager (falls installiert und ein Endpunkt
-    // liefert), sonst die lokale Liste — der erste erreichbare gewinnt, wie bisher. Die Probe
-    // kostet einen Roundtrip (bzw. bis zu 5 s Timeout je totem Eintrag) — gegenüber der
-    // Generierung selbst vernachlässigbar, und sie deckt den Netzwechsel ab (localhost am
-    // Host vs. LAN-IP unterwegs) ohne Umkonfiguration.
-    const manager = findEndpointManager(this.app);
-    const resolved = await resolveLlmEndpoint(
-      llm,
-      manager,
-      async (cfg) => (await probeEndpoint(cfg.url, authHeaders(cfg.apiKey))).reachable,
-      "yijing-oracle",
-      (cfg) => cachedProbe(cfg.url, cfg.model || llm.model),
-    );
-    this.host.recordEndpointSource(resolved);
+    // Die Verbindung loest Quelle (Manager zuerst, sonst die lokale Liste), Familie, Backend und
+    // Sampling-Profil selbst auf und merkt sich die Aufloesung bis zur naechsten Aenderung.
+    // `force`: die Verbindung merkt sich auch eine FEHLGESCHLAGENE Aufloesung. Ohne das bliebe „kein Endpunkt“
+    // nach dem Start des Servers (oder ein toter erster Eintrag nach einem Netzwechsel) bis zur naechsten
+    // Einstellungsaenderung stehen; geprueft wird wie vor dem Tausch bei jedem Klick.
+    const resolved = await this.host.llm.resolve({ force: true });
     if (!resolved.config) {
       // Ein Fehlschlag mit installiertem Manager verweist auf DESSEN Einstellungen, nicht auf
       // die (dann evtl. leere/irrelevante) lokale Liste — der Manager entscheidet, es gibt
-      // keinen lokalen Rueckfall bei "kein Endpunkt" (resolveEndpointSource-Vertrag).
+      // keinen lokalen Rueckfall bei "kein Endpunkt".
       new Notice(t(resolved.kind === "manager" ? "notice.noEndpointManaged" : "notice.noEndpoint"));
       return;
     }
-    const endpoint = resolved.config.url;
-    const apiKey = resolved.config.apiKey ?? llm.apiKey;
 
-    // Modell auflösen: gesetztes bevorzugen (choice.model gewinnt bereits in
-    // resolveLlmEndpoint), sonst live das erste verfügbare (deckt den Fall ab, dass die
-    // Settings noch nie geöffnet und so kein Default persistiert wurde).
+    // Modell: das aufgeloeste (choice.model bzw. Zeilen-/globales Modell) gewinnt; ist keins
+    // gesetzt, das erste der Live-Liste — deckt den Fall ab, dass die Settings nie geoeffnet
+    // wurden und so kein Default persistiert ist. Lokal wird es gemerkt, damit das Dropdown
+    // spaeter dasselbe zeigt; beim Manager entscheidet er, dort wird nichts geschrieben.
     let model = resolved.model.trim();
+    let fallbackModel: string | undefined;
     if (!model) {
-      const models = await listModels(endpoint, httpGet, apiKey);
-      model = effectiveModel("", models);
+      const listed = await this.host.llm.models();
+      model = effectiveModel("", listed.models);
+      if (model) {
+        fallbackModel = model;
+        if (resolved.kind !== "manager") await this.host.persistModel(model);
+      }
     }
     if (!model) {
       new Notice(t(resolved.kind === "manager" ? "notice.noEndpointManaged" : "notice.noEndpoint"));
       return;
     }
-
-    // Sampling-Profile (Modus creative): Werte kommen aus der Kit-Tabelle, nie aus dem Code.
-    // Gesendet wird das Modell in der Schreibweise, die der Endpunkt kennt (`sentModel`); beim
-    // Rueckfall auf die Live-Liste (oben) gibt es keine Alias-Aufloesung, dort gilt `model`.
-    const sentModel = resolved.model.trim() ? resolved.sentModel : model;
-    const request = this.host.settings.request;
-    const level = thinkingFor(request, MODE);
-    const { params } = buildInterpretationParams({
-      family: resolved.family, backend: resolved.backend, thinking: level,
-      overrides: request.overrides[MODE]?.[resolved.family ?? "unknown"] ?? {},
-    });
-    this.host.requestSession.recordRequest(params);
 
     const lang = c.lang;
     const systemPrompt = (lang === "de" ? llm.systemPromptDe : llm.systemPromptEn).trim() || DEFAULT_SYSTEM_PROMPT[lang];
@@ -435,12 +420,9 @@ export class OracleView extends ItemView {
     await this.render();
 
     try {
-      const res = await streamInterpretation(this.chatClientFor(endpoint, apiKey), {
-        endpoint: { url: endpoint, apiKey },
-        model: sentModel,
-        messages,
-        params,
-        onContent: (tok) => {
+      const res = await this.host.llm.complete({ messages }, {
+        ...(fallbackModel !== undefined ? { model: fallbackModel } : {}),
+        onToken: (tok) => {
           if (c.interpretation) { c.interpretation.answer += tok; this.updateStreamDom(c); }
         },
         onReasoning: (tok) => {
@@ -448,16 +430,11 @@ export class OracleView extends ItemView {
         },
         signal: this.abortCtrl.signal,
       });
-      // Nur eine echte Server-Antwort ist pruefbar; Abbruch und Netzfehler haben keinen Status.
-      if (res.ok || res.status !== undefined) {
-        const facts: ResponseFacts = res.ok
-          ? { status: 200, finishReason: res.finishReason ?? null, content: res.content, reasoning: res.reasoning, ...(res.model !== undefined ? { responseModel: res.model } : {}) }
-          : { status: res.status ?? 0, errorText: res.body ?? res.detail, finishReason: null, content: res.partial, reasoning: res.reasoning };
-        this.host.requestSession.report(checkResponse({ family: resolved.family, thinking: level }, facts));
-      }
       if (!res.ok) {
         c.interpretation = null;
-        if (res.kind !== "aborted") {
+        if (res.kind === "no-endpoint") {
+          new Notice(t(res.source.kind === "manager" ? "notice.noEndpointManaged" : "notice.noEndpoint"));
+        } else if (res.kind !== "aborted") {
           // Der Servergrund (`detail`) steht hinter dem eigenen Satz, nicht an seiner Stelle.
           new Notice(`${t("notice.llmError")} ${res.detail}`);
           console.error("[yijing-oracle]", res.kind, res.detail);
@@ -467,7 +444,7 @@ export class OracleView extends ItemView {
         new Notice(t("notice.noInterpretation"));
       }
     } catch (e) {
-      // Der Kit-Client wirft nicht; das hier faengt nur Fehler in den eigenen Callbacks.
+      // Die Verbindung wirft nicht; das hier faengt nur Fehler in den eigenen Callbacks.
       c.interpretation = null;
       new Notice(t("notice.llmError"));
       console.error("[yijing-oracle]", e);
@@ -476,15 +453,6 @@ export class OracleView extends ItemView {
       this.abortCtrl = null;
       await this.render();
     }
-  }
-
-  private chatClientFor(endpoint: string, apiKey: string): ChatClient {
-    const key = `${endpoint}\n${apiKey}`;
-    if (this.chatClient === null || key !== this.chatClientKey) {
-      this.chatClient = createChatClient({ transport: xhrSseTransport, fallbackTransport: requestUrlTransport });
-      this.chatClientKey = key;
-    }
-    return this.chatClient;
   }
 
   /** Baut Szene+Prompt deterministisch aus dem Wurf und holt das Bild vom Server. */

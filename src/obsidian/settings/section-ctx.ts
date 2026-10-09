@@ -3,7 +3,8 @@
 // importieren müssen (index.ts importiert alle, nicht umgekehrt).
 import { type App, type SettingGroupItem } from "obsidian";
 import { type ControlKey } from "../../core/settings/controls";
-import { type RequestHost } from "./request-section";
+import { type SettingsHost } from "../../core/settings";
+import { type LlmConnection } from "../../vendor/kit-obsidian/llm-connection";
 
 /** Eine Zeile in einer Sektion. Der Generic bindet jeden `control.key` an einen Schlüssel,
  *  den die Registry kennt — ein Tippfehler bricht den Build, statt zur Laufzeit eine Zeile
@@ -11,7 +12,9 @@ import { type RequestHost } from "./request-section";
 export type SettingRow = SettingGroupItem<ControlKey>;
 
 export interface SectionCtx {
-  host: RequestHost;
+  host: SettingsHost;
+  /** Die LLM-Verbindung (Kit): zeichnet Quelle, Endpunkte und „Anfrage“ und kennt die Modell-Liste. */
+  llm: LlmConnection;
   /** Fuer den Endpunkt-Manager-Abschnitt (`findEndpointManager`) — sonst braucht keine
    *  Sektion `app` direkt. */
   app: App;

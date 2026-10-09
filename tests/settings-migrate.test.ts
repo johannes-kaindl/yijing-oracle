@@ -1,70 +1,125 @@
 import { describe, expect, it } from "vitest";
-import { migrateEndpointList, stripLegacyLlmFields } from "../src/core/settings/migrate";
+import { migrateLlmSettings } from "../src/core/settings/migrate";
+import { DEFAULT_LLM_SETTINGS } from "../src/core/llm/settings-defaults";
 
-describe("migrateEndpointList", () => {
-  it("parst den alten Textarea-String zeilenweise (Bestands-data.json)", () => {
-    expect(migrateEndpointList("http://a:1\nhttp://b:2")).toEqual(["http://a:1", "http://b:2"]);
+describe("migrateLlmSettings — Endpunkt-Liste", () => {
+  it("parst den alten Textarea-String zeilenweise (Bestands-data.json bis 0.2.0)", () => {
+    const { llm, migrated } = migrateLlmSettings({ endpoints: "http://a:1\nhttp://b:2" }, "");
+    expect(llm.endpoints).toEqual([{ url: "http://a:1" }, { url: "http://b:2" }]);
+    expect(migrated).toBe(true);
   });
 
-  it("trimmt und wirft Leerzeilen weg", () => {
-    expect(migrateEndpointList("  http://a:1  \n\n\nhttp://b:2")).toEqual([
-      "http://a:1",
-      "http://b:2",
-    ]);
+  it("macht aus einem string[] eine EndpointConfig[]", () => {
+    const { llm, migrated } = migrateLlmSettings({ endpoints: ["http://a:1", "", "  ", "http://b:2"] }, "");
+    expect(llm.endpoints).toEqual([{ url: "http://a:1" }, { url: "http://b:2" }]);
+    expect(migrated).toBe(true);
   });
 
-  it("dedupliziert (parseEndpointList-Semantik)", () => {
-    expect(migrateEndpointList("http://a:1\nhttp://a:1")).toEqual(["http://a:1"]);
+  it("lässt eine schon migrierte EndpointConfig[] unverändert und verlangt kein Neuschreiben", () => {
+    const eps = [{ url: "http://a:1", id: "x", secretId: "yijing-oracle-ep-x", model: "m" }];
+    const { llm, migrated } = migrateLlmSettings({ endpoints: eps }, "");
+    expect(llm.endpoints).toEqual(eps);
+    expect(migrated).toBe(false);
   });
 
-  it("lässt eine bereits migrierte Liste unverändert", () => {
-    expect(migrateEndpointList(["http://a:1", "http://b:2"])).toEqual([
-      "http://a:1",
-      "http://b:2",
-    ]);
+  it("fehlendes Feld → die Default-Liste, als frische Kopie", () => {
+    const { llm } = migrateLlmSettings({}, "");
+    expect(llm.endpoints).toEqual(DEFAULT_LLM_SETTINGS.endpoints);
+    expect(llm.endpoints).not.toBe(DEFAULT_LLM_SETTINGS.endpoints);
+    expect(llm.endpoints[0]).not.toBe(DEFAULT_LLM_SETTINGS.endpoints[0]);
   });
 
-  it("filtert Leereinträge aus einer bestehenden Liste", () => {
-    expect(migrateEndpointList(["http://a:1", "", "  "])).toEqual(["http://a:1"]);
+  it("leere Liste bleibt leer (kein Rückfall auf den Default)", () => {
+    expect(migrateLlmSettings({ endpoints: [] }, "").llm.endpoints).toEqual([]);
   });
 
-  it("liefert [] für undefined (Feld fehlt in data.json)", () => {
-    expect(migrateEndpointList(undefined)).toEqual([]);
+  it("kein Objekt (null, undefined) → Defaults", () => {
+    expect(migrateLlmSettings(undefined, "").llm).toEqual(DEFAULT_LLM_SETTINGS);
+    expect(migrateLlmSettings(null, "").llm).toEqual(DEFAULT_LLM_SETTINGS);
   });
 
-  it("liefert [] für einen leeren String", () => {
-    expect(migrateEndpointList("")).toEqual([]);
-  });
-
-  it("liefert [] für eine leere Liste", () => {
-    expect(migrateEndpointList([])).toEqual([]);
-  });
-});
-
-describe("stripLegacyLlmFields", () => {
-  it("entfernt das alte activeEndpoint-Feld", () => {
-    const llm = { endpoints: ["http://a:1"], activeEndpoint: "http://a:1", model: "m" };
-    stripLegacyLlmFields(llm);
-    expect(llm).toEqual({ endpoints: ["http://a:1"], model: "m" });
-  });
-
-  it("ist ein No-Op, wenn das Feld gar nicht da ist", () => {
-    const llm = { endpoints: ["http://a:1"] };
-    expect(stripLegacyLlmFields(llm)).toEqual({ endpoints: ["http://a:1"] });
+  it("meldet verworfene Einträge, statt sie still zu verlieren", () => {
+    const { llm, dropped } = migrateLlmSettings({ endpoints: ["http://a:1", 42, { url: 7 }] }, "");
+    expect(llm.endpoints).toEqual([{ url: "http://a:1" }]);
+    expect(dropped).toBe(2);
   });
 });
 
-describe("onload-Migrationskette (Bestands-data.json bis 0.2.0)", () => {
-  it("macht aus dem Textarea-String eine Liste und laesst keine Leiche zurueck", () => {
-    // Form einer echten 0.2.0-data.json (verifiziert gegen eine echte Bestands-data.json, 2026-07-16):
-    const raw = { llm: { endpoints: "http://localhost:1234", activeEndpoint: "http://localhost:1234", model: "qwen3" } };
-    // exakt die Kette aus main.ts onload:
-    const llm = { ...raw.llm } as Record<string, unknown>;
-    llm.endpoints = migrateEndpointList(llm.endpoints as string);
-    stripLegacyLlmFields(llm);
+describe("migrateLlmSettings — der eine globale Schlüssel", () => {
+  it("wandert aus data.json als apiKey in jede Zeile und verschwindet aus llm", () => {
+    const { llm, migrated } = migrateLlmSettings({ endpoints: ["http://a:1", "http://b:2"], apiKey: "sk-alt" }, "");
+    expect(llm.endpoints).toEqual([{ url: "http://a:1", apiKey: "sk-alt" }, { url: "http://b:2", apiKey: "sk-alt" }]);
+    expect("apiKey" in llm).toBe(false);
+    expect(migrated).toBe(true);
+  });
 
-    expect(llm.endpoints).toEqual(["http://localhost:1234"]);
-    expect(llm.activeEndpoint).toBeUndefined();
-    expect(llm.model).toBe("qwen3"); // uebrige Bestandswerte ueberleben
+  it("der alte Schlüsselbund-Eintrag gewinnt gegen data.json (wie bis 0.10)", () => {
+    const { llm } = migrateLlmSettings({ endpoints: ["http://a:1"], apiKey: "sk-datei" }, "sk-bund");
+    expect(llm.endpoints[0]?.apiKey).toBe("sk-bund");
+  });
+
+  it("data.json trägt nur den Leerstring (Schlüssel lag im Schlüsselbund) → Bund-Wert in die Zeilen", () => {
+    const { llm, migrated } = migrateLlmSettings({ endpoints: ["http://a:1"], apiKey: "" }, "sk-bund");
+    expect(llm.endpoints).toEqual([{ url: "http://a:1", apiKey: "sk-bund" }]);
+    expect(migrated).toBe(true);
+  });
+
+  it("überschreibt weder einen Schlüssel noch einen Schlüsselbund-Verweis der Zeile", () => {
+    const { llm } = migrateLlmSettings({
+      endpoints: [{ url: "http://a:1", apiKey: "sk-eigen" }, { url: "http://b:2", secretId: "yijing-oracle-ep-b" }, "http://c:3"],
+      apiKey: "sk-global",
+    }, "");
+    expect(llm.endpoints).toEqual([
+      { url: "http://a:1", apiKey: "sk-eigen" },
+      { url: "http://b:2", secretId: "yijing-oracle-ep-b" },
+      { url: "http://c:3", apiKey: "sk-global" },
+    ]);
+  });
+
+  it("ohne Schlüssel bekommt keine Zeile ein apiKey-Feld", () => {
+    const { llm } = migrateLlmSettings({ endpoints: ["http://a:1"] }, "");
+    expect(llm.endpoints[0]).toEqual({ url: "http://a:1" });
+  });
+});
+
+describe("migrateLlmSettings — abgelöste Felder", () => {
+  it("nimmt apiKey, activeEndpoint und requestThinking ausdrücklich aus dem Ergebnis", () => {
+    const { llm } = migrateLlmSettings({ endpoints: ["http://a:1"], apiKey: "x", activeEndpoint: "http://a:1", requestThinking: true }, "");
+    expect("apiKey" in llm).toBe(false);
+    expect("activeEndpoint" in llm).toBe(false);
+    expect("requestThinking" in llm).toBe(false);
+  });
+
+  it("behält eigene Werte und Fremdfelder (Forward-Compat)", () => {
+    const { llm } = migrateLlmSettings({ model: "m", systemPromptDe: "p", zukunft: 1 }, "");
+    expect(llm.model).toBe("m");
+    expect(llm.systemPromptDe).toBe("p");
+    expect((llm as unknown as Record<string, unknown>).zukunft).toBe(1);
+  });
+});
+
+describe("migrateLlmSettings — zweiter Lauf und Sonderfälle (Gegenlese 2026-10-09)", () => {
+  it("setzt den globalen Schluessel NICHT erneut ein, wenn die Liste schon migriert ist", () => {
+    // Zustand nach dem ersten Lauf: Objekt-Liste, Zeile 2 ohne Schluessel (neu angelegt oder entzogen),
+    // der alte Schluesselbund-Eintrag steht weiter da.
+    const bereits = { endpoints: [{ url: "http://a:1", id: "x", secretId: "yijing-oracle-ep-x" }, { url: "http://fremd:2" }] };
+    const { llm, migrated } = migrateLlmSettings(bereits, "sk-alt-im-bund");
+    expect(llm.endpoints[1]).toEqual({ url: "http://fremd:2" });
+    expect(migrated).toBe(false);
+  });
+
+  it("fehlt `endpoints` ganz, bekommt die Standardzeile keinen Schluessel aus dem alten Eintrag", () => {
+    const { llm } = migrateLlmSettings({}, "sk-alt-im-bund");
+    expect(llm.endpoints).toEqual(DEFAULT_LLM_SETTINGS.endpoints);
+  });
+
+  it("leere Liste plus Klartext-Schluessel in data.json: der Schluessel geht nicht verloren", () => {
+    const { llm } = migrateLlmSettings({ endpoints: [], apiKey: "sk-nur-in-datei" }, "");
+    expect((llm as unknown as Record<string, unknown>).apiKey).toBe("sk-nur-in-datei");
+  });
+
+  it("…und gilt, sobald eine Zeile entsteht (naechster Lauf)", () => {
+    const { llm } = migrateLlmSettings({ endpoints: ["http://neu:1"], apiKey: "sk-nur-in-datei" }, "");
+    expect(llm.endpoints).toEqual([{ url: "http://neu:1", apiKey: "sk-nur-in-datei" }]);
   });
 });

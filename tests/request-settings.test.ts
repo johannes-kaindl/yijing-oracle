@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { MODE, loadRequestSettings } from "../src/core/llm/request-settings";
 import { DEFAULT_LLM_SETTINGS } from "../src/core/llm/settings-defaults";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
-import { stripLegacyLlmFields } from "../src/core/settings/migrate";
+import { migrateLlmSettings } from "../src/core/settings/migrate";
 
 describe("loadRequestSettings — Legacy-Migration llm.requestThinking (Modus creative)", () => {
   it("Modus ist creative", () => { expect(MODE).toBe("creative"); });
@@ -32,9 +32,8 @@ describe("Legacy-Feld requestThinking ist aus dem Modell", () => {
   it("steht nicht mehr in den LLM-Defaults", () => {
     expect(DEFAULT_LLM_SETTINGS).not.toHaveProperty("requestThinking");
   });
-  it("stripLegacyLlmFields entfernt es aus einem geladenen Bestand", () => {
-    const llm = { ...DEFAULT_LLM_SETTINGS, requestThinking: true } as Record<string, unknown>;
-    stripLegacyLlmFields(llm as never);
+  it("migrateLlmSettings entfernt es aus einem geladenen Bestand", () => {
+    const { llm } = migrateLlmSettings({ ...DEFAULT_LLM_SETTINGS, requestThinking: true }, "");
     expect(llm).not.toHaveProperty("requestThinking");
   });
   it("DEFAULT_SETTINGS traegt einen leeren request-Block", () => {
