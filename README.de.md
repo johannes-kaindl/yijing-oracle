@@ -135,13 +135,12 @@ Zwei Befehle übergehen das Panel und werfen sofort:
 | **Allgemein** | Sprache der Befragung (oder Obsidian folgen), Register (klassisch / geschlechtsneutral), Standard-Ausgabe (neue Notiz / an der Cursorposition). |
 | **Notiz & Ablage** | Ordner für Befragungen, Dateinamen-Schema (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), nach dem Speichern öffnen. |
 | **Notiz-Inhalt** | Frontmatter an/aus samt umbenennbarem Schlüssel je Feld, Wilhelms Fußnoten, Callout-Rahmen je Abschnitt. |
-| **KI-Deutung** | Endpunkte, Modell, API-Schlüssel, System-Prompt (mitgelieferte Vorlagen oder eigener), Verhalten der Reasoning-Anzeige. |
+| **KI-Deutung** | Endpunkte (jede Zeile mit eigenem API-Schlüssel und optionalem Modell), Modell, System-Prompt (mitgelieferte Vorlagen oder eigener), Abschnitt **Anfrage** (Temperatur und Denkstufe je Modellfamilie), Verhalten der Reasoning-Anzeige. |
 | **Bilderzeugung** | Bild-Endpunkt, Stil-Suffix, Negativ-Prompt, Größe. Siehe die [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
-**Zu den Endpunkten:** einer pro Zeile — der **erste erreichbare gewinnt**, die
-Reihenfolge ist also die Priorität. So deckt eine Konfiguration jedes Netz ab
-(localhost am Schreibtisch, LAN-IP unterwegs), ohne dass etwas umgestellt werden muss.
-Jede Zeile hat ihren eigenen Verbindungstest mit einem Ergebnis in Klartext.
+**Zu den Endpunkten:** eine Zeile nach der anderen hinzufügen — der **erste erreichbare gewinnt**, die Reihenfolge ist also die Priorität (**Diesen Endpunkt zuerst versuchen** schiebt eine Zeile nach oben). So deckt eine Konfiguration jedes Netz ab (localhost am Schreibtisch, LAN-IP unterwegs), ohne dass etwas umgestellt werden muss. Jede Zeile hat ihren eigenen Knopf **Verbindung prüfen** mit einem Ergebnis in Klartext sowie einen eigenen, optionalen API-Schlüssel und ein optionales Modell.
+
+**Zu den API-Schlüsseln:** der Schlüssel jeder Zeile liegt im Schlüsselbund von Obsidian (vom Betriebssystem verschlüsselt, je Gerät), nicht im Vault — er wird also nie mit den Notizen synchronisiert oder gesichert, und du trägst ihn je Zeile einmal pro Gerät ein. Für lokale Server bleibt er leer. Ein Schlüssel aus der Zeit vor 0.11 (einer für alle Zeilen) wird beim ersten Start in jede Zeile kopiert; der alte Schlüsselbund-Eintrag bleibt unangetastet. Ist der LLM Endpoint Manager installiert, kommen Endpunkte und Schlüssel von dort.
 
 <p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/settings.png" width="380" alt="Die Plugin-Einstellungen von oben nach unten: Allgemein, Notiz und Ablage, Notiz-Inhalt, KI-Deutung, Bildgenerierung"></a><br><sub>Die vollständige Einstellungsseite — zum Vergrößern klicken</sub></p>
 

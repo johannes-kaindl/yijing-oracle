@@ -8,15 +8,15 @@ Each entry starts with what you see — the wording is the plugin's own English 
 
 **Cause:** **Interpret with AI** found no endpoint that answers, or the endpoint offers no model. The list under **AI interpretation → Endpoints** is tried top to bottom and the first reachable one wins.
 
-**Fix:** start your server and load a model, then press **Test connections** in the settings. Each row says why it fails:
+**Fix:** start your server and load a model, then press **Test connection** on the row in the settings. The row says why it fails:
 
 | Row status | Meaning |
 |---|---|
-| Connection refused — server not running or wrong port? | The server is off, or the port is wrong. |
+| Connection refused — server not running or wrong port. | The server is off, or the port is wrong. |
 | Unknown host — typo in the address? | The host name does not resolve. |
-| Timed out — network unreachable (wrong network / VPN off?). | The machine is not reachable from here. |
-| Responds, but is not an OpenAI-compatible endpoint — wrong path or service? | Something answers, but not a chat server. |
-| Access denied — the API key is missing or invalid. | The server wants a key; enter it under **API key (optional)**. |
+| Timed out — network unreachable. | The machine is not reachable from here. |
+| Answers, but is not an OpenAI-compatible endpoint. | Something answers, but not a chat server. |
+| Access denied — API key missing or invalid. | The server wants a key; enter it in that row (**API key (optional)**, or **Change key** if one is saved). |
 
 Local servers almost always need a port, for example `http://127.0.0.1:1234`. With the LLM Endpoint Manager installed the message reads "No endpoint from the LLM Endpoint Manager — check its settings." and the fix is in the manager, not here.
 

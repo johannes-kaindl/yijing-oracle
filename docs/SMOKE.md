@@ -64,11 +64,17 @@ Deshalb:
 | # | Prüft | Entspricht Handover-Schritt |
 |---|---|---|
 | A1–A5 | Plugin lädt · Panel öffnet · Wurf zeichnet 6 Linien · Vorschau trägt Text · Frage-Feld ist danach leer | 1 |
-| B0–B7 | Bestands-`data.json` (0.3.0-Form) lädt · `backend` fällt auf `a1111` · Endpunkt, steps/size/negativ, LLM-Liste und API-Schlüssel überleben · neue Comfy-Felder bekommen Defaults · `activeEndpoint` kommt nicht zurück | 2 |
+| B0–B8 | Bestands-`data.json` (0.3.0-Form) lädt · `backend` fällt auf `a1111` · Endpunkt, steps/size/negativ, LLM-Liste (jetzt zwei Zeilen mit URL) und API-Schlüssel (jetzt je Zeile im Schlüsselbund unter `yijing-oracle-ep-<id>`) überleben · neue Comfy-Felder bekommen Defaults · `activeEndpoint` kommt nicht zurück · der Altwert verlässt `data.json` | 2 |
 | C1–C7 | Einstellungen-Tab öffnet · A1111-Felder · Umschalten tauscht sie · gültiger Workflow wird erkannt (4 Node-IDs) · kaputtes JSON meldet einen Fehler · leeres Feld schweigt · Zurückschalten stellt wieder her | 3, 6, 9 |
 | D1–D5 | Bild-Kasten erscheint · Generieren startet · PNG kommt an · Anzeige zeigt Fortschritt **oder nennt seinen Grund** · Szenen-Satz steht darunter | 4, 7 |
 | E1–E3 | Speichern legt genau eine Notiz an · Notiz trägt den Text · Bild liegt als Anhang und ist eingebettet | 8 |
-| F1–F7 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur · die maskierte API-Schlüssel-Zeile bleibt über Aliase auffindbar · das API-Schlüssel-Feld ist maskiert | — (F1–F5 neu mit 0.5.0, F6–F7 mit dem Auth-Fix 2026-09-02) |
+| F1–F9 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur · die Endpunkt-Zeile bleibt über Aliase (u. a. „token“) auffindbar · das API-Schlüssel-Feld der Zeile ist maskiert (nach „Schlüssel ändern“) · eine Eingabe landet im Schlüsselbund-Eintrag der Zeile, nicht in `data.json` · die Hilfe-Zeile steht oben | — (F1–F5 neu mit 0.5.0, F6–F7 mit dem Auth-Fix 2026-09-02, F6–F8 mit dem Verbindungs-Tausch auf Schlüssel je Zeile umgeschrieben) |
+| M1–M4 | LLM Endpoint Manager (Fake): die Einstellungen zeigen den Manager statt der lokalen Liste · ein Lauf nutzt seinen Endpunkt und sein Modell (auch die Wahl) · ohne Manager wieder die lokale Liste · Deutung gegen einen echten Endpunkt (braucht ein geladenes Modell, sonst „nichts gemessen“) | — |
+| N1–N6 | Abschnitt „Anfrage“ (Sampling-Profile, Modus creative): klappt auf · Bearbeitungen bleiben offen · gesendeter Body folgt Defaults und Einstellungen · Zurücksetzen · „Letzte Anfrage“ | — |
+| V1–V6 | Verbindung (Kit 0.51.2): eine Zeile mit Klartext-Schlüssel landet nach `resolve` im Schlüsselbund und nicht in `data.json` · der Schlüssel geht als Bearer an den Endpunkt · ein Geheimnis in der Frage geht als Platzhalter an den Draht (nicht im Klartext) und kommt in der Deutung im Original zurück · eine Antwort mit Bild-URL und Platzhalter erzeugt kein `img` · ein `dataviewjs`-Block rendert als Text | — (neu mit dem Verbindungs-Tausch; Gegenproben: Neutralisierung entfernt → V5/V6 rot, `redact: false` → V3/V4 rot) |
+
+> [!bug] M1 war bis 2026-10-09 rot, ohne je gemessen zu haben
+> `wurzelAusdruck(ui)` lieferte im Einstellungen-Fenster `document`, und `Document.textContent` ist immer `null`: M1 las den Leerstring, fand den Manager-Text „nicht“ und blieb rot — die Baseline führte das als vorbestehenden Plugin-Befund. Gemessen wird jetzt an `document.body`, und M1/M3 warten, bis der Tab gezeichnet ist. **Ein Prüfpunkt, der immer rot ist, hat seinen Prüfling vielleicht nie berührt** (CORE-TEST-15).
 
 **Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen, ob sich das Panel
 flüssig anfühlt, und der Export eines zweiten Workflows aus ComfyUI (Schritte 5, 10, 11 der
@@ -175,10 +181,7 @@ den Nutzer hart:
   > Ohne Sabotage hätte ein grünes 27/27 den blinden Prüfpunkt beglaubigt. **Ein Prüfpunkt, der
   > einen Suchbegriff verwendet, muss belegen, dass der Begriff nur an der geprüften Stelle
   > steht** — und der Beleg ist die Gegenprobe, nicht die Behauptung im Kommentar.
-- **F7** — die Maskierung greift im nativen Pfad nicht. Der Unit-Test
-  (`tests/api-key-field.test.ts`) misst den Renderer gegen den Obsidian-Mock; ob der Host das
-  `inputEl` wirklich so übernimmt, sagt nur das laufende Programm. Gezählt werden die
-  `input[type=password]` im Plugin-Tab: genau eines.
+- **F7** — die Maskierung greift nicht. Seit dem Verbindungs-Tausch zeichnet das Kit die Endpunkt-Zeilen (`okit-ep-row`): eine Zeile mit gespeichertem Schlüssel zeigt „saved“ mit Stift („Change key“), das Feld erscheint erst nach dem Klick. F7 klickt den Stift und zählt die `input[type=password]` in der ersten Zeile: genau eines. Der Aliase-Teil (F6) bleibt als Test in `tests/llm-section-connection.test.ts`; ob der Host das `inputEl` wirklich so übernimmt, sagt nur das laufende Programm.
 
 > [!warning] Wer im Settings-Tab **Text** misst, braucht kein `\b`
 > Aus `markdown-presentation` (2026-09-02, im Austausch am CDP-Lock): `textContent` klebt die

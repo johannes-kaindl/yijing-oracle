@@ -128,17 +128,12 @@ Two commands skip the panel entirely and cast straight away:
 | **General** | Reading language (or follow Obsidian), register (classic / gender-neutral), default output (new note / at cursor). |
 | **Note & storage** | Readings folder, filename scheme (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), open-after-save. |
 | **Note content** | Frontmatter on/off plus a renameable key per field, Wilhelm's footnotes, per-section callout wrapping. |
-| **AI interpretation** | Endpoints, model, API key, system prompt (built-in templates or your own), the **Request** section (temperature and thinking level per model family). |
+| **AI interpretation** | Endpoints (each row with its own API key and optional model), model, system prompt (built-in templates or your own), the **Request** section (temperature and thinking level per model family). |
 | **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
-**On endpoints:** list them one per line — the **first reachable one wins**, so the
-order is the priority. That way one config covers every network (localhost at your
-desk, LAN IP on the go) without switching anything. Each row has its own connection
-test with a plain-language result.
+**On endpoints:** add them one row at a time — the **first reachable one wins**, so the order is the priority (**Try this endpoint first** moves a row up). That way one config covers every network (localhost at your desk, LAN IP on the go) without switching anything. Each row has its own **Test connection** button with a plain-language result, and its own optional API key and model.
 
-**On the API key:** it is kept in Obsidian's keychain (OS-encrypted, per device), not in the
-vault — so it is never synced or backed up along with your notes, and you enter it once on
-each device. Leave it empty for local servers.
+**On API keys:** each row's key is kept in Obsidian's keychain (OS-encrypted, per device), not in the vault — so it is never synced or backed up along with your notes, and you enter it once per row on each device. Leave it empty for local servers. A key you set up before 0.11 (one key for all rows) is copied into every row on the first start; the old keychain entry stays untouched. With the LLM Endpoint Manager installed, the endpoints and keys come from there instead.
 
 <p><a href="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/settings.png"><img src="https://raw.githubusercontent.com/johannes-kaindl/yijing-oracle/main/docs/images/thumbs/settings.png" width="380" alt="The plugin settings from top to bottom: general, note and storage, note content, AI interpretation, image generation"></a><br><sub>The full settings page — click to enlarge</sub></p>
 

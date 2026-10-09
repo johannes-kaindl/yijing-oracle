@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The AI connection now comes from the shared kit connection** (`obsidian-kit` 0.51.2, `createLlmConnection`): endpoint choice, model list, request parameters, chat client and the "Endpoints" and "Request" settings are one building block instead of a plugin-own copy. The visible effects follow.
+- **API keys are per endpoint now.** Every row under **AI interpretation → Endpoints** has its own optional key, kept in Obsidian's keychain (OS-encrypted, per device), and an optional model. The single key for all rows is gone. On the first start your existing key is copied into every row; the old keychain entry is left untouched. Nothing is stored in `data.json` any more. Going back to 0.10 afterwards is not supported (it cannot read the new endpoint list).
+- **The endpoint rows look and read differently**: **Test connection** button, **Try this endpoint first**, the key shows "saved" with **Change key** / **Remove key**, and the status and role texts have the kit's wording (for example "Timed out — network unreachable."). The **Request** section sits directly below the list, before the model row. The "Level picker in chat" switch is gone from it — it never had an effect in this plugin.
+- **A model that loads on first use no longer times out after 2 minutes**: the wait for the first part of the answer is 10 minutes (it was 120 s). Once the answer is flowing, a pause of 2 minutes still ends the request.
+- **A saved endpoint/model choice only applies with the LLM Endpoint Manager installed.** Without it the first reachable row and the model from the settings are used.
+- **Secrets in your question or prompt are masked before sending.** API keys, bearer tokens and private-key blocks go to the model as placeholders and are put back in the answer you see, so the model never receives them. Nothing to configure.
+- **The interpretation in the panel is shown without code formatting.** Fenced code and inline code lose their backticks, images and embeds appear as text, raw HTML is escaped; links still work. This keeps a model answer from running other plugins' code-block processors or loading remote images. The saved note still receives the model's text as written.
+- The notice about a deviating answer (for example a model that thought despite "off") now uses the kit's text.
+
+### Removed
+
+- The plugin-own endpoint editor, API-key field, request-section texts and the separate connection test: the kit provides them.
+
 ## [0.10.1] — 2026-10-03
 
 ### Changed

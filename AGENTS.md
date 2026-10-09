@@ -62,23 +62,12 @@ Passwortfeld: `SettingTextControl` trägt genau `type: 'text'` und `placeholder`
 Das kostet die Auffindbarkeit **nicht** — am 2026-09-02 gegen 1.13.7 gemessen, nicht abgeleitet:
 `searchable`/`aliases` sitzen auf `SettingDefinitionBase`, von der auch `SettingDefinitionRender`
 erbt, und Prüfpunkt **F6** findet die maskierte Zeile über einen Alias (ohne `aliases` 0 Treffer,
-mit 1). Betroffen ist heute das API-Schlüssel-Feld (maskiert seit 2026-09-02).
+mit 1). Betroffen ist heute die Verbindungs-Zeile „Endpunkte“ (Kit-Baustein, enthält die maskierten Schlüsselfelder je Zeile).
 **Gib einer maskierten Zeile `aliases`**: ihr Wert ist unlesbar, es bleibt die Beschriftung — und
 die hängt an der UI-Sprache.
 Prüfpunkte F1–F4 im GUI-Smoke messen genau das.
 
-**Der API-Schlüssel liegt im Schlüsselbund, nicht in `data.json`** (seit 2026-09-03). Die
-sechs Netzwege lesen weiterhin `settings.llm.apiKey` aus dem Speicher — `getSecret` ist synchron,
-deshalb ändert sich an ihnen nichts. Verteilt wird nur beim Laden und Speichern
-(`src/core/settings/api-key-storage.ts`, rein; `src/vendor/kit-obsidian/secrets.ts`, regulär
-vendort — s. u.): `saveSettings` schreibt `data.json` **ohne** den Schlüssel, `onload` migriert
-einen Altwert. Seit `minAppVersion 1.11.4` (Welle 12b) garantiert der Obsidian-Typ
-`app.secretStorage` als Pflichtfeld, der Direktzugriff braucht keinen strukturellen
-Umweg mehr. Das eigene maskierte Feld bleibt; Obsidians `SecretComponent` ist ein Verweis auf
-einen Eintrag, kein Passwortfeld (REGISTRY § Zugangsdaten im Schlüsselbund). Wer den Smoke
-fährt: B8 misst den Ladepfad, F8 den Speicherpfad über das echte Feld, und das `finally` setzt
-den Schlüsselbund-Eintrag zurück — sonst gewänne der Smoke-Schlüssel beim nächsten Laden gegen
-`data.json`.
+**Die LLM-Anbindung ist die Kit-Verbindung, die API-Schlüssel liegen je Endpunkt-Zeile im Schlüsselbund, nicht in `data.json`** (seit Welle 15, 2026-10-09; vorher ein globaler Schlüssel, seit 2026-09-03 im Schlüsselbund). `src/obsidian/connection.ts` baut `createLlmConnection` (fester Modus `creative`); sie zeichnet die Settings-Abschnitte „Endpunkte“ und „Anfrage“ (die Zeile in `llm-section.ts` ist nur ihr Host, ein eigener Container, nie der Tab) und löst Quelle, Familie, Backend und Sampling-Profil auf. Aufrufer holen einen Schlüssel aus `(await llm.resolve()).config`, nicht aus den Settings. `LlmSettings.endpoints` ist eine `EndpointConfig[]`; `migrateLlmSettings` (`core/settings/migrate.ts`) hebt die Alt-Formen (Textarea-String, `string[]` plus `llm.apiKey`, Schlüsselbund-Eintrag `yijing-oracle-llm-api-key`) beim Laden, `migrateLocalEndpoints` legt die Klartext-Schlüssel sofort je Zeile in den Schlüsselbund (`yijing-oracle-ep-<id>`) — auch mit installiertem Manager. Der alte Eintrag wird nur für die alte Form gelesen und nie gelöscht; einen Downgrade-Pfad trägt das nicht (0.10 lädt die Objekt-Liste nicht). Die Verbindung merkt sich ihre Auflösung: wer `llm.endpoints`, `llm.model` oder `llm.choice` im Code ändert, ruft danach `llm.invalidate()` (der Settings-Tab und `persistModel` tun es). Wer den Smoke fährt: B5–B8 messen die Migration, F7/F8 das Feld der Zeile, V1–V6 Schlüssel, Schwärzung und Neutralisierung; das `finally` setzt alle Schlüsselbund-Einträge mit dem Präfix zurück.
 
 **Historie: `src/obsidian/secret-store.ts` war zwischen Welle 12 (2026-09-27, `76cc56f`) und
 Welle 12b (2026-09-27) eigener Code, kein Kit-Vendoring** — Grund war ein struktureller Umbau
@@ -94,19 +83,7 @@ gelöscht.
 Deklaration nach `UI-STANDARD.md` §1a — von einem verbindlichen §8-Baustein abzuweichen ist
 erlaubt, stillschweigend abzuweichen nicht.
 
-- **endpoint-list** — Grund: eigenständige, schlankere Re-Implementierung (string[], ein
-  globaler apiKey), kein Kit-Modul. **Bestand nach der Endpunkt-Manager-Migration (2026-09-16,
-  Plan 3): weiterhin bestehend, nicht behoben.** `resolveEndpointSource()` ist verdrahtet
-  (`src/core/llm/resolve-endpoint.ts`, `src/obsidian/settings/llm-section.ts`
-  `buildEndpointSourceSection`) — bei installiertem LLM Endpoint Manager zeigt die
-  Endpunkt-Zeile dessen Kit-Baustein statt `endpoint-list.ts`. Ohne Manager bleibt
-  `endpoint-list.ts` aber der Fallback-Editor, und der ist unveraendert: die lokale Liste ist
-  weiterhin `string[]` + ein globaler `apiKey`, keine `EndpointConfig[]`
-  (`localEndpointConfigs()` adaptiert nur beim LESEN, das Speicherformat bleibt). Die
-  Migration des Fallback-Editors selbst auf `EndpointConfig[]` ist NICHT Teil dieses Auftrags
-  gewesen und bleibt offen — Cockpit-Task „Endpunkt-Liste auf Kit-EndpointConfig-Modell
-  migrieren — Bruch aus Welle 2".
-  — gilt-solange: `src/obsidian/settings/endpoint-list.ts` enthaelt-nicht `EndpointConfig`
+Keine Abweichung deklariert. Die Endpunkt-Liste ist seit dem Verbindungs-Tausch (2026-10-09, Welle 15) der Kit-Baustein; die frühere Deklaration `endpoint-list` entfällt.
 
 - Conventional Commits, deutsche Beschreibung erlaubt. Nur berührte Dateien stagen.
 - `src/core/**` und `src/vendor/kit/**` importieren nie `obsidian` (`check:pure`-gated).
