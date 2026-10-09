@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.11.0] — 2026-10-09
+
 ### Changed
 
 - **The AI connection now comes from the shared kit connection** (`obsidian-kit` 0.51.2, `createLlmConnection`): endpoint choice, model list, request parameters, chat client and the "Endpoints" and "Request" settings are one building block instead of a plugin-own copy. The visible effects follow.
