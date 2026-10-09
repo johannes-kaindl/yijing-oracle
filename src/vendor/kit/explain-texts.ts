@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.38.0, src/pure/explain-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.51.2, src/pure/explain-texts.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Erklärtexte für acht wiederkehrende LLM-Endpunkt-Sachverhalte — obsidian-frei, in Node
  *  testbar (PROF-OBS-03/04). Bauart wie `code-kit/pure/endpoint_diagnostics.ts`s `KLARTEXT`:
  *  Schlüssel + Text, hier zusätzlich je Sprache (EN kanonisch, DE daneben) — der Konsument
@@ -31,6 +31,15 @@
  *    Bilder"), was ein Platzhalter nicht garantieren kann.
  *  - `suppressThinkingDesc`: „Smart Apply" (vault-rags Feature-Name) → `{feature}`, im
  *    Loanword-Stil der Vorlage beibehalten (`{feature}-Call`, nicht „{feature}-Aufruf").
+ *
+ *  **`{content}` braucht einen je Sprache BERECHNETEN Füllwert, `{feature}` nicht.**
+ *  `{feature}` kommt mit einem Loanword für beide Sprachen aus („Chat" passt in beide Sätze
+ *  unverändert). Bei `{content}` bäckt der EN-Satz das Possessiv in die Vorlage ein
+ *  (`the request with your {content}`), der DE-Satz nicht (`die Anfrage mit {content}`) — der
+ *  Konsument muss den deutschen Füllwert deshalb selbst mit Possessiv UND Kasus füllen
+ *  („deinen Nachrichten", nicht „Nachrichten" oder „dein Nachrichten"), während der englische
+ *  Füllwert bloß das nackte Substantiv braucht („messages"). Wer denselben Füllwert für beide
+ *  Sprachen verwendet, bekommt in einer davon einen grammatisch falschen Satz.
  *
  *  §10 Punkt 2 (kein Fachbegriff ohne Auflösung): CORS und Token-Budget sind an ihrer
  *  Fundstelle jeweils mit dem Handgriff/Mechanismus erklärt (getestet, s. u.). „Endpunkt"
@@ -73,7 +82,7 @@ export const EXPLAIN_TEXTS: Record<ExplainTextKey, ExplainText> = {
     de: "Trägt einen API-Schlüssel — die Anfrage mit {content} geht an diesen Anbieter, nicht an einen lokalen Server.",
   },
   endpointUnreachableKeepsModel: {
-    en: 'Endpoint unreachable — the saved value is kept. Use "Fetch models" once it is running.',
+    en: "Endpoint unreachable — the saved value is kept. Use “Fetch models” once it is running.",
     de: "Endpunkt nicht erreichbar — gespeicherter Wert bleibt erhalten. „Modelle abrufen“, sobald er läuft.",
   },
   reasoningOnlyNoText: {
@@ -89,7 +98,7 @@ export const EXPLAIN_TEXTS: Record<ExplainTextKey, ExplainText> = {
     de: "Sendet Suppress-Hints für den {feature}-Call. Standardmäßig an: Denken und Antwort teilen sich dasselbe Token-Budget, und eine lange Denkphase kann es aufbrauchen, bevor die Antwort überhaupt beginnt. Nur ausschalten, wenn das Modell nach dem Denken strukturierter schreibt.",
   },
   tokenLimitBeforeText: {
-    en: 'The response was cut off at the token limit before any text came out — the usual case with reasoning models, whose thinking eats the budget first. Raise "max_tokens" on the endpoint, or try again.',
+    en: "The response was cut off at the token limit before any text came out — the usual case with reasoning models, whose thinking eats the budget first. Raise “max_tokens” on the endpoint, or try again.",
     de: "Die Antwort ist am Token-Limit abgeschnitten, bevor Text entstand — der Normalfall bei Reasoning-Modellen, deren Denken das Budget zuerst verbraucht. „max_tokens“ am Endpunkt erhöhen oder erneut versuchen.",
   },
 };
