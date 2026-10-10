@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.12.1] — 2026-10-10
+
 ### Fixed
 
 - A remote image behind a reference definition with a line break (`![x][a b]` plus `[a⏎b]: https://…`, or a target after a lone carriage return), and Mermaid diagrams that would load remote images (`A@{ img: … }`, `classDef … url(…)` and similar), are neutralized before the interpretation is saved. A reference-style image becomes its alt text in brackets, such a Mermaid fence becomes a plain `text` fence.
