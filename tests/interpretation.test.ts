@@ -60,6 +60,30 @@ describe("renderInterpretationBlock", () => {
       });
     }
 
+    const refAnswer = "Text\n\n![r][a b]\n\n[a\nb]: https://evil.example/pixel.png";
+    const mermaidAnswer = 'Text\n\n```mermaid\ngraph TD\n  A@{ img: "https://evil.example/pixel.png" }\n```';
+
+    for (const mode of MODES) {
+      it(`${mode}: Referenz-Definition mit Zeilenumbruch im Label laedt kein Fernbild mehr`, () => {
+        const md = renderInterpretationBlock({ answer: refAnswer, reasoning: "" }, { lang: "en", thinkingInNote: mode });
+        expect(md).not.toMatch(/!\[/);
+        expect(md).toContain("[r]");
+      });
+      it(`${mode}: Mermaid-Bildform mit Fernquelle wird eine text-Fence`, () => {
+        const md = renderInterpretationBlock({ answer: mermaidAnswer, reasoning: "" }, { lang: "en", thinkingInNote: mode });
+        expect(md).not.toContain("```mermaid");
+        expect(md).toContain("```text");
+      });
+    }
+
+    for (const mode of ["closed-callout", "open-callout", "text"] as const) {
+      it(`${mode}: Referenz-Definition und Mermaid-Bildform in der Denkspur werden entschaerft`, () => {
+        const md = renderInterpretationBlock({ answer: "A", reasoning: `${refAnswer}\n\n${mermaidAnswer}` }, { lang: "en", thinkingInNote: mode });
+        expect(md).not.toMatch(/!\[/);
+        expect(md).not.toContain("```mermaid");
+      });
+    }
+
     for (const mode of ["closed-callout", "open-callout"] as const) {
       it(`${mode}: mehrzeiliges <img>-Tag in der Denkspur wird VOR dem Wickeln escaped`, () => {
         const md = renderInterpretationBlock(

@@ -90,7 +90,7 @@ From there:
   on the *Default output* setting).
 - **Interpret with AI** streams an interpretation into the panel, if an LLM endpoint
   is configured. **Generate image** does the same for the meditation image.
-  When you save, the interpretation is written into the note with remote images and dataview/dataviewjs/js-engine blocks defused (shown as plain text), so opening the note does not load anything from the web.
+  When you save, the interpretation is written into the note with remote images (including reference-style ones), Mermaid diagrams that would load remote images, and dataview/dataviewjs/js-engine blocks defused (shown as plain text), so opening the note does not load anything from the web.
 - **New question** clears the field for the next cast.
 - Past readings are listed below the panel — clicking one **reconstructs the cast**
   from its frontmatter.

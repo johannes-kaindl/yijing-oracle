@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- A remote image behind a reference definition with a line break (`![x][a b]` plus `[a⏎b]: https://…`, or a target after a lone carriage return), and Mermaid diagrams that would load remote images (`A@{ img: … }`, `classDef … url(…)` and similar), are neutralized before the interpretation is saved. A reference-style image becomes its alt text in brackets, such a Mermaid fence becomes a plain `text` fence.
+
+### Changed
+
+- Vendored `code-kit` 0.20.0 (was 0.16.0). Besides the fixes above, `url(url(…))` and `image-set(image-set(…))` are removed as a whole even with a local target, and line endings are read as CommonMark reads them.
+
 ## [0.12.0] — 2026-10-10
 
 ### Changed
