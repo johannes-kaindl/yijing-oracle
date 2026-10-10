@@ -44,11 +44,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
   works fully offline.
 - **Optional, for AI interpretation:** an OpenAI-compatible local server (e.g.
   [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com)). Endpoint and
-  model are set in the plugin settings. **The server needs CORS enabled** — the
-  interpretation streams from Obsidian's renderer, which always sends
-  `Origin: app://obsidian.md`, and most local servers reject that by default (LM Studio:
-  `lms server start --cors`). The connection test in the settings passes either way; it
-  takes a different route that sends no `Origin`.
+  model are set in the plugin settings. CORS on the server is optional: Obsidian's renderer sends `Origin: app://obsidian.md`, and most local servers reject that by default. The plugin then repeats the request without streaming, so the interpretation arrives in one piece instead of word by word. To get the live stream, enable CORS (LM Studio: `lms server start --cors`).
 - **Optional, for meditation images:** an A1111-compatible image server (e.g.
   [Draw Things](https://drawthings.ai) with its API server enabled). See the
   [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).

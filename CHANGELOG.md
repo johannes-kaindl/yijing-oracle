@@ -12,6 +12,10 @@ All notable changes to this project are documented here. The format follows
 - A model answer that contains this plugin's own block marker (`<!-- yijing:…`) can no longer end the saved interpretation block early; the marker is written escaped. Adding an interpretation to an existing note ("Save interpretation" again) replaces the whole block as before.
 - Vendored `code-kit` 0.16.0 (was 0.15.4).
 
+### Fixed
+
+- **Documentation: CORS is no longer described as required for the interpretation.** README, Getting started and Troubleshooting named a CORS message the plugin does not show. Measured against a server without CORS headers: the interpretation still arrives, in one piece instead of streaming, and no notice appears. Troubleshooting now has the real failure text and a section for the all-at-once case.
+
 ## [0.11.0] — 2026-10-09
 
 ### Changed

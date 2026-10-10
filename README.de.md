@@ -50,12 +50,7 @@ kein Konto.
   Werfen funktioniert vollständig offline.
 - **Optional, für die KI-Deutung:** ein OpenAI-kompatibler lokaler Server (z.B.
   [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com)). Endpunkt und
-  Modell werden in den Plugin-Einstellungen gesetzt. **Der Server braucht aktiviertes
-  CORS** — die Deutung streamt aus Obsidians Renderer, der immer
-  `Origin: app://obsidian.md` mitsendet, und die meisten lokalen Server weisen das
-  standardmäßig ab (LM Studio: `lms server start --cors`). Der Verbindungstest in den
-  Einstellungen ist davon unberührt; er nimmt einen anderen Weg, der keinen `Origin`
-  sendet.
+  Modell werden in den Plugin-Einstellungen gesetzt. CORS am Server ist optional: Obsidians Renderer sendet `Origin: app://obsidian.md`, und die meisten lokalen Server weisen das standardmäßig ab. Das Plugin wiederholt die Anfrage dann ohne Streaming, die Deutung erscheint am Stück statt Wort für Wort. Für den Live-Stream CORS aktivieren (LM Studio: `lms server start --cors`).
 - **Optional, für Meditationsbilder:** ein A1111-kompatibler Bild-Server (z.B.
   [Draw Things](https://drawthings.ai) mit aktiviertem API-Server). Siehe die
   [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).

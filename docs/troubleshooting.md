@@ -20,15 +20,21 @@ Each entry starts with what you see — the wording is the plugin's own English 
 
 Local servers almost always need a port, for example `http://127.0.0.1:1234`. With the LLM Endpoint Manager installed the message reads "No endpoint from the LLM Endpoint Manager — check its settings." and the fix is in the manager, not here.
 
-## Interpretation failed or blocked
-
-> The endpoint answers the connection test but not the chat request from Obsidian. A local server usually needs CORS enabled for that — LM Studio: turn on “Enable CORS” in the server settings (or start it with `lms server start --cors`); Ollama: set `OLLAMA_ORIGINS`. The test button stays green either way — it takes a different route.
+## Interpretation failed
 
 > Interpretation failed — check the endpoint in the settings.
 
-**Cause:** the first message means the interpretation streams from Obsidian's renderer, which always sends `Origin: app://obsidian.md`, and most local servers reject that by default. The connection test sends no origin, so it passes anyway. The second message is any other failure of the request.
+**Cause:** the chat request to the endpoint failed: the server is off or the port is wrong, the key is missing or invalid, or the model is not available. The connection test in the settings only checks that something answers; the chat request can still fail.
 
-**Fix:** for the first, enable CORS on the server: LM Studio **Enable CORS** in the server settings, or `lms server start --cors`; Ollama `OLLAMA_ORIGINS=app://obsidian.md`, then restart it. For the second, check the endpoint and model in the settings and the developer console (Ctrl+Shift+I, or Cmd+Option+I on macOS).
+**Fix:** check the endpoint, key and model in the settings (**AI interpretation → Endpoints**) and the developer console (Ctrl+Shift+I, or Cmd+Option+I on macOS), then press **Interpret with AI** again.
+
+## The interpretation appears all at once instead of streaming
+
+There is no message for this. The answer shows up in one piece when it is done.
+
+**Cause:** Obsidian's renderer always sends `Origin: app://obsidian.md`, and most local servers reject that by default (no CORS). The plugin notices the failed stream and repeats the request once without streaming, through Obsidian's own request function, which sends no `Origin`. The answer is complete, only the live view is missing. Measured against a server without any CORS headers: the first request is a blocked `OPTIONS` preflight with that `Origin`, the second a plain `POST` without it, and no notice appears.
+
+**Fix:** only if you want the live stream: enable CORS on the server. LM Studio: **Enable CORS** in the server settings, or `lms server start --cors`; Ollama: `OLLAMA_ORIGINS=app://obsidian.md`, then restart it.
 
 ## No interpretation received
 
