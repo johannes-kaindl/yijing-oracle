@@ -1,4 +1,4 @@
-// vendored from code-kit@0.15.4, src/ts/pure/safe-markdown.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.16.0, src/ts/pure/safe-markdown.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 // uebernommen aus settings-assistant/src/core/chat-markdown.ts, 2026-10-09
 /** Neutralises Markdown from an untrusted source (a model answer) BEFORE it is handed to a
  *  Markdown renderer. Pure, no dependencies.
@@ -129,18 +129,19 @@ function matchBracket(s: string, open: number): number {
 const DEST_CAP = 2048;
 
 /** Parses the destination of an inline link starting right after `(`; null if it is not one. `rest` is where
- *  the optional title and the closing `)` start. A destination longer than `DEST_CAP` is judged by its first
- *  `DEST_CAP` characters (whether it is remote is decided by its start), which keeps the scan linear. */
-function inlineDestination(s: string, from: number): { dest: string; rest: number } | null {
+ *  the optional title and the closing `)` start. A destination longer than `DEST_CAP` is `truncated`, and the
+ *  caller treats it as REMOTE (fail closed): judged by its start it could hide a scheme behind padding that the
+ *  URL parser ignores (entities that decode to nothing). */
+function inlineDestination(s: string, from: number): { dest: string; rest: number; truncated: boolean } | null {
   let p = from;
   while (p < s.length && /\s/.test(s[p] ?? "")) p++;
   if (s[p] === "<") {
     const limit = Math.min(s.length, p + DEST_CAP);
     for (let q = p + 1; q < limit; q++) {
-      if (s[q] === ">") return { dest: s.slice(p + 1, q), rest: q + 1 };
+      if (s[q] === ">") return { dest: s.slice(p + 1, q), rest: q + 1, truncated: false };
       if (s[q] === "\n") return null;
     }
-    return limit === s.length ? null : { dest: s.slice(p + 1, limit), rest: limit };
+    return limit === s.length ? null : { dest: s.slice(p + 1, limit), rest: limit, truncated: true };
   }
   let depth = 0;
   const start = p;
@@ -153,7 +154,7 @@ function inlineDestination(s: string, from: number): { dest: string; rest: numbe
     else if (c === ")") { if (depth === 0) break; depth--; }
     p++;
   }
-  return { dest: s.slice(start, Math.min(p, limit)), rest: Math.min(p, limit) };
+  return { dest: s.slice(start, Math.min(p, limit)), rest: Math.min(p, limit), truncated: p >= limit && limit < s.length };
 }
 
 const MAX_NESTING = 50;
@@ -183,7 +184,7 @@ function neutralizeImages(s: string, remoteRefs: ReadonlySet<string>, depth = 0)
     const after = s[close + 1];
     if (after === "(") {
       const d = inlineDestination(s, close + 2);
-      if (d && !isLocalRef(d.dest, true)) {
+      if (d && (d.truncated || !isLocalRef(d.dest, true))) {
         const end = findClose(d.rest);
         if (end >= 0) { out += `${altOf(alt)} (${d.dest.trim().replace(/^<|>$/g, "")})`; i = end + 1; continue; }
       }
