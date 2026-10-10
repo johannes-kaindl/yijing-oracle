@@ -1,3 +1,5 @@
+/** Gemeinsamer Anfang beider Marker; `renderInterpretationBlock` entschärft ihn im Modelltext. */
+export const MARKER_START_PREFIX = "<!-- yijing:";
 export const MARKER_START = "<!-- yijing:deutung:start -->";
 export const MARKER_END = "<!-- yijing:deutung:end -->";
 
