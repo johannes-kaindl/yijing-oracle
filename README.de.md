@@ -101,6 +101,7 @@ Von dort aus:
   *Standard-Ausgabe* einen Link an der Cursorposition ein).
 - **Mit KI deuten** streamt eine Deutung ins Panel, sofern ein LLM-Endpunkt
   konfiguriert ist. **Bild erzeugen** tut dasselbe für das Meditationsbild.
+  Beim Speichern wird die Deutung mit entschärften Fernbildern und dataview-/dataviewjs-/js-engine-Blöcken (als einfacher Text) in die Notiz geschrieben, sodass beim Öffnen der Notiz nichts aus dem Netz geladen wird.
 - **Neue Frage** leert das Feld für den nächsten Wurf.
 - Frühere Befragungen stehen unter dem Panel — ein Klick darauf **rekonstruiert den
   Wurf** aus ihrem Frontmatter.

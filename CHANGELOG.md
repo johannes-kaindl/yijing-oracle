@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **Saved interpretations no longer load remote images by themselves and show dataview/dataviewjs/js-engine blocks as plain text.** This replaces the 0.11.0 behaviour ("The saved note still receives the model's text as written"). Unchanged: links, inline `$=` expressions, HTML comments. The same goes for the reasoning in the note. Remote image syntax turns into plain text (`![x](https://…)` becomes `x (https://…)`), a `<img src="https://…">` tag is escaped. The interpretation in the panel is unchanged.
+- A model answer that contains this plugin's own block marker (`<!-- yijing:…`) can no longer end the saved interpretation block early; the marker is written escaped. Adding an interpretation to an existing note ("Save interpretation" again) replaces the whole block as before.
+- Vendored `code-kit` 0.16.0 (was 0.15.4).
+
 ## [0.11.0] — 2026-10-09
 
 ### Changed
