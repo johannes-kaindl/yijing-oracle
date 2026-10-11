@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The global *Model* setting is gone; each endpoint row carries its own model.** An existing value moves once into every row that had none (a row with its own model keeps it; a row you clear stays empty after a restart). With an installed LLM Endpoint Manager the model is still chosen there.
+- With the row the *Model* line takes its context-length display and its "Load models" button: the settings no longer show the loaded context length of the model. The model list is available in the endpoint row.
+- When the panel has to pick a model itself (the row has none), it now stores the first model of the list in the active endpoint row instead of a global field.
+- Vendored `obsidian-kit` 0.53.0 (was 0.51.3) and `code-kit` 0.21.0 (was 0.20.0). Mermaid diagrams in a reply that would load remote sources are now shown as plain `text`, and the redaction masks more bearer tokens.
+
 ## [0.12.1] — 2026-10-10
 
 ### Fixed

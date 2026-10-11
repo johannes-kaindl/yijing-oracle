@@ -1,10 +1,10 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { requestUrl } from "obsidian";
-import { fetchModelContext, httpGet } from "../src/obsidian/http";
+import { httpGet } from "../src/obsidian/http";
 
 // Die Erreichbarkeits-Probe der LLM-Endpunkte liegt seit der Verbindung im Kit (llm-connection).
-// Hier bleiben die zwei Netzwege des Plugins, die einen Schluessel mitschicken muessen: die
-// LM-Studio-Kontextabfrage der Modell-Zeile und der gemeinsame httpGet.
+// Hier bleiben die zwei Netzwege des Plugins, die einen Schluessel mitschicken muessen: der
+// gemeinsame httpGet.
 
 const mock = requestUrl as unknown as {
   mock: { calls: unknown[][] };
@@ -38,13 +38,6 @@ function letzterAufruf(): { url: string; headers?: Record<string, string> } {
 describe("http.ts — Authorization-Header", () => {
   it("reicht Header durch httpGet durch", async () => {
     await httpGet("http://h:1234/v1/models", { Authorization: "Bearer sk-geheim" });
-    expect(letzterAufruf().headers).toMatchObject({ Authorization: "Bearer sk-geheim" });
-  });
-
-  it("sendet den Schluessel auch an die LM-Studio-Kontextabfrage", async () => {
-    mock.mockImplementation((() => Promise.resolve({ status: 200, json: { data: [] }, headers: {}, text: "" })) as never);
-    await fetchModelContext("http://h:1234", "m", { Authorization: "Bearer sk-geheim" });
-    expect(letzterAufruf().url).toBe("http://h:1234/api/v0/models");
     expect(letzterAufruf().headers).toMatchObject({ Authorization: "Bearer sk-geheim" });
   });
 });

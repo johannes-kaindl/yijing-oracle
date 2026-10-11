@@ -524,7 +524,7 @@ async function main(): Promise<void> {
     p.settings.image = { ...p.settings.image, backend: "comfyui", endpoint: ${JSON.stringify(bildEndpunkt)},
       size: 768, comfyStepsOverride: 12,
       comfyWorkflow: ${JSON.stringify(readFileSync(join(repoRoot, "tests", "fixtures", "comfy-sdxl.json"), "utf-8"))} };
-    p.settings.llm = { ...p.settings.llm, endpoints: [{ url: ${JSON.stringify(llmEndpunkt)} }], model: ${JSON.stringify(modell)} };
+    p.settings.llm = { ...p.settings.llm, endpoints: [{ url: ${JSON.stringify(llmEndpunkt)}, model: ${JSON.stringify(modell)} }] };
     p.llm.invalidate();
     await p.saveSettings();
     for (const l of app.workspace.getLeavesOfType(${JSON.stringify(PANEL_VIEW)})) l.detach();

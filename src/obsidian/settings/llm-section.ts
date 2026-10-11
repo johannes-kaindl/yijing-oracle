@@ -1,14 +1,10 @@
-// KI-Deutung: Verbindung (Quelle, Endpunkte, Anfrage), Modell + Kontextlänge, Prompts, Thinking.
+// KI-Deutung: Verbindung (Quelle, Endpunkte mit Modell je Zeile, Anfrage), Prompts, Thinking.
 import { type Setting, getLanguage } from "obsidian";
 import { getLang, pickLang, t } from "../../vendor/kit/i18n";
-import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { settingBodyHost } from "../../vendor/kit-obsidian/settings_walker";
 import { PROMPT_PRESETS } from "../../core/llm/prompt-presets";
 import { DEFAULT_SYSTEM_PROMPT } from "../../core/llm/defaults";
-import { type LlmSettings, effectiveModel } from "../../core/llm/settings-defaults";
-import { fetchModelContext } from "../http";
-import { authHeaders } from "../../vendor/kit/endpoint_config";
-import { findEndpointManager } from "../../vendor/kit-obsidian/endpoint-source";
+import { type LlmSettings } from "../../core/llm/settings-defaults";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
 
 export function llmRows(ctx: SectionCtx): SettingRow[] {
@@ -31,19 +27,6 @@ export function llmRows(ctx: SectionCtx): SettingRow[] {
         ctx.llm.renderSettings(settingBodyHost(setting), { lang: getLang() });
       },
     },
-    // Bei aktivem Manager sitzt die Modellwahl bereits in der Endpunkt-Zeile oben
-    // (buildEndpointSourceSection) — eine zweite Modell-UI hier waere eine zweite Wahrheit.
-    findEndpointManager(ctx.app)
-      ? {
-          name: t("set.llmModel"),
-          desc: t("src.modelManaged"),
-          render: () => {},
-        }
-      : {
-          name: t("set.llmModel"),
-          desc: t("set.llmModelDesc"),
-          render: (setting: Setting) => renderModelField(setting, ctx, llm),
-        },
     {
       name: t("set.llmPreset"),
       desc: t("set.llmPresetDesc"),
@@ -115,53 +98,4 @@ function promptRow(
         );
     },
   };
-}
-
-/** Modell — Dropdown live aus der Verbindung, Fallback Textfeld; dazu die Kontextlänge.
- *  Die Liste kommt von dem Endpunkt, den die Verbindung gerade aufgelöst hat (der erste
- *  erreichbare), nicht vom ersten Listeneintrag: ein toter erster Eintrag lieferte sonst eine
- *  leere Liste, obwohl der zweite antwortet. */
-function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettings): void {
-  void Promise.all([ctx.llm.models(), ctx.llm.resolve()]).then(([{ models }, source]) => {
-    if (models.length) {
-      // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
-      // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.
-      const resolved = effectiveModel(llm.model ?? "", models);
-      if (resolved !== (llm.model ?? "")) {
-        llm.model = resolved;
-        ctx.save();
-        ctx.llm.invalidate();
-      }
-      const cur = llm.model ?? "";
-      const list = models.includes(cur) ? models : [cur, ...models];
-      modelSetting.addDropdown((d) => {
-        for (const m of list) d.addOption(m, m);
-        d.setValue(cur);
-        d.onChange((v) => {
-          ctx.write("llm.model", v); // schreibt und baut neu auf (Kontextlänge, Thinking-Zustand)
-        });
-      });
-
-      // Kontextlänge — entfällt still, wenn der Server sie nicht liefert (Ollama/MLX/vLLM).
-      const cfg = source.config;
-      if (cfg) {
-        void fetchModelContext(normalizeEndpoint(cfg.url), cur, authHeaders(cfg.apiKey)).then((cx) => {
-          const len = cx?.loadedContextLength ?? cx?.maxContextLength;
-          if (len) modelSetting.setDesc(t("set.llmContext", len.toLocaleString()));
-        });
-      }
-    } else {
-      modelSetting.setDesc(t("set.llmModelOffline"));
-      modelSetting.addText((txt) =>
-        txt.setValue(llm.model ?? "").onChange((v) => {
-          // Direkt über die Registry, aber OHNE Neuaufbau: ein Rebuild bei jedem Tastendruck
-          // nähme dem Feld den Fokus.
-          llm.model = v.trim();
-          ctx.save();
-          ctx.llm.invalidate();
-        }),
-      );
-      modelSetting.addButton((b) => b.setButtonText(t("set.llmLoadModels")).onClick(() => { ctx.llm.invalidate(); ctx.rerender(); }));
-    }
-  });
 }

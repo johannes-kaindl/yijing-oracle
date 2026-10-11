@@ -74,8 +74,6 @@ export class SettingsTab extends PluginSettingTab {
     // Alles läuft durch die pure Registry: der deklarative Host prüft nur den Control-Typ,
     // nicht unsere Grenzen (Trim, Default-Rückfall, Zahl-Coercion).
     const needsRefresh = writeControl(this.host.settings, key, value);
-    // Die Verbindung merkt sich die Aufloesung samt Modell; ein neues Modell gilt erst nach invalidate().
-    if (key === "llm.model") this.llm.invalidate();
     await this.host.saveSettings();
     if (needsRefresh) this.refresh();
   }

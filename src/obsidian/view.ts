@@ -41,8 +41,6 @@ export interface OracleHost {
   resolveReadingLang(): Lang;
   /** Die LLM-Verbindung (Kit): Quelle, Modellliste, Anfrage-Parameter, Client, Sitzung. */
   llm: LlmConnection;
-  /** Merkt ein aus der Modell-Liste gewaehltes Standard-Modell (lokaler Pfad, Modell war leer). */
-  persistModel(model: string): Promise<void>;
 }
 
 interface Interpretation {
@@ -391,10 +389,9 @@ export class OracleView extends ItemView {
       return;
     }
 
-    // Modell: das aufgeloeste (choice.model bzw. Zeilen-/globales Modell) gewinnt; ist keins
-    // gesetzt, das erste der Live-Liste — deckt den Fall ab, dass die Settings nie geoeffnet
-    // wurden und so kein Default persistiert ist. Lokal wird es gemerkt, damit das Dropdown
-    // spaeter dasselbe zeigt; beim Manager entscheidet er, dort wird nichts geschrieben.
+    // Modell: das aufgeloeste (choice.model bzw. Modell der Zeile) gewinnt; ist keins gesetzt, das erste
+    // der Live-Liste — deckt den Fall ab, dass die Zeile nie ein Modell bekam. Lokal merkt es
+    // `setModel` in der aktiven Zeile; beim Manager entscheidet er, dort wird nichts geschrieben.
     let model = resolved.model.trim();
     let fallbackModel: string | undefined;
     if (!model) {
@@ -402,7 +399,7 @@ export class OracleView extends ItemView {
       model = effectiveModel("", listed.models);
       if (model) {
         fallbackModel = model;
-        if (resolved.kind !== "manager") await this.host.persistModel(model);
+        if (resolved.kind !== "manager") await this.host.llm.setModel(model);
       }
     }
     if (!model) {

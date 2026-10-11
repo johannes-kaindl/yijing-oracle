@@ -3,7 +3,6 @@
 // bewusst über XHR (streamSSE); requestUrl kann nicht streamen.
 import { arrayBufferToBase64, requestUrl } from "obsidian";
 import { classifyEndpointStatus, type EndpointStatus } from "../vendor/kit/endpoint_diagnostics";
-import { parseLmStudioContext, type ModelContext } from "../vendor/kit/model-context";
 import { type ComfyTransport } from "../core/comfy/client";
 
 /** Passt zu `HttpGet` in chat-client.ts. `headers` traegt den Authorization-Header, wenn
@@ -35,19 +34,6 @@ export async function httpPostJson(url: string, body: unknown, timeoutMs = 18000
     return raced;
   } finally {
     if (timer) window.clearTimeout(timer);
-  }
-}
-
-/** Kontextlänge des Modells von einem LM-Studio-Server (GET /api/v0/models). Liefert null,
- *  wenn der Server den Endpunkt nicht kennt (Ollama/MLX/vLLM) oder das Modell fehlt — die
- *  Anzeige entfällt dann stillschweigend, kein Fehler, kein Platzhalter. */
-export async function fetchModelContext(baseUrl: string, model: string, headers: Record<string, string>): Promise<ModelContext | null> {
-  try {
-    const r = await httpGet(`${baseUrl}/api/v0/models`, headers);
-    if (r.status !== 200) return null;
-    return parseLmStudioContext(r.json, model);
-  } catch {
-    return null;
   }
 }
 

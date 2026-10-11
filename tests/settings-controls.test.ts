@@ -17,11 +17,9 @@ describe("readControl", () => {
   it("liest flache und verschachtelte Felder über denselben Schlüsselraum", () => {
     const s = fresh();
     s.readingsFolder = "Orakel";
-    s.llm.model = "qwen";
     s.image.backend = "comfyui";
 
     expect(readControl(s, "readingsFolder")).toBe("Orakel");
-    expect(readControl(s, "llm.model")).toBe("qwen");
     expect(readControl(s, "image.backend")).toBe("comfyui");
   });
 
@@ -46,11 +44,9 @@ describe("writeControl — Normalisierung", () => {
     expect(s.filenameTemplate).toBe(DEFAULT_FILENAME_TEMPLATE);
   });
 
-  it("trimmt Endpunkt und Modell", () => {
+  it("trimmt den Endpunkt", () => {
     const s = fresh();
-    writeControl(s, "llm.model", "  qwen  ");
     writeControl(s, "image.endpoint", " http://127.0.0.1:8000 ");
-    expect(s.llm.model).toBe("qwen");
     expect(s.image.endpoint).toBe("http://127.0.0.1:8000");
   });
 
@@ -78,8 +74,8 @@ describe("writeControl — Normalisierung", () => {
 
   it("macht aus einem Objekt keinen Text — es würde sonst als „[object Object]“ gespeichert", () => {
     const s = fresh();
-    writeControl(s, "llm.model", { nope: true });
-    expect(s.llm.model).toBe("");
+    writeControl(s, "image.styleSuffix", { nope: true });
+    expect(s.image.styleSuffix).toBe("");
   });
 
   it("hält die Bildgröße als Zahl, obwohl das Dropdown Strings liefert", () => {
@@ -114,7 +110,6 @@ describe("writeControl — Refresh-Meldung", () => {
     const s = fresh();
     expect(writeControl(s, "includeFrontmatter", false)).toBe(true);
     expect(writeControl(s, "image.backend", "comfyui")).toBe(true);
-    expect(writeControl(s, "llm.model", "qwen")).toBe(true);
 
     expect(writeControl(s, "showNotes", false)).toBe(false);
     expect(writeControl(s, "image.styleSuffix", "tusche")).toBe(false);

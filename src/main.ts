@@ -127,13 +127,6 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
     await this.saveData(this.settings);
   }
 
-  /** OracleHost: ein aus der Modell-Liste gewaehltes Standard-Modell merken (lokaler Pfad). */
-  async persistModel(model: string): Promise<void> {
-    this.settings.llm.model = model;
-    await this.saveSettings();
-    this.llm.invalidate();
-  }
-
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */
   private readLocale(): string | null {
     return getLanguage();

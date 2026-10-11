@@ -15,7 +15,7 @@ import { type ThinkingInNote } from "../llm/interpretation";
 import { DEFAULT_SETTINGS, type OutputMode, type PluginSettings } from "../settings";
 
 /** Ein Einstellungs-Schlüssel, wie er in `control.key` einer Definition steht. Verschachtelte
- *  Felder tragen ihren Pfad im Namen (`llm.model`) — der Schlüssel ist für Obsidian nur ein
+ *  Felder tragen ihren Pfad im Namen (`llm.systemPromptDe`) — der Schlüssel ist für Obsidian nur ein
  *  Identifikator, aufgelöst wird er hier. */
 export type ControlKey =
   | "readingLang"
@@ -26,7 +26,6 @@ export type ControlKey =
   | "openAfterCreate"
   | "includeFrontmatter"
   | "showNotes"
-  | "llm.model"
   | "llm.systemPromptDe"
   | "llm.systemPromptEn"
   | "llm.thinkingInNote"
@@ -117,13 +116,6 @@ export const SETTING_CONTROLS: Record<ControlKey, ControlSpec> = {
     },
   },
 
-  "llm.model": {
-    get: (s) => s.llm.model ?? "",
-    set: (s, v) => {
-      s.llm.model = asText(v).trim();
-    },
-    refresh: true, // Kontextlänge und der Thinking-Zustand hängen am Modell
-  },
   "llm.systemPromptDe": {
     get: (s) => s.llm.systemPromptDe,
     set: (s, v) => {

@@ -50,7 +50,7 @@ kein Konto.
   Werfen funktioniert vollständig offline.
 - **Optional, für die KI-Deutung:** ein OpenAI-kompatibler lokaler Server (z.B.
   [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com)). Endpunkt und
-  Modell werden in den Plugin-Einstellungen gesetzt. CORS am Server ist optional: Obsidians Renderer sendet `Origin: app://obsidian.md`, und die meisten lokalen Server weisen das standardmäßig ab. Das Plugin wiederholt die Anfrage dann ohne Streaming, die Deutung erscheint am Stück statt Wort für Wort. Für den Live-Stream CORS aktivieren (LM Studio: `lms server start --cors`).
+  Modell (eins je Endpunkt-Zeile) werden in den Plugin-Einstellungen gesetzt. CORS am Server ist optional: Obsidians Renderer sendet `Origin: app://obsidian.md`, und die meisten lokalen Server weisen das standardmäßig ab. Das Plugin wiederholt die Anfrage dann ohne Streaming, die Deutung erscheint am Stück statt Wort für Wort. Für den Live-Stream CORS aktivieren (LM Studio: `lms server start --cors`).
 - **Optional, für Meditationsbilder:** ein A1111-kompatibler Bild-Server (z.B.
   [Draw Things](https://drawthings.ai) mit aktiviertem API-Server). Siehe die
   [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
@@ -131,7 +131,7 @@ Zwei Befehle übergehen das Panel und werfen sofort:
 | **Allgemein** | Sprache der Befragung (oder Obsidian folgen), Register (klassisch / geschlechtsneutral), Standard-Ausgabe (neue Notiz / an der Cursorposition). |
 | **Notiz & Ablage** | Ordner für Befragungen, Dateinamen-Schema (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), nach dem Speichern öffnen. |
 | **Notiz-Inhalt** | Frontmatter an/aus samt umbenennbarem Schlüssel je Feld, Wilhelms Fußnoten, Callout-Rahmen je Abschnitt. |
-| **KI-Deutung** | Endpunkte (jede Zeile mit eigenem API-Schlüssel und optionalem Modell), Modell, System-Prompt (mitgelieferte Vorlagen oder eigener), Abschnitt **Anfrage** (Temperatur und Denkstufe je Modellfamilie), Verhalten der Reasoning-Anzeige. |
+| **KI-Deutung** | Endpunkte (jede Zeile mit eigenem API-Schlüssel und Modell), System-Prompt (mitgelieferte Vorlagen oder eigener), Abschnitt **Anfrage** (Temperatur und Denkstufe je Modellfamilie), Verhalten der Reasoning-Anzeige. |
 | **Bilderzeugung** | Bild-Endpunkt, Stil-Suffix, Negativ-Prompt, Größe. Siehe die [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
 **Zu den Endpunkten:** eine Zeile nach der anderen hinzufügen — der **erste erreichbare gewinnt**, die Reihenfolge ist also die Priorität (**Diesen Endpunkt zuerst versuchen** schiebt eine Zeile nach oben). So deckt eine Konfiguration jedes Netz ab (localhost am Schreibtisch, LAN-IP unterwegs), ohne dass etwas umgestellt werden muss. Jede Zeile hat ihren eigenen Knopf **Verbindung prüfen** mit einem Ergebnis in Klartext sowie einen eigenen, optionalen API-Schlüssel und ein optionales Modell.
