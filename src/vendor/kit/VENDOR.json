@@ -1,7 +1,7 @@
 {
   "source": "code-kit",
-  "version": "0.20.0",
-  "sha": "b6fd3ec",
+  "version": "0.21.0",
+  "sha": "914e925",
   "vendored": "backend-probe.ts, capabilities.ts, endpoint.ts, endpoint_config.ts, endpoint_diagnostics.ts, error_body.ts, filename-template.ts, i18n.ts, model-choice.ts, model-context.ts, model-list-cache.ts, reasoning.ts, redact.ts, safe-markdown.ts, sampling-profiles.ts, secrets.ts, settings.ts, sse.ts, think-splitter.ts, clipboard.ts",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit.",
   "obsidian_kit_version": "0.51.3",
