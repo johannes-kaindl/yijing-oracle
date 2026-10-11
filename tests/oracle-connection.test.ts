@@ -143,10 +143,17 @@ describe("Settings <-> Verbindung", () => {
 
   it("applyConnectionPatch schreibt synchron und fasst Unbenanntes nicht an", () => {
     const s = fresh();
-    s.llm.model = "alt";
+    s.llm.choice = { endpointId: "x" };
     applyConnectionPatch(s, { endpoints: [{ url: "http://z:9" }] });
     expect(s.llm.endpoints).toEqual([{ url: "http://z:9" }]);
-    expect(s.llm.model).toBe("alt");
+    expect(s.llm.choice).toEqual({ endpointId: "x" });
+  });
+
+  it("die Verbindung bekommt kein globales Modell mehr und schreibt keins", () => {
+    const s = fresh();
+    expect(connectionSettings(s)).not.toHaveProperty("model");
+    applyConnectionPatch(s, { model: "x" } as never);
+    expect(s.llm).not.toHaveProperty("model");
   });
 
   it("choice: undefined im Patch loescht die Wahl", () => {

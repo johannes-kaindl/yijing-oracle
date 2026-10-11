@@ -28,7 +28,6 @@ export function connectionSettings(s: PluginSettings): LlmConnectionSettings {
   return {
     endpoints: s.llm.endpoints,
     ...(s.llm.choice !== undefined ? { choice: s.llm.choice } : {}),
-    model: s.llm.model,
     request: s.request,
   };
 }
@@ -42,7 +41,6 @@ export function applyConnectionPatch(s: PluginSettings, patch: Partial<LlmConnec
     if (patch.choice === undefined) delete s.llm.choice;
     else s.llm.choice = patch.choice;
   }
-  if (patch.model !== undefined) s.llm.model = patch.model;
   if (patch.request !== undefined) s.request = patch.request;
 }
 

@@ -118,7 +118,7 @@ export const SETTING_CONTROLS: Record<ControlKey, ControlSpec> = {
   },
 
   "llm.model": {
-    get: (s) => s.llm.model,
+    get: (s) => s.llm.model ?? "",
     set: (s, v) => {
       s.llm.model = asText(v).trim();
     },

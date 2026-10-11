@@ -9,8 +9,9 @@ export interface LlmSettings {
    *  (`secretId`), nicht in dieser Datei — das Kit überführt Klartext beim ersten Auflösen.
    *  Gilt nur ohne LLM Endpoint Manager (oder wenn der Manager keinen Endpunkt liefert). */
   endpoints: EndpointConfig[];
-  /** Zuletzt gewähltes Modell (lokaler Pfad, wenn `choice.model` leer ist). */
-  model: string;
+  /** Abgeschafft (Welle 17): das Modell steht je Endpunkt-Zeile. Nur noch, bis die Zeile „Modell“ und die
+   *  Panel-Wahl auf die Zeilen umgestellt sind; geladen wird es nie (`migrateLlmSettings` entfernt es). */
+  model?: string;
   /** Wahl gegenueber dem LLM Endpoint Manager (Endpunkt + Modell) — wirkt nur, wenn der
    *  Manager installiert ist. Leer/fehlend = "automatisch" (Manager entscheidet). */
   choice?: EndpointChoice;
@@ -33,7 +34,6 @@ export function effectiveModel(current: string, available: string[]): string {
 
 export const DEFAULT_LLM_SETTINGS: LlmSettings = {
   endpoints: [{ url: "http://localhost:1234" }],
-  model: "",
   systemPromptDe: "",
   systemPromptEn: "",
   thinkingInNote: "closed-callout",

@@ -1,6 +1,6 @@
 // Migration der Bestands-Settings. Pure — von check:pure erfasst.
 import { parseEndpointList } from "../../vendor/kit/endpoint";
-import { migrateEndpointListChecked, type EndpointConfig } from "../../vendor/kit/endpoint_config";
+import { fillMissingRowModels, migrateEndpointListChecked, type EndpointConfig } from "../../vendor/kit/endpoint_config";
 import { DEFAULT_LLM_SETTINGS, type LlmSettings } from "../llm/settings-defaults";
 
 /** Schlüsselbund-Eintrag des einen globalen API-Schlüssels bis 0.10 (`api-key-storage.ts`).
@@ -29,8 +29,8 @@ export interface LlmMigration {
  *  `EndpointConfig[]` mit Schlüssel je Zeile. Der globale Schlüssel wandert als `apiKey` in jede
  *  Zeile ohne eigenen — das Kit überführt ihn beim ersten Auflösen in den Schlüsselbund.
  *
- *  Die Fremdfelder bleiben (Forward-Compat), die vier abgelösten Felder `apiKey`, `activeEndpoint`,
- *  `requestThinking` verschwinden ausdrücklich: ein Merge mit den Defaults würde sie sonst als
+ *  Die Fremdfelder bleiben (Forward-Compat), die abgelösten Felder `apiKey`, `activeEndpoint`,
+ *  `requestThinking` und `model` verschwinden ausdrücklich: ein Merge mit den Defaults würde sie sonst als
  *  Leichen zurückschreiben. `requestThinking` liest `loadRequestSettings` aus dem ROHEN Bestand,
  *  bevor diese Funktion es streicht.
  *
@@ -66,9 +66,15 @@ export function migrateLlmSettings(rawLlm: unknown, legacyStoreKey: string): Llm
 
   const storedKey = typeof r.apiKey === "string" ? r.apiKey : "";
   const key = altForm ? (legacyStoreKey || storedKey).trim() : "";
-  const endpoints = key
+  const withKeys = key
     ? checked.list.map((e) => (e.apiKey || e.secretId ? e : { ...e, apiKey: key }))
     : checked.list;
+  // Das globale Modell (`llm.model`) ist abgeschafft: der Altwert geht einmal in jede Zeile ohne Modell
+  // (nach Migration und Default-Zeile, vor dem Entfernen des Schluessels). Der Schluessel MUSS aus dem
+  // geladenen Objekt verschwinden, sonst fuellt jeder Start eine vom Nutzer geleerte Zeile wieder auf.
+  const endpoints = fillMissingRowModels(withKeys, r.model);
+  if ("model" in r) migrated = true;
+  delete r.model;
 
   // Ein Klartext-Schluessel aus data.json, fuer den es keine Zeile gibt, darf weder verloren gehen noch im
   // Klartext stehen bleiben: er wird als `strandedKey` gemeldet und vom Aufrufer in den Schluesselbund gelegt.

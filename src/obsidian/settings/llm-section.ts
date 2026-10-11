@@ -126,16 +126,17 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
     if (models.length) {
       // Dropdown-Default persistieren: ein leeres model bei vorhandener Liste würde sonst
       // im Dropdown zwar angezeigt, aber nie gespeichert → generateInterpretation-Guard.
-      const resolved = effectiveModel(llm.model, models);
-      if (resolved !== llm.model) {
+      const resolved = effectiveModel(llm.model ?? "", models);
+      if (resolved !== (llm.model ?? "")) {
         llm.model = resolved;
         ctx.save();
         ctx.llm.invalidate();
       }
-      const list = models.includes(llm.model) ? models : [llm.model, ...models];
+      const cur = llm.model ?? "";
+      const list = models.includes(cur) ? models : [cur, ...models];
       modelSetting.addDropdown((d) => {
         for (const m of list) d.addOption(m, m);
-        d.setValue(llm.model);
+        d.setValue(cur);
         d.onChange((v) => {
           ctx.write("llm.model", v); // schreibt und baut neu auf (Kontextlänge, Thinking-Zustand)
         });
@@ -144,7 +145,7 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
       // Kontextlänge — entfällt still, wenn der Server sie nicht liefert (Ollama/MLX/vLLM).
       const cfg = source.config;
       if (cfg) {
-        void fetchModelContext(normalizeEndpoint(cfg.url), llm.model, authHeaders(cfg.apiKey)).then((cx) => {
+        void fetchModelContext(normalizeEndpoint(cfg.url), cur, authHeaders(cfg.apiKey)).then((cx) => {
           const len = cx?.loadedContextLength ?? cx?.maxContextLength;
           if (len) modelSetting.setDesc(t("set.llmContext", len.toLocaleString()));
         });
@@ -152,7 +153,7 @@ function renderModelField(modelSetting: Setting, ctx: SectionCtx, llm: LlmSettin
     } else {
       modelSetting.setDesc(t("set.llmModelOffline"));
       modelSetting.addText((txt) =>
-        txt.setValue(llm.model).onChange((v) => {
+        txt.setValue(llm.model ?? "").onChange((v) => {
           // Direkt über die Registry, aber OHNE Neuaufbau: ein Rebuild bei jedem Tastendruck
           // nähme dem Feld den Fokus.
           llm.model = v.trim();

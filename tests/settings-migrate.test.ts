@@ -91,8 +91,7 @@ describe("migrateLlmSettings — abgelöste Felder", () => {
   });
 
   it("behält eigene Werte und Fremdfelder (Forward-Compat)", () => {
-    const { llm } = migrateLlmSettings({ model: "m", systemPromptDe: "p", zukunft: 1 }, "");
-    expect(llm.model).toBe("m");
+    const { llm } = migrateLlmSettings({ systemPromptDe: "p", zukunft: 1 }, "");
     expect(llm.systemPromptDe).toBe("p");
     expect((llm as unknown as Record<string, unknown>).zukunft).toBe(1);
   });
@@ -125,4 +124,33 @@ describe("migrateLlmSettings — zweiter Lauf und Sonderfälle (Gegenlese 2026-1
     expect(migrateLlmSettings({ endpoints: [], apiKey: "sk" }, "sk-bund").strandedKey).toBe("");
   });
 
+});
+
+describe("migrateLlmSettings — globales Modell wandert in die Zeilen (Welle 17)", () => {
+  it("erster Lauf: der Altwert geht in jede Zeile ohne Modell, der Schlüssel verschwindet, neu speichern", () => {
+    const r = migrateLlmSettings({ model: " alt ", endpoints: [{ url: "http://a:1", id: "a" }, { url: "http://b:2", id: "b", model: "eigen" }] }, "");
+    expect(r.llm.endpoints).toEqual([{ url: "http://a:1", id: "a", model: "alt" }, { url: "http://b:2", id: "b", model: "eigen" }]);
+    expect("model" in r.llm).toBe(false);
+    expect(r.migrated).toBe(true);
+  });
+
+  it("die Default-Zeile (fehlende Liste) bekommt den Altwert", () => {
+    const { llm } = migrateLlmSettings({ model: "alt" }, "");
+    expect(llm.endpoints).toEqual([{ ...DEFAULT_LLM_SETTINGS.endpoints[0], model: "alt" }]);
+  });
+
+  it("zweiter Lauf ändert nichts — auch eine vom Nutzer geleerte Zeile bleibt leer", () => {
+    const first = migrateLlmSettings({ model: "alt", endpoints: [{ url: "http://a:1", id: "a" }] }, "");
+    const geleert = { ...first.llm, endpoints: first.llm.endpoints.map(({ model: _m, ...e }) => e) };
+    const second = migrateLlmSettings(geleert, "");
+    expect(second.llm.endpoints).toEqual(geleert.endpoints);
+    expect(second.migrated).toBe(false);
+  });
+
+  it("ein leerer Altwert streicht nur den Schlüssel", () => {
+    const r = migrateLlmSettings({ model: "", endpoints: [{ url: "http://a:1", id: "a" }] }, "");
+    expect(r.llm.endpoints).toEqual([{ url: "http://a:1", id: "a" }]);
+    expect("model" in r.llm).toBe(false);
+    expect(r.migrated).toBe(true);
+  });
 });
