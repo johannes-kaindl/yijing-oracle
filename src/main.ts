@@ -11,7 +11,8 @@ import { buildReading } from "./core/reading";
 import { renderReading } from "./core/render";
 import { mergeCallouts } from "./core/note-callouts";
 import { LEGACY_API_KEY_SECRET_ID, migrateLlmSettings } from "./core/settings/migrate";
-import { loadRequestSettings } from "./core/llm/request-settings";
+import { REQUEST_MIGRATIONS } from "./core/llm/request-settings";
+import { loadRequestSettings } from "./vendor/kit/sampling-profiles";
 import { type LlmConnection } from "./vendor/kit-obsidian/llm-connection";
 import { obsidianSecretStore } from "./vendor/kit-obsidian/secrets";
 import { migrateLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
@@ -48,7 +49,7 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
     // Sampling-Profile: request-Block saeubern und das alte `llm.requestThinking` einmalig nach
     // `request.thinking.creative` migrieren — aus dem ROHEN Bestand, BEVOR migrateLlmSettings das
     // Feld streicht. `dropped` wird nach registerI18n gemeldet (Notice braucht t()).
-    const requestLoad = loadRequestSettings(raw);
+    const requestLoad = loadRequestSettings(raw, REQUEST_MIGRATIONS);
     this.settings.request = requestLoad.request;
     // Endpunkt-Liste: Textarea-String / string[] + ein globaler Schluessel → EndpointConfig[] mit
     // Schluessel je Zeile (das Kit ueberfuehrt ihn beim ersten Aufloesen in den Schluesselbund).

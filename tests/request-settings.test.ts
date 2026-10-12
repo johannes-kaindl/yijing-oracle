@@ -1,8 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { MODE, loadRequestSettings } from "../src/core/llm/request-settings";
+import { MODE, REQUEST_MIGRATIONS } from "../src/core/llm/request-settings";
+import { loadRequestSettings as kitLoad } from "../src/vendor/kit/sampling-profiles";
 import { DEFAULT_LLM_SETTINGS } from "../src/core/llm/settings-defaults";
 import { DEFAULT_SETTINGS } from "../src/core/settings";
 import { migrateLlmSettings } from "../src/core/settings/migrate";
+
+const loadRequestSettings = (raw: unknown) => kitLoad(raw, REQUEST_MIGRATIONS);
 
 describe("loadRequestSettings — Legacy-Migration llm.requestThinking (Modus creative)", () => {
   it("Modus ist creative", () => { expect(MODE).toBe("creative"); });
