@@ -10,24 +10,21 @@
 
 import {
   buildFilename as buildFromTemplate,
+  clipText,
   sanitizeFilename as kitSanitizeFilename,
 } from "../vendor/kit/filename-template";
 
-/** Ungültige Datei-Zeichen entfernen, Whitespace normalisieren, trimmen.
- *
- *  `onInvalid: "strip"` ist load-bearing und muss gesetzt bleiben: der Kit-Default ist
- *  `"replace"` (ungültiges Zeichen → `_`, so machen es paperize und letterhead), dieses
- *  Repo löscht sie ersatzlos. Ohne die Option würde aus `Re: A/B` still `Re_ A_B` statt
- *  `Re AB` — kein Typfehler, keine Warnung. Festgenagelt in tests/filename.test.ts. */
+/** Ungültige Datei-Zeichen durch `_` ersetzen (Kit-Default), Whitespace normalisieren, trimmen.
+ *  Bis 0.13.0 löschte dieses Repo sie ersatzlos (`Re: A/B` → `Re AB`); für neue Notizen heißt es
+ *  jetzt `Re_ A_B`, bestehende Dateien bleiben unberührt. */
 export function sanitizeFilename(s: string): string {
-  return kitSanitizeFilename(s, { onInvalid: "strip" });
+  return kitSanitizeFilename(s);
 }
 
 /** Feld-Kappung auf 48 Zeichen. Wirkt bewusst **vor** der Substitution (also beim Bau der
- *  subs-Map) und bleibt deshalb lokal — das Kit kappt nicht. */
+ *  subs-Map): die Kappung des fertigen Namens (`maxLength`) würde auch Datum und Trefferpaar treffen. */
 function slugQuestion(q: string): string {
-  const c = sanitizeFilename(q);
-  return c.length > 48 ? c.slice(0, 48).trim() : c;
+  return clipText(sanitizeFilename(q), 48);
 }
 
 export const DEFAULT_FILENAME_TEMPLATE = "{date} {time} Yijing {hexpair}";
@@ -55,7 +52,6 @@ export function buildFilename(template: string, v: FilenameValues): string {
   // Kein lastResort: das Fallback-Template besteht aus immer gefüllten Feldern, es kann
   // nie leer rendern. So hält es der Kit-Modulkopf für dieses Repo ausdrücklich fest.
   return buildFromTemplate(template, subs, {
-    onInvalid: "strip",
     fallbacks: ["{date} {time} {hexpair}"],
   });
 }

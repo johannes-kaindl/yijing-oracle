@@ -19,22 +19,26 @@ describe("buildFilename", () => {
     expect(buildFilename(DEFAULT_FILENAME_TEMPLATE, V({ resulting: null }))).toBe("2026-07-12 1034 Yijing H3");
   });
 
-  it("supports {hex} {resulting} {question} placeholders (invalid chars stripped)", () => {
+  it("supports {hex} {resulting} {question} placeholders (invalid chars replaced by _)", () => {
     const out = buildFilename("{hex}→{resulting} {question}", V({ question: "Was jetzt?" }));
-    expect(out).toBe("3→54 Was jetzt"); // '?' ist dateisystem-ungültig → entfernt
+    expect(out).toBe("3→54 Was jetzt_"); // '?' ist dateisystem-ungültig → Unterstrich (Kit-Default)
   });
 
   it("{question} is empty when there is no question (no dangling spaces)", () => {
     expect(buildFilename("{date} {question}", V({ question: "" }))).toBe("2026-07-12");
   });
 
-  it("strips filesystem-invalid characters from the result", () => {
+  it("replaces filesystem-invalid characters in the result with underscores", () => {
     const out = buildFilename("{question} {hexpair}", V({ question: 'a/b:c*?"<>|' }));
-    expect(out).toBe("abc H3-H54");
+    expect(out).toBe("a_b_c______ H3-H54");
   });
 
   it("empty/garbage template falls back to date time hexpair", () => {
     expect(buildFilename("", V())).toBe("2026-07-12 1034 H3-H54");
+  });
+
+  it("replaces invalid characters in the schema too, not only in the question", () => {
+    expect(buildFilename("{date}: {hexpair}", V())).toBe("2026-07-12_ H3-H54");
   });
 
   it("truncates long questions to ~48 chars", () => {
@@ -60,6 +64,6 @@ describe("buildFilename", () => {
 
 describe("sanitizeFilename", () => {
   it("removes invalid chars and collapses whitespace", () => {
-    expect(sanitizeFilename('  a  /  b:c  ')).toBe("a bc");
+    expect(sanitizeFilename('  a  /  b:c  ')).toBe("a _ b_c");
   });
 });
