@@ -1,14 +1,14 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.53.0" },
-    "code-kit": { "ref": "0.21.0" }
+    "obsidian-kit": { "ref": "0.56.0" },
+    "code-kit": { "ref": "0.23.0" }
   },
   "targets": [
     {
       "dir": "src/vendor/kit",
       "source": "code-kit",
       "from": "src/ts/pure",
-      "modules": ["backend-probe", "capabilities", "endpoint", "endpoint_config", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "model-choice", "model-context", "model-list-cache", "reasoning", "redact", "safe-markdown", "sampling-profiles", "secrets", "settings", "sse", "think-splitter"]
+      "modules": ["backend-probe", "capabilities", "endpoint", "endpoint_config", "embeddings-client", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "model-choice", "model-context", "model-list-cache", "reasoning", "redact", "safe-markdown", "sampling-profiles", "secrets", "settings", "sse", "think-splitter", "timeout"]
     },
     {
       "dir": "src/vendor/kit",
@@ -27,7 +27,7 @@
       "dir": "src/vendor/kit-obsidian",
       "source": "obsidian-kit",
       "from": "src/obsidian",
-      "modules": ["backend-probe", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", "endpoint-list", "endpoint-secrets", "endpoint-source", "folder-suggest", "help-setting", "llm-connection", "llm-connection-strings", "model-picker", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "stream-area"],
+      "modules": ["backend-probe", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", "embedding-connection", "endpoint-list", "endpoint-plumbing", "endpoint-secrets", "endpoint-source", "endpoint-status-text", "folder-suggest", "help-setting", "llm-connection", "llm-connection-strings", "model-picker", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "stream-area"],
       "rewrite": [["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"], ["../pure/", "../kit/"]]
     },
     {
