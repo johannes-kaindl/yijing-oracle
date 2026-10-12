@@ -45,8 +45,8 @@
  * erreicht" (Einstellungen nicht zu oeffnen, kein Modell geladen, ComfyUI nicht erreichbar, Messung
  * abgebrochen) ist „nichts gemessen" und setzt Exit 1. Abbruch vor der ersten Messung: Exit 2.
  *
- * ⚠️ Chromium drosselt das Rendering nicht-fokussierter Fenster: ohne `Page.bringToFront`
- * **und** `osascript … activate` bleibt die Ansicht leer und man debuggt ein Phantom.
+ * ⚠️ Chromium drosselt das Rendering nicht-fokussierter Fenster: ohne ein sichtbares Fenster bleibt die Ansicht leer
+ * und man debuggt ein Phantom. `requireVisible` der Brücke holt es nach vorn (kein `osascript activate`: das trifft die reguläre Instanz).
  *
  * ## Was dieser Lauf am Wirt aendert — und zurueckdreht
  *
@@ -56,9 +56,8 @@
  * zurueckgeschrieben. Erzeugte Notizen und Anhaenge wandern in den Papierkorb.
  */
 
-import { execFileSync } from "node:child_process";
 
-import { Cdp, attachTo, bereiteInstanzVor, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
 import { join } from "node:path";
@@ -1675,15 +1674,16 @@ async function main(): Promise<void> {
     if (/yijing/i.test(zeile)) protokoll.push(zeile);
   });
 
-  // Chromium drosselt Hintergrundfenster — ohne beides misst man ein Phantom.
+  // Chromium drosselt Hintergrundfenster — ohne ein sichtbares Fenster misst man ein Phantom. `requireVisible` holt das Fenster
+  // dieser Verbindung nach vorn (nicht per `osascript activate`: das trifft die reguläre Instanz statt der Zweitinstanz, gemessen
+  // von kl-w19) und bricht mit Meldung ab, wenn es unsichtbar bleibt.
   await cdp.send("Page.enable");
-  await cdp.send("Page.bringToFront");
   try {
-    execFileSync("osascript", ["-e", 'tell application "Obsidian" to activate']);
-  } catch {
-    console.log("Hinweis: osascript-Aktivierung fehlgeschlagen — Messungen koennen leer bleiben.");
+    await requireVisible(cdp);
+  } catch (e) {
+    cdp.close();
+    throw new Error(e instanceof Error ? e.message : String(e));
   }
-  await schlaf(1500);
 
   // Ein frischer Staging-Vault startet im Restricted Mode, ein frisches Profil fragt „Dem Ersteller vertrauen“:
   // `bereiteInstanzVor` bestaetigt den Dialog und schaltet frei — nur im eigenen Staging-Vault (`nurVault`,
