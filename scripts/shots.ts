@@ -7,18 +7,26 @@
  * 2026-08-16 — vorher vendored unter `scripts/lib/`). Kopien waeren der Anfang derselben
  * Drift, die bei `release.mjs` zu sieben Fassungen fuehrte.
  *
- * ## Ablauf
+ * ## Ablauf (Zweitinstanz, eigenes Profil, eigener Port — die reguläre Instanz wird nie angefasst)
+ *
+ * Der Port ist PFLICHT (`--port <n>` oder `SHOTS_PORT`, Wert dieses Rezepts: 9400); es gibt keinen
+ * Standardport, damit ein vergessener Port nicht die reguläre Instanz (9222) trifft.
  *
  * ```bash
- * export STAGING_VAULTS_DIR="$HOME/StagingVaults"   # beliebiges Verzeichnis ausserhalb des Repos
- * npm run build && npm run shots -- --setup     # Vault aus dem Fixture bauen
+ * echo "$STAGING_VAULTS_DIR"                          # muss gesetzt sein (~/.zshenv)
+ * npm run build && npm run shots -- --setup           # Vault aus dem Fixture bauen
  *
- * osascript -e 'quit app "Obsidian"'            # Handarbeit: Debug-Port
- * open -a Obsidian --args --remote-debugging-port=9222
- * #   ... den Aufnahme-Vault oeffnen und einmalig als vertrauenswuerdig markieren
+ * UD=/tmp/obs-test-yijing-oracle; mkdir -p "$UD"
+ * lsof -nP -iTCP:9400 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+ * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-w19 nehmen"
+ * cp ~/Library/Application\ Support/obsidian/obsidian-<version>.asar "$UD"/
+ * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/yijing-oracle";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{yijing01:{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
+ * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9400 &
+ * #   Vertrauensdialog beim ersten Start bestaetigen; PID merken (beendet wird nur sie), Lock je Port:
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "Bilder" --exclusive focus --port 9400 --ttl 600
  *
- * npm run shots
- * npm run shots -- --only panel.png
+ * npm run shots -- --port 9400
+ * npm run shots -- --port 9400 --only panel.png
  * npm run shots -- --list
  * ```
  *
@@ -446,21 +454,21 @@ async function main(): Promise<void> {
       console.log(`  Aufnahmesprache auf "en" gesetzt (Vorwert "${vorher || "(leer)"}" gemerkt)`);
     }
     console.log(
-      "\n⚠️  Erst pruefen, ob schon ein Obsidian laeuft — ein Quit zerstoert den Zustand\n" +
-      "    einer fremden Session, und der eigene Lauf ist danach trotzdem gruen:\n" +
-      "      lsof -nP -iTCP:9222 -sTCP:LISTEN\n" +
-      "    Hoert der Port, haengt jemand dran: erst fragen, dann quitten.\n" +
-      "\nJetzt Obsidian neu starten und den Aufnahme-Vault oeffnen:\n" +
-        "  osascript -e 'quit app \"Obsidian\"'\n" +
-        "  open -a Obsidian --args --remote-debugging-port=9222\n" +
-        `  open -a Obsidian "${vaultDir}"\n` +
+      "\nJetzt die Zweitinstanz starten (Rezept im Dateikopf: eigenes Profil mit diesem Vault in obsidian.json,\n" +
+        "eigener Port, z. B. 9400; die reguläre Instanz wird nicht beendet):\n" +
+        "  lsof -nP -iTCP:9400 -sTCP:LISTEN   # frei?\n" +
+        `  Vault: ${vaultDir}\n` +
         "Beim ersten Mal fragt Obsidian, ob es dem Vault-Autor vertraut — bestaetigen,\n" +
         "sonst laeuft das Plugin nicht und jedes Bild zeigt einen leeren Vault.",
     );
     return;
   }
 
-  const port = Number(flag("--port") ?? env.SHOTS_PORT ?? 9222);
+  const portRoh = flag("--port") ?? env.SHOTS_PORT;
+  const port = Number(portRoh);
+  if (portRoh === undefined || !Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error(`--port <Zahl> (oder SHOTS_PORT) fehlt oder ist ungueltig (${JSON.stringify(portRoh)}). Den Port der eigenen Zweitinstanz angeben (Rezept im Dateikopf, z. B. 9400).`);
+  }
   const nur = flag("--only");
   const bildEndpunkt = flag("--image-endpoint") ?? "http://127.0.0.1:8000";
   const llmEndpunkt = flag("--llm-endpoint") ?? "http://127.0.0.1:1234";
@@ -472,8 +480,7 @@ async function main(): Promise<void> {
   if (!cdp) {
     throw new Error(
       `Kein Obsidian-Fenster mit dem Vault "${REPO_NAME}" auf Port ${port}.\n` +
-        "Den Aufnahme-Vault oeffnen (er darf neben anderen Vaults offen sein):\n" +
-        `  open -a Obsidian "$STAGING_VAULTS_DIR/${REPO_NAME}"`,
+        "Die Zweitinstanz mit diesem Vault starten (Rezept im Dateikopf); der Vault darf neben anderen offen sein.",
     );
   }
   console.log(`Verbunden auf Port ${port}.\n`);

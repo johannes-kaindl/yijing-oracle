@@ -12,38 +12,38 @@
  * Lade-Kette), das **Umschalten der Bild-Sektion** (Rerender im echten Settings-Modal) und den
  * **Bildlauf gegen die echte ComfyUI**.
  *
- * ## Voraussetzung
+ * ## Zweitinstanz (der richtige Ort fuer diesen Lauf — eigenes Profil, eigener Port)
  *
- * ⚠️ **Zuerst pruefen, wer sonst an Obsidian haengt.** Obsidian ist Single-Instance — ein
- * `quit` trifft die Instanz, an der moeglicherweise eine andere Session arbeitet, und zerstoert
- * deren Zustand. Der eigene Lauf ist danach sauber gruen; der Schaden entsteht woanders und
- * faellt nicht auf.
- *
- * ```bash
- * lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "laeuft bereits — NICHT beenden"
- * ```
- *
- * Hoert der Port schon, dann **mitnutzen statt neu starten**: ein eigenes Fenster per
- * `vault-open` ueber IPC oeffnen, dann `attachTo("workspace", port, vault)` — der Vault-Name
- * waehlt, nicht die Reihenfolge. ⚠️ Die Port-Pruefung ersetzt die Frage nicht: sie zeigt aktive
- * CDP-Treiber, aber nicht, wer ein Fenster offen haelt oder auf den Port wartet.
- *
- * Erst wenn nichts laeuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
- *
- * Obsidian muss mit offenem Debug-Port laufen (der einzige Handgriff, der Handarbeit bleibt —
- * die App muss dafuer neu gestartet werden):
+ * Der Port ist PFLICHT (`--port <n>`, Wert dieses Rezepts: 9400); der Treiber hat keinen Default, damit
+ * ein vergessener Port nie die reguläre Instanz (9222) trifft. Die reguläre Instanz wird weder genutzt
+ * noch beendet. Reihenfolge laut obsidian-plugins/AGENTS.md § Staging-Vaults (a)-(c):
  *
  * ```bash
- * osascript -e 'quit app "Obsidian"'
- * open -a Obsidian --args --remote-debugging-port=9222
+ * echo "$STAGING_VAULTS_DIR"                                    # muss gesetzt sein (~/.zshenv)
+ * UD=/tmp/obs-test-yijing-oracle; mkdir -p "$UD"
+ * lsof -nP -iTCP:9400 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+ * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-w19 nehmen"
+ * npm run build && OBSIDIAN_PLUGIN_DIR="$STAGING_VAULTS_DIR/yijing-oracle/.obsidian/plugins/yijing-oracle" npm run deploy
+ * # (a) aktuelle Version statt gebuendelter:
+ * cp ~/Library/Application\ Support/obsidian/obsidian-<version>.asar "$UD"/
+ * # Vault registrieren (Obsidian liest obsidian.json nur beim Start), Oberflaeche Englisch:
+ * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/yijing-oracle";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{yijing01:{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
+ * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9400 &
+ * # PID merken: beendet wird NUR sie, nie pkill/killall. Je Messlauf frischer Prozess.
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke Zweitinstanz :9400" --exclusive focus --port 9400 --ttl 300
+ * npm run smoke:gui -- --port 9400 --vault yijing-oracle    # (b) Restricted Mode, (c) Vertrauensdialog: macht `bereiteInstanzVor`
+ * npm run smoke:gui -- --port 9400 --vault yijing-oracle --kein-bild   # D und E gelten als uebersprungen (Flag)
+ * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
  *
- * Dann, mit deployter Plugin-Version (`npm run deploy`):
+ * Der erste Lauf nach dem Anlegen eines Profils ist ein Aufwaermlauf und zaehlt nicht.
  *
- * ```bash
- * npm run smoke:gui -- --vault 10_Pallas
- * npm run smoke:gui -- --vault 10_Pallas --kein-bild   # Abschnitt D ueberspringen
- * ```
+ * ## Bilanz in vier Zustaenden (CORE-TEST-19)
+ *
+ * gruen · rot · uebersprungen · nichts gemessen; `PUNKTE` ist der Nenner. Uebersprungen heisst „in dieser
+ * Lage nicht anwendbar" (`--kein-bild`, Obsidian ohne native 1.13-Settings-API); „Gegenstand nicht
+ * erreicht" (Einstellungen nicht zu oeffnen, kein Modell geladen, ComfyUI nicht erreichbar, Messung
+ * abgebrochen) ist „nichts gemessen" und setzt Exit 1. Abbruch vor der ersten Messung: Exit 2.
  *
  * ⚠️ Chromium drosselt das Rendering nicht-fokussierter Fenster: ohne `Page.bringToFront`
  * **und** `osascript … activate` bleibt die Ansicht leer und man debuggt ein Phantom.
@@ -58,7 +58,8 @@
 
 import { execFileSync } from "node:child_process";
 
-import { Cdp, attachTo, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, pollUntil } from "../../tools/obsidian-cdp/cdp.js";
+import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
 import { join } from "node:path";
 
@@ -97,31 +98,91 @@ const BESTAND_030 = {
   },
 };
 
-interface Check {
-  name: string;
-  passed: boolean;
-  detail: string;
-}
-const checks: Check[] = [];
+/** Soll-Liste aller Pruefpunkte (der Nenner der Bilanz). Ein Name, der hier fehlt, laesst `createBilanz`
+ *  werfen; ein Punkt, der nie aufgezeichnet wird, zaehlt als „nichts gemessen“. */
+const PUNKTE = [
+  "A1 Plugin aktiv",
+  "A2 Panel oeffnet",
+  "A3 Wurf erzeugt ein Hexagramm",
+  "A4 Vorschau traegt Text",
+  "A5 Frage-Feld ist nach dem Wurf leer",
+  "B-1 Kein liegen gebliebener Smoke-Schluessel im Schluesselbund aus einem abgebrochenen Vorlauf",
+  "B0 Plugin laedt mit Bestandsdaten",
+  "B1 backend faellt auf a1111",
+  "B2 Bild-Endpunkt unveraendert",
+  "B3 eigene Werte ueberleben (steps/size/negativ)",
+  "B4 neue Comfy-Felder bekommen Defaults",
+  "B5 LLM-Endpunktliste unveraendert (jetzt zwei Zeilen mit URL)",
+  "B6 API-Schluessel ueberlebt die Migration (je Zeile, im Schluesselbund unter yijing-oracle-ep-<id>)",
+  "B7 keine Alt-Leiche activeEndpoint",
+  "B8 Altwert verlaesst data.json: wandert beim Laden in den Schluesselbund",
+  "B9 Altwert llm.model wandert in die Zeilen, der Schluessel verschwindet (Speicher und data.json)",
+  "C1 Einstellungen-Tab oeffnet",
+  "C1b Keine Settings-Zeile „Model“ und keine Option „global model“",
+  "C2 A1111-Ansicht zeigt Schritte, kein Workflow-Feld",
+  "C3 Umschalten auf ComfyUI tauscht die Felder",
+  "C4 gueltiger Workflow wird erkannt",
+  "C5 kaputtes JSON meldet einen Fehler statt zu haengen",
+  "C6 leeres Feld meldet nichts",
+  "C7 Zurueckschalten stellt die A1111-Felder wieder her",
+  "F1 Tab liefert deklarative Definitionen",
+  "F2 bedingte Zeilen werden weggelassen, nicht versteckt",
+  "F3 Oberflaeche zieht nach einer Wertaenderung nach",
+  "F9 die Hilfe-Zeile steht als erste Zeile oben im Settings-Tab",
+  "F4 Einstellungen erscheinen in Obsidians Einstellungs-Suche",
+  "F5 Fallback-Pfad (< 1.13) zeichnet dieselbe Struktur",
+  "F6 maskierte Zeile bleibt ueber Aliase auffindbar",
+  "F7 API-Schluessel-Feld der Endpunkt-Zeile ist maskiert (nach „aendern“)",
+  "F8 Eingabe im Feld landet im Schluesselbund (Eintrag der Zeile), nicht in data.json",
+  "M1 Settings zeigen den Manager statt der lokalen Liste",
+  "M2 Lauf nutzt den Manager-Endpunkt und das Default-Modell",
+  "M2b Manager-Lauf nutzt gewaehltes Modell, nicht den Endpunkt-Default (C1)",
+  "M3 Manager aus → lokale Liste in Settings und im Lauf",
+  "M1b Manager erst nach dem ersten Oeffnen des Tabs installiert: die Settings zeigen ihn nach einem Tab-Wechsel",
+  "N3 Gesendeter Body traegt die Modus-Defaults (Temperatur 0.7, Denkstufe medium)",
+  "N1 Abschnitt „Anfrage“ klappt auf und zeigt die Felder des Modus",
+  "N6 „Letzte Anfrage“ zeigt beim Oeffnen des Tabs den gesendeten Body",
+  "N2 Zwei Bearbeitungen hintereinander (Temperatur, Denkstufe) speichern und lassen den Abschnitt offen",
+  "N4 Gesendeter Body folgt den Einstellungen (Ueberschreibung 0.9, Denken aus → reasoning_effort none)",
+  "N5 Zuruecksetzen entfernt die Ueberschreibung und laesst den Abschnitt offen",
+  "V1 Zeile mit Klartext-Schluessel: nach resolve steht kein apiKey mehr in data.json, der Wert im Schluesselbund",
+  "V2 Der Schluessel der Zeile geht als Bearer an den Endpunkt",
+  "V3 Ein Geheimnis in der Frage geht als Platzhalter an den Draht, nicht im Klartext",
+  "V4 Die Deutung zeigt das Original wieder (Schwaerzung ist umkehrbar)",
+  "V5 Eine Antwort mit Bild-URL und Platzhalter erzeugt kein img-Element",
+  "V6 Ein dataviewjs-Block in der Antwort rendert als Text, nicht als Codeblock",
+  "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs und ```mermaid, kein Fernbild, auch nicht als Referenz-Definition), kein dataviewjs-Code im DOM",
+  "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
+  "V9 Zeile ohne Modell: das Panel nimmt das erste Modell der Liste und merkt es in der aktiven Zeile (setModel)",
+  "M4 Deutung streamt gegen den echten Endpunkt",
+  "D1 Bild-Kasten erscheint bei gesetztem Endpunkt",
+  "D2 Generieren startet",
+  "D3 Bild kommt an und ist ein PNG",
+  "D4 Anzeige zeigt Fortschritt oder nennt seinen Grund",
+  "D5 Szenen-Satz steht unter dem Bild",
+  "E1 Speichern legt genau eine Notiz an",
+  "E2 Notiz traegt den Reading-Text",
+  "E3 Bild liegt als Anhang im Vault",
+] as const;
+
+const bilanz = createBilanz({ punkte: PUNKTE });
 
 function record(name: string, passed: boolean, detail: string): void {
-  checks.push({ name, passed, detail });
-  console.log(`${passed ? "✅" : "❌"} ${name} — ${detail}`);
+  bilanz.record(name as (typeof PUNKTE)[number], passed, detail);
 }
 
-/** Was der Lauf bewusst NICHT misst. Steht im Protokoll, damit eine Luecke nicht wie
- *  ein bestandener Punkt aussieht. */
-/** Uebersprungene Abschnitte. Bewusst eine EIGENE Liste und nicht `checks`: ein
- *  uebersprungener Abschnitt ist weder bestanden noch durchgefallen, und beide Zuordnungen
- *  waeren falsch (obsidian-transmute hat ihn einmal als gruen gezaehlt, vault-rag als rot —
- *  derselbe Baufehler in beide Richtungen). Er gehoert aber IN die Bilanz: sonst liest sich
- *  ein „27/27 bestanden" wie ein vollstaendiger Lauf, obwohl zwei Abschnitte nie liefen. */
-const uebersprungen: string[] = [];
-
+/** In dieser Lage nicht anwendbar (Flag abgewaehlt, Obsidian ohne native 1.13-Settings-API). */
 function skipped(name: string, reason: string): void {
-  uebersprungen.push(name);
-  console.log(`⏭️  ${name} — uebersprungen: ${reason}`);
+  bilanz.skipped(name as (typeof PUNKTE)[number], reason);
 }
+
+/** Der Gegenstand des Punkts wurde nicht erreicht (Vorbedingung fehlt, Messung abgebrochen) —
+ *  „nichts gemessen“, nie gruen, Exit 1. */
+function unmeasured(name: string, reason: string): void {
+  bilanz.unmeasured(name as (typeof PUNKTE)[number], reason);
+}
+
+const aufgezeichnet = (name: string): boolean => bilanz.eintraege().some((e) => e.name === name);
 
 const schlaf = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms));
 
@@ -363,11 +424,14 @@ async function clickPanelButton(cdp: Cdp, auswahl: string): Promise<boolean> {
 // ─── Abschnitte ────────────────────────────────────────────────────────────────────
 
 /** A — Laden und Panel (Handover-Schritt 1). */
+/** Meldung von `bereiteInstanzVor`, falls das Plugin trotz Vorbereitung nicht geladen ist (gehoert in A1). */
+let instanzHinweis = "";
+
 async function abschnittPanel(cdp: Cdp): Promise<void> {
   console.log("\n── A · Laden und Panel ──");
 
   const aktiv = await cdp.evaluate<boolean>(`return Boolean(app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]);`);
-  record("A1 Plugin aktiv", Boolean(aktiv), aktiv ? "app.plugins kennt die Instanz" : "Plugin nicht geladen");
+  record("A1 Plugin aktiv", Boolean(aktiv), aktiv ? "app.plugins kennt die Instanz" : `Plugin nicht geladen${instanzHinweis ? ` — ${instanzHinweis}` : ""}`);
   if (!aktiv) return;
 
   const offen = await openPanel(cdp);
@@ -585,12 +649,15 @@ async function abschnittSettings(cdp: Cdp, port: number, workflowFixture: string
  *
  * Unter 1.12 gibt es den nativen Pfad nicht; dort wird der Abschnitt uebersprungen statt rot.
  */
+/** Die Punkte des Abschnitts F (Reihenfolge wie `PUNKTE`). */
+const F_NAMEN = PUNKTE.filter((n) => n.startsWith("F"));
+
 async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
   console.log("\n── F · Deklarative Settings-API ──");
 
   const ui = await openSettingsTab(cdp, port);
   if (!ui) {
-    skipped("F Deklarative API", "Einstellungen-Tab in keinem Fenster gefunden");
+    for (const n of F_NAMEN) unmeasured(n, "Einstellungen-Tab in keinem Fenster gefunden");
     return;
   }
 
@@ -637,7 +704,7 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
 
   if (!defs?.hatUpdate) {
     // Kein update() → Obsidian < 1.13, der native Pfad existiert nicht.
-    skipped("F Deklarative API", "Obsidian ohne native 1.13-Settings-API (Fallback-Pfad)");
+    for (const n of F_NAMEN) skipped(n, "Obsidian ohne native 1.13-Settings-API (Fallback-Pfad) — in dieser Lage nicht anwendbar");
     await closeSettings(cdp, ui);
     return;
   }
@@ -1118,6 +1185,46 @@ async function laufeDeutung(cdp: Cdp, wartenMs = 15000, frage = "Smoke M: Endpun
   return Boolean(fertig);
 }
 
+/** M1b — der Fall, den M1 NICHT trifft (Cockpit-Task „Settings-Tab zeigt neu installierten LLM Endpoint Manager nicht sofort“):
+ *  der Tab ist schon einmal gezeichnet und gecacht, DANACH installiert sich der Manager, und der Nutzer kommt von einem
+ *  ANDEREN Tab zurueck. Schliessen und Wiederoeffnen (M1) reproduziert den Fehler nicht — `hide()` ruft dort `update()`;
+ *  `openTab()` ruft `hide()` aber nur auf dem VERLASSENEN Tab, und `renderTab()` des neu aktiven zeichnet bei
+ *  unveraenderter `settingItems.length` nicht neu (Kit `installTabRefreshOnOpen`, gemessen 1.14.2). */
+async function pruefeTabWechsel(cdp: Cdp, port: number): Promise<void> {
+  console.log("\nM1b · Manager erst nach dem gecachten Tab installiert, Rueckkehr per Tab-Wechsel");
+  const name = "M1b Manager erst nach dem ersten Oeffnen des Tabs installiert: die Settings zeigen ihn nach einem Tab-Wechsel";
+  let fake: FakeChatEndpoint | null = null;
+  let ui: SettingsUi | null = null;
+  try {
+    await removeFakeManager(cdp);
+    // Vorbedingung: Tab zeichnet die LOKALE Liste (ohne Manager) — sonst ist der Fall nicht hergestellt.
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { unmeasured(name, "Settings-Oberflaeche nicht gefunden"); return; }
+    const vorher = await pollUntil<number>(ui.cdp, `const n = (${wurzelAusdruck(ui)}).querySelectorAll(".okit-ep-status").length; return n > 0 ? n : null;`, 6000, 250);
+    if (!vorher) { unmeasured(name, "Vorbedingung nicht hergestellt: die lokale Endpunkt-Liste erschien nicht"); return; }
+
+    // Auf einen anderen Tab wechseln (verlaesst unseren Tab: hide() laeuft dort), dann den Manager installieren.
+    await cdp.evaluate(`app.setting.openTabById("appearance"); await new Promise((r) => setTimeout(r, 600)); return app.setting.activeTab?.id ?? null;`);
+    fake = await startFakeChatEndpoint(MANAGER_DEFAULT_MODEL);
+    await installFakeManager(cdp, fake.url);
+
+    // Zurueck zu unserem Tab: der Host ruft nur renderTab() auf dem neu aktiven Tab.
+    const aktiv = await cdp.evaluate<string | null>(`app.setting.openTabById(${JSON.stringify(PLUGIN_ID)}); await new Promise((r) => setTimeout(r, 800)); return app.setting.activeTab?.id ?? null;`);
+    const body = (await pollUntil<string>(ui.cdp, `const t = (${wurzelAusdruck(ui)}).textContent || ""; return t.length > 200 && ${JSON.stringify(MANAGED_TEXT)}.some((m) => t.includes(m)) ? t : null;`, 6000, 250))
+      ?? await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
+    const managed = MANAGED_TEXT.some((x) => body.includes(x));
+    const lokal = await zeilenZahlSelector(ui, ".okit-ep-status");
+    record(name, aktiv === PLUGIN_ID && managed && lokal === 0,
+      `aktiver Tab ${JSON.stringify(aktiv)}, vorher ${vorher} lokale Zeile(n), jetzt managed-Text ${managed ? "da" : "fehlt"} und ${lokal} lokale Zeile(n)`);
+  } catch (e) {
+    if (!aufgezeichnet(name)) unmeasured(name, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    if (ui) await closeSettings(cdp, ui);
+    await removeFakeManager(cdp).catch(() => null);
+    if (fake) await fake.close().catch(() => undefined);
+  }
+}
+
 /** M1-M3 (+M2b): Manager an → Settings zeigen den Baustein statt der lokalen Liste, ein Lauf
  *  geht an den Manager-Endpunkt mit dem korrekten Modell; eine Modellwahl gegenueber dem
  *  Manager gewinnt gegen dessen Default (M2b, Regression aus lingotuner C1); Manager aus →
@@ -1143,7 +1250,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     // M1 — Settings zeigen den Manager-Baustein (managed-Text), keine .okit-ep-status-Zeile
     // (der Marker des lokalen Listen-Editors).
     ui = await openSettingsTab(cdp, port);
-    if (!ui) { for (const n of NAMEN) skipped(n, "Settings-Oberflaeche nicht gefunden"); return; }
+    if (!ui) { for (const n of NAMEN) unmeasured(n, "Settings-Oberflaeche nicht gefunden"); return; }
     // Erst warten, bis der Tab gezeichnet ist (das frische Fenster ist beim Anhaengen noch leer), und
     // dem Kit-Baustein Zeit fuer sein asynchrones Neuzeichnen nach der Aufloesung geben — gemessen wird
     // der Zustand danach, nicht der erste Anstrich.
@@ -1194,7 +1301,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
     // Server, sonst "nichts gemessen" statt still gruen).
     await removeFakeManager(cdp);
     ui = await openSettingsTab(cdp, port);
-    if (!ui) { skipped(NAMEN[3]!, "Settings-Oberflaeche nach Manager-Entfernung nicht gefunden"); return; }
+    if (!ui) { unmeasured(NAMEN[3]!, "Settings-Oberflaeche nach Manager-Entfernung nicht gefunden"); return; }
     const bodyNach = (await pollUntil<string>(ui.cdp, `const t = (${wurzelAusdruck(ui)}).textContent || ""; return t.length > 200 && !${JSON.stringify(MANAGED_TEXT)}.some((m) => t.includes(m)) ? t : null;`, 6000, 250))
       ?? await ui.cdp.evaluate<string>(`return (${wurzelAusdruck(ui)}).textContent || "";`);
     const managedNach = MANAGED_TEXT.some((s) => bodyNach.includes(s));
@@ -1219,7 +1326,7 @@ async function pruefeManager(cdp: Cdp, port: number): Promise<void> {
       `managed-Text ${managedNach ? "noch da" : "weg"}, ${localRowsNach} lokale Zeilen, lokaler Lauf ${okLokal ? "ok" : "fehlgeschlagen"} (${lokaleCalls} POST /v1/chat/completions, Modell ${JSON.stringify(modellLokal)})`);
   } catch (e) {
     for (const n of NAMEN) {
-      skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+      if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
     }
   } finally {
     if (ui) await closeSettings(cdp, ui);
@@ -1280,7 +1387,7 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
     // N1 — Tab oeffnen, Abschnitt aufklappen. `.okit-collapsible-header` ist hier die EINZIGE
     // einklappbare Sektion (die Einstellungs-Gruppen sind nicht einklappbar).
     ui = await openSettingsTab(cdp, port);
-    if (!ui) { for (const n of NAMEN.filter((_, i) => i !== 2)) skipped(n, "Settings-Oberflaeche nicht gefunden"); return; }
+    if (!ui) { for (const n of NAMEN.filter((_, i) => i !== 2)) unmeasured(n, "Settings-Oberflaeche nicht gefunden"); return; }
     const w = wurzelAusdruck(ui);
     const vorKlick = await ui.cdp.evaluate<string | null>(`return (${w}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded") ?? null;`);
     await ui.cdp.evaluate(`(${w}).querySelector(".okit-collapsible-header")?.click(); return true;`);
@@ -1320,7 +1427,7 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
 
     // N5 — Zuruecksetzen der Temperatur ueber den Knopf der Zeile.
     ui = await openSettingsTab(cdp, port);
-    if (!ui) { skipped(NAMEN[4]!, "Settings-Oberflaeche nicht gefunden"); return; }
+    if (!ui) { unmeasured(NAMEN[4]!, "Settings-Oberflaeche nicht gefunden"); return; }
     const w2 = wurzelAusdruck(ui);
     await ui.cdp.evaluate(`
       const zeile = (${w2}).querySelector('input[data-field="temperature"]')?.closest(".setting-item");
@@ -1330,7 +1437,7 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
     const offen3 = await pollUntil<string>(ui.cdp, `const a = (${w2}).querySelector(".okit-collapsible-header")?.getAttribute("aria-expanded"); return a === "true" ? a : null;`, 2000, 200);
     record(NAMEN[4]!, weg === true && offen3 === "true", `Ueberschreibung ${weg ? "entfernt" : "noch da"}, Abschnitt ${offen3 === "true" ? "offen" : "zugeklappt"}`);
   } catch (e) {
-    for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+    for (const n of NAMEN) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
     if (ui) await closeSettings(cdp, ui);
     if (fake) await fake.close().catch(() => undefined);
@@ -1454,7 +1561,7 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
     record(NAMEN[8]!, okV9 && nachV9.zeile === SCHUTZ_MODELL && !nachV9.global,
       okV9 ? `Modell der Zeile: ${JSON.stringify(nachV9.zeile)} (erwartet ${JSON.stringify(SCHUTZ_MODELL)}), globales Feld llm.model: ${nachV9.global ? "da" : "fehlt"}` : "Deutungslauf lieferte kein Ergebnis");
   } catch (e) {
-    for (const n of NAMEN) if (!checks.some((c) => c.name === n)) skipped(n, `Messung abgebrochen: ${(e as Error).message}`);
+    for (const n of NAMEN) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
     if (fake) await fake.close().catch(() => undefined);
     if (vorher !== null) {
@@ -1489,7 +1596,7 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
   const name = "M4 Deutung streamt gegen den echten Endpunkt";
   const url = "http://127.0.0.1:1234";
   const modell = await geladenesModell(url);
-  if (modell === null) { skipped(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht — nichts gemessen (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
+  if (modell === null) { unmeasured(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
   const vorher = await cdp.evaluate<{ eps: unknown; choice: unknown; thinking: unknown }>(`
     const l = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm;
     const r = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.request;
@@ -1534,16 +1641,19 @@ async function zeilenZahlSelector(ui: SettingsUi, selector: string): Promise<num
 
 // ─── Hauptlauf ─────────────────────────────────────────────────────────────────────
 
+/** D1-D5 (Bildlauf) und E1-E3 (Speichern): haengen beide an der Bildgenerierung. */
+const BILD_NAMEN = PUNKTE.filter((n) => /^[DE]\d/.test(n));
+
 async function main(): Promise<void> {
-  const argv = process.argv.slice(2);
-  const arg = (name: string): string | undefined => {
-    const i = argv.indexOf(name);
-    return i >= 0 ? argv[i + 1] : undefined;
-  };
-  const port = Number(arg("--port") ?? 9222);
-  const vault = arg("--vault");
-  const endpoint = arg("--endpoint") ?? "http://127.0.0.1:8000";
-  const keinBild = argv.includes("--kein-bild");
+  const args = parseArgs(process.argv.slice(2));
+  const portRoh = args.value("--port");
+  const port = Number(portRoh);
+  if (portRoh === undefined || !Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error(`--port <Zahl> fehlt oder ist ungueltig (${JSON.stringify(portRoh)}). Den Port der eigenen Zweitinstanz angeben (Rezept im Dateikopf, z. B. 9400).`);
+  }
+  const vault = args.value("--vault") ?? PLUGIN_ID;
+  const endpoint = args.value("--endpoint") ?? "http://127.0.0.1:8000";
+  const keinBild = args.has("--kein-bild");
 
   // Die Fixture ist dieselbe, die auch die Unit-Tests fuettert — ein zweiter Workflow
   // waere ein zweiter Wahrheitsbegriff.
@@ -1556,7 +1666,10 @@ async function main(): Promise<void> {
     fs.readFile(`${process.cwd()}/tests/fixtures/comfy-sdxl.json`, "utf8"),
   );
 
-  const cdp = await Cdp.attach(port, vault);
+  // `attachTo` waehlt das Fenster mit `app.workspace.rootSplit.doc === document` — `Cdp.attach` nahm das erste
+  // Fenster mit passendem Titel und war bei einem Pop-out mit gleichem Titel mehrdeutig.
+  const cdp = await attachTo("workspace", port, vault);
+  if (!cdp) throw new Error(`Kein Obsidian-Fenster fuer Vault „${vault}“ auf Port ${port} — laeuft die Zweitinstanz (Rezept im Dateikopf)?`);
   const protokoll: string[] = [];
   await cdp.mitschnitt((zeile) => {
     if (/yijing/i.test(zeile)) protokoll.push(zeile);
@@ -1571,6 +1684,15 @@ async function main(): Promise<void> {
     console.log("Hinweis: osascript-Aktivierung fehlgeschlagen — Messungen koennen leer bleiben.");
   }
   await schlaf(1500);
+
+  // Ein frischer Staging-Vault startet im Restricted Mode, ein frisches Profil fragt „Dem Ersteller vertrauen“:
+  // `bereiteInstanzVor` bestaetigt den Dialog und schaltet frei — nur im eigenen Staging-Vault (`nurVault`,
+  // heisst wie das Repo); in einem fremden Vault bleibt es beim Pruefpunkt A1 mit Ansage. `manifest.id` = Repo-Name.
+  if (!(await cdp.evaluate<boolean>(`return Boolean(app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]);`))) {
+    const r = await bereiteInstanzVor(cdp, { pluginIds: [PLUGIN_ID], nurVault: PLUGIN_ID, sprache: "en" });
+    instanzHinweis = r.hinweis;
+    console.log(`Instanz vorbereitet: ${r.hinweis}`);
+  }
 
   // Herkunfts-Guard: laeuft dieser Smoke ueberhaupt gegen UNSEREN Build? Der Pfad kommt aus
   // der LAUFENDEN Instanz, nicht aus stagingVaultDir(REPO_NAME) — ein Treiber dockt per
@@ -1699,21 +1821,24 @@ async function main(): Promise<void> {
     await abschnittMigration(cdp);
     await abschnittSettings(cdp, port, workflowFixture);
     await abschnittDeklarativ(cdp, port);
-    if (!argv.includes("--kein-manager")) await pruefeManager(cdp, port);
+    if (args.has("--kein-manager")) {
+      for (const n of PUNKTE.filter((x) => /^M[123]/.test(x))) skipped(n, "--kein-manager gesetzt");
+    } else {
+      await pruefeManager(cdp, port);
+      await pruefeTabWechsel(cdp, port);
+    }
     await pruefeAnfrage(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {
-      skipped("D Bildlauf", "--kein-bild gesetzt");
-      skipped("E Speichern", "haengt am Bildlauf");
+      for (const n of BILD_NAMEN) skipped(n, "--kein-bild gesetzt (Bildlauf und Speichern abgewaehlt)");
     } else {
       const erreichbar = await fetch(`${endpoint.replace(/\/+$/, "")}/system_stats`)
         .then((r) => r.ok)
         .catch(() => false);
       if (!erreichbar) {
-        skipped("D Bildlauf", `ComfyUI unter ${endpoint} nicht erreichbar`);
-        skipped("E Speichern", "haengt am Bildlauf");
+        for (const n of BILD_NAMEN) unmeasured(n, `ComfyUI unter ${endpoint} nicht erreichbar`);
       } else {
         await abschnittBild(cdp, endpoint, workflowFixture);
         await abschnittSpeichern(cdp, aufraeumen);
@@ -1761,31 +1886,17 @@ async function main(): Promise<void> {
       for (const z of protokoll.slice(0, 20)) console.log(`  ${z}`);
     }
 
-    const bestanden = checks.filter((c) => c.passed).length;
-    const nachsatz = uebersprungen.length
-      ? ` · ${uebersprungen.length} Abschnitt(e) NICHT gelaufen: ${uebersprungen.join(", ")}`
-      : "";
-    // Kein einziger Pruefpunkt = Abbruch vor der ersten Messung (typisch: der
-    // Herkunfts-Guard). Das darf NICHT als Bilanz erscheinen: "0/0 bestanden" liest sich wie
-    // ein bestandener Lauf, und `bestanden === checks.length` ist bei 0 === 0 wahr — der
-    // exitCode waere 0 gewesen. Gerettet hat ihn bisher nur die unbehandelte Exception; wer
-    // sie je faengt, haette einen "erfolgreichen" Lauf ohne eine einzige Messung.
-    // Gemessen am 2026-09-02, unmittelbar nachdem der Guard ins try wanderte und das finally
-    // erstmals im Abbruchfall lief — der Fix des einen Fehlers hat den anderen sichtbar
-    // gemacht, der vorher hinter dem uebersprungenen finally lag.
-    if (checks.length === 0) {
-      console.log("\nKEIN Pruefpunkt gelaufen — der Lauf wurde abgebrochen, bevor gemessen wurde.");
-      cdp.close();
-      process.exitCode = 1;
-    } else {
-      console.log(`\nErgebnis: ${bestanden}/${checks.length} bestanden${nachsatz}`);
-      for (const c of checks.filter((c) => !c.passed)) console.log(`  ❌ ${c.name} — ${c.detail}`);
-      if (herkunftsWarnung) {
-        console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
-      }
-      cdp.close();
-      process.exitCode = bestanden === checks.length ? 0 : 1;
+    // Die Abschlusszeile traegt alle vier Zustaende: ein uebersprungener oder nie gemessener Punkt gehoert IN sie,
+    // sonst wird aus „60 gruen“ beim Zitieren ein vollstaendiger Lauf. `abschluss()` setzt Exit 1 bei Rot ODER
+    // nichts gemessen; ein Abbruch vor der ersten Messung zaehlt dabei alle Punkte als „nichts gemessen“.
+    bilanz.abschluss();
+    for (const p of bilanz.eintraege()) {
+      if (p.zustand === "rot" || p.zustand === "nichts-gemessen") console.log(`  ${p.name} — ${p.detail}`);
     }
+    if (herkunftsWarnung) {
+      console.log(`\n⚠️  Diese Bilanz ist NICHT fuer den Repo-Stand belegt: ${herkunftsWarnung}`);
+    }
+    cdp.close();
     // Abmelden, sonst haengt ein SPAETES Signal (nach normalem Abschluss, cdp schon zu) den
     // Prozess in onAbortSignal an einer toten Verbindung auf.
     process.off("SIGINT", onAbortSignal);
@@ -1793,4 +1904,4 @@ async function main(): Promise<void> {
   }
 }
 
-void main();
+runDriver(main);

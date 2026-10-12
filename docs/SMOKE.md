@@ -3,7 +3,7 @@
 Was dieses Plugin gegen ein **laufendes** Obsidian prüft, statt gegen einen Mock —
 und was bewusst Handarbeit bleibt.
 
-Treiber: `scripts/gui-smoke.ts` · Lauf: `npm run smoke:gui -- --vault <name>`
+Treiber: `scripts/gui-smoke.ts` · Lauf: `npm run smoke:gui -- --port <Port>` (der Port ist Pflicht)
 
 ## Warum es das gibt
 
@@ -18,39 +18,27 @@ Die 195 vitest-Fälle prüfen den puren Kern. Drei Dinge können sie strukturell
 
 ## Voraussetzung
 
-⚠️ **Zuerst prüfen, wer sonst an Obsidian hängt.** Obsidian ist Single-Instance — ein
-`quit` trifft die Instanz, an der möglicherweise eine andere Session arbeitet, und zerstört
-deren Zustand. Der eigene Lauf ist danach sauber grün; der Schaden entsteht woanders und
-fällt nicht auf.
+Der Lauf gehört in eine **Zweitinstanz** mit eigenem Profil und eigenem Port; die reguläre Instanz (9222) wird weder genutzt noch beendet, ein Quit träfe die Sitzungen anderer. Der Port ist Pflicht, der Treiber hat keinen Default und bricht ohne `--port` mit Exit 2 ab. Das vollständige Rezept steht im Kopf von `scripts/gui-smoke.ts` (Profil, `.asar` der regulären Instanz, `obsidian.json` mit dem Staging-Vault und `"language":"en"`, Lock je Port). Der Vertrauensdialog und der Restricted Mode eines frischen Profils erledigt der Treiber selbst (`bereiteInstanzVor`, nur im Staging-Vault `yijing-oracle`).
 
 ```bash
-lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "läuft bereits — NICHT beenden"
+UD=/tmp/obs-test-yijing-oracle; mkdir -p "$UD"
+lsof -nP -iTCP:9400 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
+OBSIDIAN_PLUGIN_DIR="$STAGING_VAULTS_DIR/yijing-oracle/.obsidian/plugins/yijing-oracle" npm run deploy
+/Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9400 &
+python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke :9400" --exclusive focus --port 9400 --ttl 300
+npm run smoke:gui -- --port 9400
+python3 ~/.claude/hooks/obsidian-cdp-lock.py release
 ```
 
-Hört der Port schon, dann **mitnutzen statt neu starten**: ein eigenes Fenster per
-`vault-open` über IPC öffnen, dann `attachTo("workspace", port, vault)` — der Vault-Name
-wählt, nicht die Reihenfolge. ⚠️ Die Port-Prüfung ersetzt die Frage nicht: sie zeigt aktive
-CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den Port wartet.
+Optionen: `--port` (Pflicht) · `--vault` (Default `yijing-oracle`) · `--endpoint` (ComfyUI, Default `http://127.0.0.1:8000`) · `--kein-bild` (D und E gelten als übersprungen, Lauf dauert dann ~20 s statt ~60 s) · `--kein-manager` (M1–M3 und M1b gelten als übersprungen).
 
-Erst wenn nichts läuft — oder nach Absprache mit dem, der es benutzt — gilt das Rezept unten.
+## Bilanz in vier Zuständen
 
-Obsidian muss mit offenem Debug-Port laufen. Das ist der einzige Handgriff, der Handarbeit
-bleibt — die App muss dafür neu gestartet werden:
-
-```bash
-osascript -e 'quit app "Obsidian"'
-open -a Obsidian --args --remote-debugging-port=9222
-OBSIDIAN_PLUGIN_DIR="<vault>/.obsidian/plugins/yijing-oracle" npm run deploy
-npm run smoke:gui -- --vault <vault-name>
-```
-
-Optionen: `--port` (Default 9222) · `--endpoint` (ComfyUI, Default `http://127.0.0.1:8000`) ·
-`--kein-bild` (Abschnitte D/E überspringen, Lauf dauert dann ~20 s statt ~60 s).
+Die letzte Zeile nennt grün · rot · übersprungen · nichts gemessen, bezogen auf die Soll-Liste `PUNKTE` im Treiber (der Nenner). **Übersprungen** heißt „in dieser Lage nicht anwendbar“ (`--kein-bild`, `--kein-manager`, Obsidian ohne native 1.13-Settings-API). **Nichts gemessen** heißt „Gegenstand nicht erreicht“ (kein Modell in LM Studio geladen, ComfyUI nicht erreichbar, Einstellungen nicht zu öffnen, Messung abgebrochen) und setzt Exit 1, ebenso ein roter Punkt. Ein Abbruch vor der ersten Messung ist Exit 2.
 
 ## Was der Lauf am Vault ändert — und zurückdreht
 
-Er läuft im **produktiven** Vault (seit 2026-07-16 gibt es keinen Wegwerf-Vault mehr).
-Deshalb:
+Er läuft im Staging-Vault `yijing-oracle` (`$STAGING_VAULTS_DIR`), nie im Arbeits-Vault. Trotzdem setzt er jeden Zustand zurück, den er anlegt:
 
 - Die `data.json` wird **vor** dem Lauf gelesen, zusätzlich als `data.json.smoke-rescue`
   gesichert und im `finally` zurückgeschrieben; die letzte Zeile der Ausgabe meldet, ob sie
@@ -69,13 +57,13 @@ Deshalb:
 | D1–D5 | Bild-Kasten erscheint · Generieren startet · PNG kommt an · Anzeige zeigt Fortschritt **oder nennt seinen Grund** · Szenen-Satz steht darunter | 4, 7 |
 | E1–E3 | Speichern legt genau eine Notiz an · Notiz trägt den Text · Bild liegt als Anhang und ist eingebettet | 8 |
 | F1–F9 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur · die Endpunkt-Zeile bleibt über Aliase (u. a. „token“) auffindbar · das API-Schlüssel-Feld der Zeile ist maskiert (nach „Schlüssel ändern“) · eine Eingabe landet im Schlüsselbund-Eintrag der Zeile, nicht in `data.json` · die Hilfe-Zeile steht oben | — (F1–F5 neu mit 0.5.0, F6–F7 mit dem Auth-Fix 2026-09-02, F6–F8 mit dem Verbindungs-Tausch auf Schlüssel je Zeile umgeschrieben) |
-| M1–M4 | LLM Endpoint Manager (Fake): die Einstellungen zeigen den Manager statt der lokalen Liste · ein Lauf nutzt seinen Endpunkt und sein Modell (auch die Wahl) · ohne Manager wieder die lokale Liste · Deutung gegen einen echten Endpunkt (braucht ein geladenes Modell, sonst „nichts gemessen“) | — |
+| M1–M4, M1b | LLM Endpoint Manager (Fake): M1b: ein Manager, der sich erst nach dem Zeichnen und Cachen des Tabs installiert, erscheint nach einem Tab-Wechsel (nicht nur nach Schließen und Öffnen) · die Einstellungen zeigen den Manager statt der lokalen Liste · ein Lauf nutzt seinen Endpunkt und sein Modell (auch die Wahl) · ohne Manager wieder die lokale Liste · Deutung gegen einen echten Endpunkt (braucht ein geladenes Modell, sonst „nichts gemessen“) | — |
 | N1–N6 | Abschnitt „Anfrage“ (Sampling-Profile, Modus creative): klappt auf · Bearbeitungen bleiben offen · gesendeter Body folgt Defaults und Einstellungen · Zurücksetzen · „Letzte Anfrage“ | — |
 | V1–V9 | Verbindung (Kit 0.53.0): eine Zeile mit Klartext-Schlüssel landet nach `resolve` im Schlüsselbund und nicht in `data.json` · der Schlüssel geht als Bearer an den Endpunkt · ein Geheimnis in der Frage geht als Platzhalter an den Draht (nicht im Klartext) und kommt in der Deutung im Original zurück · eine Antwort mit Bild-URL und Platzhalter erzeugt kein `img` · ein `dataviewjs`-Block rendert als Text · V9: eine Zeile ohne Modell bekommt das erste Listenmodell über `setModel` | — (neu mit dem Verbindungs-Tausch; Gegenproben: Neutralisierung entfernt → V5/V6 rot, `redact: false` → V3/V4 rot) |
 | V7–V8 | Gespeicherte Deutung: die Notiz trägt die entschärfte Form (```` ```text ```` statt `dataviewjs` und `mermaid`, kein Fernbild, auch nicht als Referenz-Definition mit Zeilenumbruch im Label), und der Zähler am Draht des Fake-Servers bleibt beim Speichern 0 | — (Gegenprobe code-kit 0.16.0 im Vendor: V7/V8 rot, `GET /pixel` 2) |
 
 > [!bug] M1 war bis 2026-10-09 rot, ohne je gemessen zu haben
-> `wurzelAusdruck(ui)` lieferte im Einstellungen-Fenster `document`, und `Document.textContent` ist immer `null`: M1 las den Leerstring, fand den Manager-Text „nicht“ und blieb rot — die Baseline führte das als vorbestehenden Plugin-Befund. Gemessen wird jetzt an `document.body`, und M1/M3 warten, bis der Tab gezeichnet ist. **Ein Prüfpunkt, der immer rot ist, hat seinen Prüfling vielleicht nie berührt** (CORE-TEST-15).
+> `wurzelAusdruck(ui)` lieferte im Einstellungen-Fenster `document`, und `Document.textContent` ist immer `null`: M1 las den Leerstring, fand den Manager-Text „nicht“ und blieb rot — die Baseline führte das als vorbestehenden Plugin-Befund. Gemessen wird jetzt an `document.body`, und M1/M3 warten, bis der Tab gezeichnet ist. **Ein Prüfpunkt, der immer rot ist, hat seinen Prüfling vielleicht nie berührt** (CORE-TEST-15). Der Cockpit-Befund „Settings-Tab zeigt einen neu installierten Manager nicht sofort“ stammte aus genau dieser Fehlmessung; M1b misst den Fall (Tab gecacht, Manager danach installiert, Rückkehr von einem anderen Tab) mit gültiger Leseart und ist grün.
 
 **Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen, ob sich das Panel
 flüssig anfühlt, und der Export eines zweiten Workflows aus ComfyUI (Schritte 5, 10, 11 der
