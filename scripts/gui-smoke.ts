@@ -57,7 +57,8 @@
  */
 
 
-import { Cdp, attachTo, bereiteInstanzVor, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, bereiteInstanzVor, entferneFakeManager, installFakeManager as installZentralFakeManager, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
 import { join } from "node:path";
@@ -153,6 +154,7 @@ const PUNKTE = [
   "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs und ```mermaid, kein Fernbild, auch nicht als Referenz-Definition), kein dataviewjs-Code im DOM",
   "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
   "V9 Zeile ohne Modell: das Panel nimmt das erste Modell der Liste und merkt es in der aktiven Zeile (setModel)",
+  "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt",
   "M4 Deutung streamt gegen den echten Endpunkt",
   "D1 Bild-Kasten erscheint bei gesetztem Endpunkt",
   "D2 Generieren startet",
@@ -1034,111 +1036,51 @@ const LOCAL_FALLBACK_MODEL = "smoke-lokal-modell";
 
 interface FakeChatEndpoint { url: string; close: () => Promise<void>; chatCalls: () => number; lastModel: () => string | null; lastBody: () => Record<string, unknown> | null; lastAuth: () => string | null; pixelCalls: () => number }
 
-/** Eigener Mini-HTTP-Server statt eines echten LLM-Servers oder des echten Manager-Plugins —
- *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in
- *  view.ts), nicht den Manager selbst. Sammelt den Request-Body VOLLSTAENDIG ein, bevor
- *  geantwortet wird (kein Race gegen die eigene Antwort — Fund aus lingotuner 66bd0be). */
+/** Duenne Huelle ueber den zentralen LLM-Stub (`tools/obsidian-cdp/llm-stub.ts`) statt eines eigenen Mini-Servers —
+ *  M1-M3 pruefen die KONSUMENTEN-Seite (resolveLlmEndpoint()/findEndpointManager() in view.ts), nicht den Manager
+ *  selbst. `/pixel` (V7/V8: ein Fernbild, das die Notiz von selbst laedt, landet hier, der Zaehler misst am Draht)
+ *  ist eine Zusatzroute des Stubs. */
 async function startFakeChatEndpoint(modelId: string, antwort?: (body: Record<string, unknown>) => string): Promise<FakeChatEndpoint> {
-  const { createServer } = await import("node:http");
-  let chatCalls = 0;
-  let lastModel: string | null = null;
-  let lastBody: Record<string, unknown> | null = null;
-  let lastAuth: string | null = null;
-  let pixelCalls = 0;
-  const server = createServer((req, res) => {
-    // Der Renderer laeuft unter app://obsidian.md — ohne CORS-Header blockt der Browser den
-    // Preflight (OPTIONS) und die eigentliche Anfrage sieht der Server nie.
-    res.setHeader("Access-Control-Allow-Origin", "*");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return; }
-    if (req.url?.includes("/v1/models") === true) {
-      res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ data: [{ id: modelId, object: "model" }] }));
-      return;
-    }
-    // V7/V8: ein Fernbild, das die Notiz von selbst laedt, landet hier — der Zaehler misst am Draht.
-    if (req.method === "GET" && req.url?.startsWith("/pixel") === true) {
-      pixelCalls += 1;
-      res.writeHead(200, { "Content-Type": "image/gif" });
-      res.end(Buffer.from("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7", "base64"));
-      return;
-    }
-    if (req.method === "POST" && req.url?.includes("/v1/chat/completions") === true) {
-      let body = "";
-      req.on("data", (chunk: Buffer) => { body += chunk.toString("utf8"); });
-      req.on("end", () => {
-        chatCalls += 1;
-        lastAuth = typeof req.headers.authorization === "string" ? req.headers.authorization : null;
-        try { lastBody = JSON.parse(body) as Record<string, unknown>; lastModel = (lastBody.model as string | undefined) ?? null; } catch { lastBody = null; lastModel = null; }
-        res.writeHead(200, { "Content-Type": "text/event-stream" });
-        const inhalt = antwort && lastBody ? antwort(lastBody) : "ok";
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: { content: inhalt }, finish_reason: null }], model: modelId })}\n\n`);
-        res.write(`data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }], model: modelId })}\n\n`);
-        res.write("data: [DONE]\n\n");
-        res.end();
-      });
-      return;
-    }
-    res.writeHead(404);
-    res.end();
+  const stub = await startLlmStub({
+    models: [modelId],
+    standard: { text: "ok", model: modelId },
+    antwort: antwort
+      ? (anfrage) => {
+          const body = anfrage.json as Record<string, unknown> | null;
+          return body ? { text: antwort(body), model: modelId } : undefined;
+        }
+      : undefined,
+    zusatz: { "GET /pixel": () => ({ body: Buffer.from(PIXEL_GIF, "base64"), contentType: "image/gif" }) },
   });
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const address = server.address();
-  const port = typeof address === "object" && address ? address.port : 0;
+  const letzteChat = () => stub.letzte("chat");
   return {
-    url: `http://127.0.0.1:${port}`,
-    close: () => new Promise<void>((resolve) => { server.close(() => { resolve(); }); }),
-    chatCalls: () => chatCalls,
-    lastModel: () => lastModel,
-    lastBody: () => lastBody,
-    lastAuth: () => lastAuth,
-    pixelCalls: () => pixelCalls,
+    url: stub.url,
+    close: () => stub.stop(),
+    chatCalls: () => stub.zaehler().chat,
+    lastModel: () => ((letzteChat()?.json as { model?: string } | null)?.model) ?? null,
+    lastBody: () => (letzteChat()?.json as Record<string, unknown> | null) ?? null,
+    lastAuth: () => { const h = letzteChat()?.header.authorization; return typeof h === "string" ? h : null; },
+    pixelCalls: () => stub.zaehler().zusatz,
   };
 }
 
-/** Injiziert eine FAKE `llm-endpoint-manager`-API — `findEndpointManager()` prueft nur die
- *  FORM (version===1 + alle Methoden als Funktion), keine Herkunft. `config.model` (nicht nur
- *  `defaultModel`) ist gesetzt, weil der ECHTE Manager beides setzt — ohne das Feld wuerde ein
- *  Fehler wie lingotuners C1 (config.model ueberschreibt eine getroffene Modellwahl) hier
- *  nicht reproduziert. Sichert einen vorher vorhandenen Eintrag statt ihn zu ueberschreiben
- *  (`window.__smokeVorherManager`, IM Renderer geparkt — ein echtes Plugin-Objekt traegt
- *  Methoden, die eine CDP-Rundreise ueber Node nicht ueberlebt). */
+const PIXEL_GIF = "R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/** Fake `llm-endpoint-manager` (Plugin-API v1) aus der zentralen Brücke. `configModel: "default"`: `config.model` ist
+ *  gesetzt, weil der ECHTE Manager beides setzt — ohne das Feld würde ein Fehler wie lingotuners C1 (config.model
+ *  überschreibt eine getroffene Modellwahl) hier nicht reproduziert. Die Brücke sichert einen vorgefundenen Eintrag
+ *  im Renderer und stellt ihn beim Abbau identisch wieder her. */
 async function installFakeManager(cdp: Cdp, url: string): Promise<void> {
-  await cdp.evaluate(`
-    if (!("__smokeVorherManager" in window)) {
-      window.__smokeVorherManager = app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] ?? null;
-    }
-    const ep = { id: "fake-mgr-ep", label: "Fake Manager Endpoint", url: ${JSON.stringify(url)}, provider: "openai", capabilities: ["chat"], defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)}, enabled: true, hasSecret: false };
-    const api = {
-      version: 1,
-      list: (filter) => [ep],
-      get: (id) => (id === ep.id ? ep : null),
-      resolve: async (capability, opts) => ({ id: ep.id, label: ep.label, config: { url: ${JSON.stringify(url)}, model: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }, defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }),
-      materialize: async (id, opts) => (id === ep.id ? { id: ep.id, label: ep.label, config: { url: ${JSON.stringify(url)}, model: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} }, defaultModel: ${JSON.stringify(MANAGER_DEFAULT_MODEL)} } : { error: "not-found" }),
-      models: async (id) => (id === ep.id ? [${JSON.stringify(MANAGER_DEFAULT_MODEL)}] : { error: "not-found" }),
-      importEndpoints: async (eps, capability) => ({ added: [], merged: [], skipped: eps.map((e) => e.url) }),
-      on: (event, cb) => (() => {}),
-    };
-    app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] = { api };
-    return { ok: true };
-  `);
+  await installZentralFakeManager(cdp, {
+    pluginId: MANAGER_PLUGIN_ID,
+    endpunkte: [{ id: "fake-mgr-ep", label: "Fake Manager Endpoint", url, models: [MANAGER_DEFAULT_MODEL], defaultModel: MANAGER_DEFAULT_MODEL, configModel: "default" }],
+  });
 }
 
-/** Stellt den VOR `installFakeManager()` vorgefundenen Eintrag wieder her, statt ihn zu
- *  loeschen — idempotent bei einem Aufruf ohne vorheriges `installFakeManager()`. */
+/** Stellt den VOR `installFakeManager()` vorgefundenen Eintrag wieder her; ohne Sicherung löscht die Brücke nur,
+ *  was selbst ein Fake ist. */
 async function removeFakeManager(cdp: Cdp): Promise<void> {
-  await cdp.evaluate(`
-    if ("__smokeVorherManager" in window) {
-      const vorher = window.__smokeVorherManager;
-      if (vorher === null) delete app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}];
-      else app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}] = vorher;
-      delete window.__smokeVorherManager;
-    } else {
-      delete app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}];
-    }
-    return { ok: true };
-  `);
+  await entferneFakeManager(cdp, { pluginId: MANAGER_PLUGIN_ID });
 }
 
 const MANAGED_TEXT = ["Endpunkte kommen vom LLM Endpoint Manager", "Endpoints come from the LLM Endpoint Manager"];
@@ -1588,6 +1530,63 @@ async function geladenesModell(url: string): Promise<string | null> {
   }
 }
 
+/** L1: der Denkblock der Deutung (buildStreamArea, `reasoning`) waechst waehrend des Stroms und ist sichtbar, bevor
+ *  die Antwort beginnt. Gegen den zentralen Stub mit Reasoning-Deltas (`reasoning_content`), der Takt haelt den
+ *  Strom lange genug offen. Gueltig nur, wenn der Strom beim zweiten Messwert noch laeuft (sonst nichts gemessen).
+ *  „Folge-Regel“ gibt es hier nicht: `view.ts` baut den Bereich ohne `scrollEl`, der Body ist unbegrenzt hoch
+ *  (Befund an den Master, kein Prüfpunkt). */
+const DENK_NAME = "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt";
+const DENK_MODELL = "smoke-denk-modell";
+
+async function pruefeDenkblockLive(cdp: Cdp): Promise<void> {
+  console.log("\nL · Denkblock live");
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({
+      models: [DENK_MODELL],
+      standard: { reasoning: "Ich wäge die Linien gegeneinander ab und prüfe den Wandel. ".repeat(8), text: "Die Deutung beginnt erst nach dem Denken.", laenge: 20, takt: 300, nachlaufMs: 4000 },
+    });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: ${JSON.stringify(DENK_MODELL)} }]; p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    if (!(await openPanel(cdp))) { unmeasured(DENK_NAME, "Panel oeffnet nicht"); return; }
+    await cdp.evaluate(`
+      const q = document.querySelector(".yijing-oracle .yijing-question");
+      if (q) { q.value = "Smoke L: Denkblock"; q.dispatchEvent(new Event("input")); }
+      return true;`);
+    if (!(await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button"))) { unmeasured(DENK_NAME, "Wurf-Knopf nicht gefunden"); return; }
+    await schlaf(500);
+    if (!(await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button"))) { unmeasured(DENK_NAME, "Deuten-Knopf nicht gefunden"); return; }
+    const messe = `return { denk: (document.querySelector(".okit-stream-reasoning pre")?.textContent ?? "").length, tail: (document.querySelector(".okit-stream-tail")?.textContent ?? "").length, strom: Boolean(document.querySelector(".okit-stream")), sichtbar: (() => { const d = document.querySelector(".okit-stream-reasoning"); return Boolean(d && d.open); })() };`;
+    const erst = await pollUntil<{ denk: number; tail: number; strom: boolean; sichtbar: boolean }>(cdp, `const m = (() => { ${messe} })(); return m.denk > 0 ? m : null;`, 15000, 150);
+    if (!erst) { record(DENK_NAME, false, "kein Reasoning-Text im Denkblock innerhalb von 15 s"); return; }
+    await schlaf(1000);
+    const zweit = await cdp.evaluate<{ denk: number; tail: number; strom: boolean; sichtbar: boolean }>(messe);
+    if (!zweit.strom || zweit.tail > 0) { unmeasured(DENK_NAME, `Strom nicht mehr im Denken beim zweiten Messwert (Strom ${String(zweit.strom)}, Antwort ${zweit.tail} Zeichen) — Lage nicht hergestellt`); return; }
+    record(DENK_NAME, erst.tail === 0 && erst.sichtbar && zweit.denk > erst.denk,
+      `Denktext ${erst.denk} → ${zweit.denk} Zeichen, Antwort ${erst.tail} → ${zweit.tail} Zeichen, Block offen: ${erst.sichtbar ? "ja" : "nein"}`);
+  } catch (e) {
+    unmeasured(DENK_NAME, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`).catch(() => null);
+    if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
 /** M4: die Deutung gegen einen ECHTEN Endpunkt — der eigentliche Beleg des Kit-Chat-Clients
  *  (M2/M3 laufen gegen einen Fake-Server mit einem Chunk). Ohne geladenes Modell "nichts gemessen". */
 async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
@@ -1829,6 +1828,7 @@ async function main(): Promise<void> {
     }
     await pruefeAnfrage(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
+    await pruefeDenkblockLive(cdp);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {
