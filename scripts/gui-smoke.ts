@@ -154,6 +154,9 @@ const PUNKTE = [
   "V7 Die gespeicherte Notiz traegt die entschaerfte Form (```text statt ```dataviewjs und ```mermaid, kein Fernbild, auch nicht als Referenz-Definition), kein dataviewjs-Code im DOM",
   "V8 Die gespeicherte Notiz laedt das Fernbild nicht (Zaehler am Draht bleibt 0)",
   "V9 Zeile ohne Modell: das Panel nimmt das erste Modell der Liste und merkt es in der aktiven Zeile (setModel)",
+  "L2 Folge-Regel: Hochscrollen mitten im Strom wird respektiert, die Ansicht springt nicht wieder nach unten",
+  "L3 Kontrolle: die Deutung folgt dem Strom ohne Störung bis zum Ende",
+  "L4 Kontrolle: die Deutung folgt auch bei absatzgroßen Stücken bis zum Ende",
   "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt",
   "M4 Deutung streamt gegen den echten Endpunkt",
   "D1 Bild-Kasten erscheint bei gesetztem Endpunkt",
@@ -1587,6 +1590,113 @@ async function pruefeDenkblockLive(cdp: Cdp): Promise<void> {
   }
 }
 
+type StubHandle = Awaited<ReturnType<typeof startLlmStub>>;
+interface FolgeErgebnis { art: "ok" | "rot" | "ungueltig"; detail: string }
+
+/** Folge-Regel in einem Strom: erst die KONTROLLE (ohne Störung folgt der Bereich), dann die STÖRUNG (`scrollTop = 0` mitten im
+ *  Strom wird respektiert). Gültig nur bei Überlauf ≥ 80 px zum Zeitpunkt der Messung (Folge-Schwelle 40 px plus 40 px Spielraum),
+ *  laufendem Strom (`unterwegs > 0`) und mindestens drei weiteren Stücken nach der Störung — sonst „ungültig“ (CORE-TEST-22).
+ *  Gleiche Vorschrift wie in vault-rag, ghostline u. a. (Master-Rundschreiben Welle 20). */
+async function messeFolge(cdp: Cdp, scrollSel: string, stub: StubHandle): Promise<{ kontrolle: FolgeErgebnis; folge: FolgeErgebnis }> {
+  const lies = `const el = document.querySelector(${JSON.stringify(scrollSel)}); if (!el) return null;
+    return { top: el.scrollTop, hoehe: el.scrollHeight, sicht: el.clientHeight, laenge: (el.textContent || "").length };`;
+  type M = { top: number; hoehe: number; sicht: number; laenge: number } | null;
+  const ungueltig = (grund: string): { kontrolle: FolgeErgebnis; folge: FolgeErgebnis } =>
+    ({ kontrolle: { art: "ungueltig", detail: grund }, folge: { art: "ungueltig", detail: grund } });
+  const voll = await pollUntil<NonNullable<M>>(cdp, `const m = (() => { ${lies} })(); return m && m.hoehe - m.sicht >= 80 ? m : null;`, 40_000, 100);
+  if (!voll) return ungueltig(`der Überlauf von ${scrollSel} erreichte in 40 s nie 80 px — Gültigkeitsbedingung nicht hergestellt`);
+  // Die Ansicht überläuft hier schon vor dem Strom (Verlauf, Bild-Kasten): der Nutzer steht zu Beginn oben und folgt damit
+  // per Definition nicht. Die Kontrolle stellt „der Nutzer liest am Ende“ selbst her, bevor sie misst.
+  await cdp.evaluate(`const el = document.querySelector(${JSON.stringify(scrollSel)}); if (el) el.scrollTop = el.scrollHeight; return true;`);
+  await schlaf(300);
+  const start = (await cdp.evaluate<M>(lies)) ?? voll;
+  const proben: NonNullable<M>[] = [start];
+  for (let i = 0; i < 2; i++) {
+    await schlaf(400);
+    const m = await cdp.evaluate<M>(lies);
+    if (m) proben.push(m);
+  }
+  const letzte = proben[proben.length - 1]!;
+  const gewachsen = letzte.laenge > start.laenge && letzte.hoehe > start.hoehe;
+  const abstaende = proben.map((m) => Math.round(m.hoehe - m.top - m.sicht));
+  let kontrolle: FolgeErgebnis;
+  if (!gewachsen || stub.zaehler().unterwegs === 0) kontrolle = { art: "ungueltig", detail: `Strom wuchs nicht (Text ${start.laenge} → ${letzte.laenge}, Höhe ${start.hoehe} → ${letzte.hoehe}) oder lief nicht mehr` };
+  else kontrolle = { art: abstaende.every((d) => d <= 24) ? "ok" : "rot", detail: `Abstand zum Ende ${abstaende.join(" / ")} px (≤ 24), Text ${start.laenge} → ${letzte.laenge} Zeichen, Überlauf ${Math.round(start.hoehe - start.sicht)} px` };
+  const z0 = await cdp.evaluate<{ top: number; laenge: number; ueberlauf: number } | null>(`
+    const el = document.querySelector(${JSON.stringify(scrollSel)}); if (!el) return null;
+    el.scrollTop = 0;
+    return { top: el.scrollTop, laenge: (el.textContent || "").length, ueberlauf: el.scrollHeight - el.clientHeight };`);
+  if (!z0) return { kontrolle, folge: { art: "ungueltig", detail: "Scroll-Element verschwunden" } };
+  const danach = await pollUntil<NonNullable<M>>(cdp, `const m = (() => { ${lies} })(); return m && m.laenge >= ${z0.laenge + 24} ? m : null;`, 4_000, 100);
+  let folge: FolgeErgebnis;
+  if (z0.ueberlauf < 80) folge = { art: "ungueltig", detail: `Überlauf bei der Störung nur ${Math.round(z0.ueberlauf)} px (< 80)` };
+  else if (!danach || stub.zaehler().unterwegs === 0) folge = { art: "ungueltig", detail: "nach der Störung kamen keine drei weiteren Stücke oder der Strom war zu Ende" };
+  else folge = { art: danach.top <= z0.top + 4 ? "ok" : "rot", detail: `scrollTop zur Störung ${Math.round(z0.top)} → ${Math.round(danach.top)} nach ${danach.laenge - z0.laenge} weiteren Zeichen, Überlauf ${Math.round(z0.ueberlauf)} px` };
+  return { kontrolle, folge };
+}
+
+function zeichneFolge(name: string, e: FolgeErgebnis): void {
+  if (e.art === "ungueltig") unmeasured(name, `Messung ungültig: ${e.detail}`);
+  else record(name, e.art === "ok", e.detail);
+}
+
+/** L2–L4: Folge-Regel und Kontrollen der Deutung (Ansicht `view-content` scrollt, `scrollEl` des Stream-Bereichs). Token- und
+ *  absatzgroße Stücke je ein Strom. */
+async function pruefeFolgeRegel(cdp: Cdp): Promise<void> {
+  console.log("\nL · Folge-Regel");
+  const NAMEN = { folge: "L2 Folge-Regel: Hochscrollen mitten im Strom wird respektiert, die Ansicht springt nicht wieder nach unten", kontrolle: "L3 Kontrolle: die Deutung folgt dem Strom ohne Störung bis zum Ende", absatz: "L4 Kontrolle: die Deutung folgt auch bei absatzgroßen Stücken bis zum Ende" } as const;
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  const zeilen = (k: number): string => Array.from({ length: k }, (_, i) => `Zeile ${String(i + 1).padStart(3, "0")}: abcdefghij klmnopqrs\n`).join("");
+  const absaetze = (k: number): string[] => Array.from({ length: k }, (_, j) => Array.from({ length: 5 }, (_, i) => `Absatz ${String(j + 1).padStart(2, "0")} Zeile ${i + 1}: abcdefghij klmnopqrs\n`).join("") + "\n");
+  let stub: StubHandle | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({ models: [DENK_MODELL], standard: { text: "ok" } });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: ${JSON.stringify(DENK_MODELL)} }]; p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    const starten = async (): Promise<boolean> => {
+      if (!(await openPanel(cdp))) return false;
+      await cdp.evaluate(`
+        const q = document.querySelector(".yijing-oracle .yijing-question");
+        if (q) { q.value = "Smoke L: Folge-Regel"; q.dispatchEvent(new Event("input")); }
+        return true;`);
+      if (!(await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button"))) return false;
+      await schlaf(500);
+      return clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+    };
+    for (const variante of ["token", "absatz"] as const) {
+      stub.antworten([variante === "token" ? { text: zeilen(120), laenge: 8, takt: 40, nachlaufMs: 6000 } : { stuecke: absaetze(24), takt: 300, nachlaufMs: 6000 }]);
+      if (!(await starten())) {
+        for (const n of variante === "token" ? [NAMEN.folge, NAMEN.kontrolle] : [NAMEN.absatz]) unmeasured(n, "Panel/Deuten-Knopf nicht bedienbar — nichts gemessen");
+      } else {
+        const r = await messeFolge(cdp, ".view-content.yijing-oracle", stub);
+        if (variante === "token") { zeichneFolge(NAMEN.kontrolle, r.kontrolle); zeichneFolge(NAMEN.folge, r.folge); }
+        else zeichneFolge(NAMEN.absatz, r.kontrolle);
+      }
+      await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`).catch(() => null);
+      await stub.trenneAlle();
+      await schlaf(800);
+    }
+  } catch (e) {
+    for (const n of Object.values(NAMEN)) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
 /** M4: die Deutung gegen einen ECHTEN Endpunkt — der eigentliche Beleg des Kit-Chat-Clients
  *  (M2/M3 laufen gegen einen Fake-Server mit einem Chunk). Ohne geladenes Modell "nichts gemessen". */
 async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
@@ -1829,6 +1939,7 @@ async function main(): Promise<void> {
     await pruefeAnfrage(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
+    await pruefeFolgeRegel(cdp);
     await pruefeEchtenEndpunkt(cdp);
 
     if (keinBild) {

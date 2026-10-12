@@ -292,6 +292,9 @@ export class OracleView extends ItemView {
       const streamArea = buildStreamArea(area, {
         strings: { reasoning: t("view.reasoningHead") },
         cls: "yijing-stream",
+        // Der Wirt scrollt (die ganze Ansicht), nicht der Bereich: ohne `scrollEl` hat der Body keine begrenzte Höhe, `followTail`
+        // bewegt nichts und die wachsende Deutung läuft unter den Rand (Befund Welle 20, gemessen im GUI-Smoke).
+        scrollEl: this.contentEl,
         reasoningOpen: this.reasoningOpen,
         onReasoningToggle: (open) => {
           this.reasoningOpen = open;

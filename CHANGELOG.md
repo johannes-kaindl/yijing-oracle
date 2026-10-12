@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The interpretation follows while it is written.** The live answer used to grow below the lower edge of the panel without the view scrolling along; now it follows to the end as long as you are at the bottom, also when a table, a code block or a whole paragraph arrives in one piece. Scrolling up still pauses it and does not pull you back.
+
+### Changed
+
+- **Endpoint list (LLM and image endpoint rows): the "move to front" and "remove endpoint" buttons stay together** instead of the trash can standing alone in a second row when the row wraps; the key and model fields are a little narrower, the address stays fully visible (obsidian-kit 0.59.0).
+- **Settings, section "Request": "not detected yet" instead of "unknown".** For an endpoint whose model family is not known yet, the header reads "Family: not detected yet · Backend: not detected yet" with a hint that this is normal for a freshly added endpoint and that the LLM Endpoint Manager records family and backend; the fields read "Not sent yet — waiting for the model family" (obsidian-kit 0.59.0).
+- Vendored `obsidian-kit` 0.59.0 (was 0.56.0) and `code-kit` 0.24.0 (was 0.23.0). The other releases in between change nothing you see in this plugin.
+
 ## [0.14.0] — 2026-10-12
 
 ### Changed
