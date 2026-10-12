@@ -1,11 +1,11 @@
 // Bildmeditation: Backend-Wahl, Endpunkt (+ Verbindungstest), Workflow (ComfyUI),
 // Stil, Negativ-Prompt, Größe.
 import { type Setting, setIcon } from "obsidian";
-import { t } from "../../vendor/kit/i18n";
+import { getLang, t } from "../../vendor/kit/i18n";
 import { normalizeEndpoint } from "../../vendor/kit/endpoint";
 import { DEFAULT_IMAGE_SETTINGS, type ImageSettings } from "../../core/image-settings";
-import { statusKindKey } from "../../core/settings/endpoint-editor-model";
 import { inspectWorkflow, type WorkflowSlots } from "../../core/comfy/workflow";
+import { endpointStatusText } from "../../vendor/kit-obsidian/endpoint-status-text";
 import { probeComfyEndpoint, probeImageEndpoint } from "../http";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
 
@@ -89,7 +89,7 @@ function endpointRow(ctx: SectionCtx, img: ImageSettings, isComfy: boolean): Set
             statusEl.removeClass("is-checking");
             setIcon(statusEl, status.reachable ? "circle-check" : "circle-x");
             statusEl.addClass(status.reachable ? "is-ok" : "is-error");
-            statusEl.setAttribute("aria-label", t(statusKindKey(status.kind)));
+            statusEl.setAttribute("aria-label", endpointStatusText(status.kind, { lang: getLang() }));
           }),
         );
     },
