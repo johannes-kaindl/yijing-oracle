@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The endpoint row shows the model's context length again.** Under a reachable row with a model it reads "Context: loaded N · max M tokens", or "Context: max M tokens" / "Context: loaded N tokens" when the server names only one of the two; nothing is shown when it names neither. It comes from the shared endpoint list now, not from a line of this plugin. The lookup asks LM Studio first and Ollama second (new), and every attempt gives up after 5 s, so a server that accepts the connection and never answers no longer holds the settings.
+- **The model dropdown of an endpoint row offers "— (server picks)" again.** Choosing it removes the model from that row, so the server decides (EN "— (server picks)", DE "— (Server wählt)"). In 0.13.0 a model you had set could not be cleared in the dropdown.
+- **New notes get a different file name when the question or the filename scheme contains characters a file system rejects.** Until now they were deleted (`Re: A/B` → `Re AB`, `Was jetzt?` → `Was jetzt`); now each becomes `_` (`Re_ A_B`, `Was jetzt_`), in the question **and** in the filename scheme (`: / # ^ [ ] \ ? * " < > |`). Existing notes keep their names; a name that already exists still gets ` (2)`. The question is still cut to 48 characters.
+- **The tooltips of the image endpoint's status icon use the wording of the shared endpoint list** (EN/DE), e.g. "Connection refused — server not running or wrong port." and, for an unknown failure, "Not reachable" without a dangling dash. They no longer come from this plugin's own table.
+- **Vendored `obsidian-kit` 0.56.0 (was 0.53.0) and `code-kit` 0.23.0 (was 0.21.0).** What a user sees from the skipped releases: removing a reply's `<think>` block no longer takes seconds on degenerate answers (code-kit 0.22.0); long streamed replies render faster and leak fewer remote sources (obsidian-kit 0.54.0, the DOM guard works incrementally); an unfinished render block is no longer cut off when the panel closes (obsidian-kit 0.55.0). The new endpoint-row texts (context length, "server picks", status tooltips) are in obsidian-kit 0.56.0.
+
 ## [0.13.0] — 2026-10-11
 
 ### Changed
