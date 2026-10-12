@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.14.1] — 2026-10-12
+
 ### Fixed
 
 - **The interpretation follows while it is written.** The live answer used to grow below the lower edge of the panel without the view scrolling along; now it follows to the end as long as you are at the bottom, also when a table, a code block or a whole paragraph arrives in one piece. Scrolling up still pauses it and does not pull you back.
