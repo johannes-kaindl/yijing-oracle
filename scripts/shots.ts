@@ -38,11 +38,11 @@
  *    Produktionscode eine Test-Hintertuer zu oeffnen.
  * 2. **Zwei Bilder haengen an fremden Servern** (LLM, ComfyUI). Sie fehlen mit Ansage,
  *    statt einen Platzhalter zu zeigen: ein gestelltes Bild waere schlimmer als keines.
- * 3. **Die Aufnahmesprache ist app-weit.** Der Treiber prueft sie und stellt sie nach dem
- *    Lauf auf den Vorwert zurueck (wirksam beim naechsten Start).
+ * 3. **Die Aufnahmesprache ist app-weit** und gehoert deshalb ins Profil der Zweitinstanz (`obsidian.json`, Rezept oben);
+ *    der Treiber prueft sie und fasst die obsidian.json der regulaeren Instanz nie an.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 
@@ -441,18 +441,8 @@ async function main(): Promise<void> {
     for (const zeile of buildVault({ repoRoot, vaultDir, fixtureDir, pluginId: PLUGIN_ID })) {
       console.log(`  ${zeile}`);
     }
-    // Aufnahmesprache app-weit auf Englisch. Der Vorwert wird neben dem Vault abgelegt,
-    // damit ihn der Aufnahmelauf zurueckstellen kann — sonst startet der Arbeits-Vault
-    // des Maintainers kuenftig auf Englisch (Skill-Befund markdown-presentation).
-    const cfg = join(env.HOME ?? "", "Library", "Application Support", "obsidian", "obsidian.json");
-    if (existsSync(cfg)) {
-      const daten = JSON.parse(readFileSync(cfg, "utf-8")) as Record<string, unknown>;
-      const vorher = typeof daten.language === "string" ? daten.language : "";
-      writeFileSync(join(vaultDir, "..", `.${REPO_NAME}-language`), vorher);
-      daten.language = "en";
-      writeFileSync(cfg, JSON.stringify(daten, null, 2));
-      console.log(`  Aufnahmesprache auf "en" gesetzt (Vorwert "${vorher || "(leer)"}" gemerkt)`);
-    }
+    // Die Aufnahmesprache (Englisch) gehoert ins Profil der Zweitinstanz (`"language":"en"` in `$UD/obsidian.json`,
+    // Rezept im Dateikopf), nie in die obsidian.json der regulaeren Instanz: --setup schreibt dort nichts.
     console.log(
       "\nJetzt die Zweitinstanz starten (Rezept im Dateikopf: eigenes Profil mit diesem Vault in obsidian.json,\n" +
         "eigener Port, z. B. 9400; die reguläre Instanz wird nicht beendet):\n" +
@@ -495,7 +485,7 @@ async function main(): Promise<void> {
   if (sprache && sprache !== "en") {
     console.log(
       `⚠️  Obsidians Oberflaeche steht auf "${sprache}", der Vertrag verlangt Englisch.\n` +
-        "    `npm run shots -- --setup` setzt die Sprache; sie wird erst nach einem Neustart wirksam.\n" +
+        "    Die Sprache gehoert ins Profil der Zweitinstanz (`\"language\":\"en\"` in obsidian.json, Rezept im Dateikopf).\n" +
         "    Der Lauf geht weiter — die Bilder tragen dann die falsche Sprache.",
     );
   }
@@ -568,28 +558,6 @@ async function main(): Promise<void> {
       console.log(`  ✗ settings.png — ${(err as Error).message}`);
       fehlend++;
     }
-  }
-
-  // Aufnahmesprache zurueckstellen (wirksam beim naechsten Start) — nur nach einem
-  // vollstaendigen Lauf. Bei `--only` waere die Serie sonst nach dem ersten Bild
-  // zurueckgestellt, und das naechste Obsidian startete mitten in der Aufnahme in der
-  // falschen Sprache.
-  const merker = join(stagingVaultDir(REPO_NAME), "..", `.${REPO_NAME}-language`);
-  if (!nur && existsSync(merker)) {
-    const vorher = readFileSync(merker, "utf-8");
-    const cfg = join(env.HOME ?? "", "Library", "Application Support", "obsidian", "obsidian.json");
-    if (existsSync(cfg)) {
-      const daten = JSON.parse(readFileSync(cfg, "utf-8")) as Record<string, unknown>;
-      if (vorher) daten.language = vorher;
-      else delete daten.language;
-      writeFileSync(cfg, JSON.stringify(daten, null, 2));
-    }
-    await cdp.evaluate(
-      vorher
-        ? `localStorage.setItem("language", ${JSON.stringify(vorher)}); return true;`
-        : `localStorage.removeItem("language"); return true;`,
-    );
-    console.log(`\n  Aufnahmesprache auf "${vorher || "(Systemsprache)"}" zurueckgestellt (ab naechstem Start).`);
   }
 
   console.log(`\n${ok} Bild(er) geschrieben, ${fehlend} offen.`);
