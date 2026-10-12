@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.56.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.59.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -135,8 +135,19 @@ export interface StreamArea {
   /** Den laufenden Absatz setzen. */
   setTail(text: string): void;
   tailText(): string;
-  /** Ans Ende scrollen — aber nur, wenn der Nutzer nicht selbst hochgescrollt hat. */
+  /** Ans Ende scrollen — aber nur, wenn der Nutzer nicht selbst hochgescrollt hat. Misst
+   *  „unten?“ JETZT, also nach einem Wachstum: wuchs der Inhalt in einem Schritt um mehr als die
+   *  Schwelle, gilt der Nutzer als hochgescrollt. Wer den Inhalt selbst ändert, nimmt
+   *  `withFollow` (misst davor); `followTail()` bleibt für den Fall, dass nichts gewachsen ist. */
   followTail(): void;
+  /** Führt `mutate` aus und folgt danach bis ans Ende — wenn der Nutzer VOR der Änderung unten
+   *  war. Wer hochgescrollt hat, wird nicht gezogen. `appendReasoning`, `setReasoning`,
+   *  `setTail` und `push` des `StableMarkdownWriter` laufen alle durch diese Regel; ein Absatz,
+   *  eine Tabelle oder ein Codeblock, der in einem Zug kommt und höher ist als die Schwelle,
+   *  reißt den Bereich damit nicht mehr vom Ende. Verschachtelt gilt die Messung der
+   *  äußersten Stelle (die innere sieht bereits den gewachsenen Inhalt, folgt also nur, wenn
+   *  sie ohnehin unten ist). */
+  withFollow(mutate: () => void): void;
   /** Zurück auf Anfang: Body leer, Tail leer, Gedankenblock weg. Der nächste Lauf
    *  beginnt sichtbar neu, statt unter den vorigen zu schreiben. */
   reset(): void;
@@ -148,7 +159,11 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
   const openByDefault = opts.reasoningOpen ?? true;
 
   const rootEl = parent.createDiv({ cls: "okit-stream" });
-  if (opts.cls !== undefined && opts.cls !== "") rootEl.addClass(opts.cls);
+  // Obsidians addClass wirft bei einem Leerzeichen (InvalidCharacterError) — mehrere Klassen einzeln.
+  const addClasses = (el: HTMLElement, cls: string | undefined): void => {
+    for (const c of (cls ?? "").split(/\s+/)) if (c !== "") el.addClass(c);
+  };
+  addClasses(rootEl, opts.cls);
 
   // Reihenfolge ist Teil des Vertrags: Gedanken über dem Text, Status unter beidem.
   // Der Gedankenblock entsteht erst beim ersten Gedanken — sein PLATZ steht aber schon
@@ -157,7 +172,7 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
   // ihn per `empty()`, statt sich auf den Elternbezug eines Einzelknotens zu verlassen.
   const reasonSlot = rootEl.createDiv({ cls: "okit-stream-reasoning-slot" });
   const bodyEl = rootEl.createDiv({ cls: "okit-stream-body" });
-  if (opts.bodyCls !== undefined && opts.bodyCls !== "") bodyEl.addClass(opts.bodyCls);
+  addClasses(bodyEl, opts.bodyCls);
   const scrollEl = opts.scrollEl ?? bodyEl;
   if (scrollEl !== bodyEl) rootEl.addClass("okit-stream--host-scroll");
   const tailEl = bodyEl.createDiv({ cls: "okit-stream-tail" });
@@ -194,19 +209,22 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
     rootEl, bodyEl, tailEl, statusEl, scrollEl,
 
     appendReasoning(text: string): void {
-      const pre = ensureReasoning();
-      reasonRaw += text;
-      pre.setText(reasonRaw);
-      // Symmetrisch zu push() im StableMarkdownWriter, das selbst followTail() ruft — sonst
-      // schiebt ein lange denkendes Modell den Strom unter die Kante, ohne dass etwas folgt
-      // (Befund aus der ersten Adoption, 2026-09-11: lingotuner rief followTail() bisher
-      // selbst nach appendReasoning auf, um genau das auszugleichen).
-      this.followTail();
+      // Folgt selbst, symmetrisch zu push() im StableMarkdownWriter — sonst schiebt ein lange
+      // denkendes Modell den Strom unter die Kante, ohne dass etwas folgt (Befund aus der
+      // ersten Adoption, 2026-09-11: lingotuner rief followTail() bisher selbst nach
+      // appendReasoning auf). „Unten?“ wird VOR dem Wachsen gemessen (Welle 20, kuro).
+      this.withFollow(() => {
+        const pre = ensureReasoning();
+        reasonRaw += text;
+        pre.setText(reasonRaw);
+      });
     },
     setReasoning(text: string): void {
-      const pre = ensureReasoning();
-      reasonRaw = text;
-      pre.setText(reasonRaw);
+      this.withFollow(() => {
+        const pre = ensureReasoning();
+        reasonRaw = text;
+        pre.setText(reasonRaw);
+      });
     },
     reasoningText(): string { return reasonRaw; },
     setReasoningSummary(text: string): void {
@@ -214,13 +232,19 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       reasonSummaryEl?.setText(text);
     },
 
-    setTail(text: string): void { tailEl.setText(text); },
+    setTail(text: string): void { this.withFollow(() => { tailEl.setText(text); }); },
     tailText(): string { return tailEl.textContent ?? ""; },
 
     followTail(): void {
       if (!follow) return;
       if (!atBottom()) return;
       scrollEl.scrollTop = scrollEl.scrollHeight ?? 0;
+    },
+
+    withFollow(mutate: () => void): void {
+      const war = follow && atBottom();
+      mutate();
+      if (war) scrollEl.scrollTop = scrollEl.scrollHeight ?? 0;
     },
 
     reset(): void {

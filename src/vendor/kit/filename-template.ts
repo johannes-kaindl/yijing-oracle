@@ -1,4 +1,4 @@
-// vendored from code-kit@0.23.0, src/ts/pure/filename-template.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from code-kit@0.24.0, src/ts/pure/filename-template.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Konfigurierbares Dateinamen-Schema: `{platzhalter}` auflösen, das Ergebnis auf
  *  dateisystem- und Obsidian-sichere Zeichen bringen, und über eine Fallback-Kette
  *  absichern, dass kein leerer Dateiname entsteht. Obsidian-frei (PROF-OBS-03/04) und
@@ -37,9 +37,10 @@
  *  ⚠️ **Die Zeichenklasse `INVALID` ist load-bearing.** Sie steht byte-identisch in drei
  *  veröffentlichten Plugins; ein zusätzliches oder entferntes Zeichen benennt bestehende
  *  Exporte **still** um — kein Typfehler, kein Testfehler, nur andere Dateinamen. Die
- *  engere Klasse `[\\/:*?"<>|]` der `sanitizeBase`-Familie (epub-exporter, apple-health,
- *  paperless-storage und `obsidian-letterhead/src/obsidian/output.ts`) ist ein **eigener**
- *  Kandidat (REGISTRY-Zeile 143) und darf hier nicht mit hineingezogen werden.
+ *  engere Klasse `[\\/:*?"<>|]` der `sanitizeBase`-Familie ist deshalb **nicht** in `INVALID`
+ *  hineingezogen worden: sie steht seit 0.24.0 als eigene Funktion {@link sanitizeBase} daneben
+ *  (epub-exporter, health-vitals; die Zeichenklasse steht auch in apple-health und paperless-storage,
+ *  `obsidian-letterhead/src/obsidian/output.ts` ersetzt sie dagegen durch `_` und bleibt dort).
  *
  *  ⚠️ **`Object.hasOwn` ist load-bearing, nicht Kosmetik.** Mit `subs[key] ?? …` liefert
  *  eine als Objekt-Literal gebaute `subs`-Map für `{toString}`, `{constructor}`,
@@ -129,6 +130,34 @@ export function sanitizeFilename(
     .replace(INVALID, opts.onInvalid === "strip" ? "" : "_")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+/** Die enge Klasse der `sanitizeBase`-Familie: nur die neun Zeichen, die ein Dateisystem verbietet. */
+const INVALID_BASE = /[\\/:*?"<>|]/g;
+
+/** Entfernt die neun dateisystem-illegalen Zeichen `\ / : * ? " < > |` aus einem Basisnamen, trimmt und liefert
+ *  `fallback`, wenn nichts übrig bleibt. Die Zeile, die epub-exporter (`core/output-path.ts:7`, „Untitled") und
+ *  health-vitals (`core/export-path.ts:15`, „Export") je einzeln schrieben — nur der Fallback unterscheidet sie.
+ *
+ *  ⚠️ **Das ist NICHT {@link sanitizeFilename} und trägt es nicht bitgleich.** Dort ist die Klasse weiter
+ *  (zusätzlich `# ^ [ ]`), `onInvalid` ersetzt standardmäßig durch `_`, und Whitespace-Folgen werden zu einem
+ *  Leerzeichen kollabiert. Hier wird **entfernt** (`Re: A/B` → `Re AB`), `# ^ [ ]` bleiben stehen und innere
+ *  Leerzeichen bleiben, wie sie sind. Ein Umstieg zwischen den beiden benennt still bestehende Exportdateien um —
+ *  jedes Repo nimmt die Funktion, deren Ergebnis seine Nutzer schon auf der Platte haben.
+ *
+ *  Ein dritter Verwandter, `obsidian-letterhead/src/obsidian/output.ts:25`, nutzt dieselbe Klasse, **ersetzt** aber durch
+ *  `_` (Fallback „Brief") — andere Semantik, bleibt dort und wird nicht hierher gezogen.
+ *
+ *  Der `fallback` ist Pflicht und kommt **verbatim** zurück (wie `lastResort`): eine Entwickler-Konstante, keine
+ *  Nutzereingabe. Wer einen leeren Namen will, übergibt `""` ausdrücklich.
+ *
+ *  Kein `(s || "")`-Guard wie in {@link sanitizeFilename}: keiner der beiden Träger hatte ihn, und ein `undefined`
+ *  soll dort weiter werfen statt still `fallback` zu liefern.
+ *
+ *  @example sanitizeBase('Re: A/B', "Brief") // → "Re AB"
+ *  @example sanitizeBase("///", "Export")    // → "Export" */
+export function sanitizeBase(name: string, fallback: string): string {
+  return name.replace(INVALID_BASE, "").trim() || fallback;
 }
 
 /** Löst `{platzhalter}` im Template gegen `subs` auf und sanitisiert das Ergebnis; bleibt
