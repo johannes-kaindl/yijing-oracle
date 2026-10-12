@@ -38,11 +38,7 @@ Schlüsselnamen zurückfallen lassen: in der Endpunkt-Zeile stünde `set.ep.stat
 aussehend wie ein String, nicht wie ein Fehler (in `markdown-presentation` und `vault-crews`
 bereits eingetreten). Beides ist jetzt da: der Schlüssel in EN und DE, die Datei auf Kit 0.29.0.
 
-**Was an seine Stelle tritt, ist kein Vermerk, sondern ein Wächter.**
-`tests/i18n-status-keys.test.ts` hält einen `Record<EndpointStatusKind, true>`; bringt ein
-Kit-Nachzug eine weitere Statusklasse mit, bricht er am `typecheck:test`, bevor der rohe
-Schlüssel eine Oberfläche erreicht (CORE-TEST-04, Form aus `obsidian-transmute`). Gegenprobe
-gefahren: eine erfundene Klasse in der Union lässt genau diesen Record brechen.
+**Was an seine Stelle trat, ist kein Vermerk, sondern ein Wächter — und er liegt seit obsidian-kit 0.56.0 im Kit.** Das Plugin führt keine eigenen Status-Schlüssel mehr: die Texte der Endpunkt-Zeile kommen aus `endpointStatusText`, der Wächter ist `tests/endpoint-status-text.test.ts` im Kit (ein `Record<EndpointStatusKind, true>`; bringt ein Kit-Nachzug eine weitere Statusklasse mit, bricht er dort am Typcheck, bevor ein roher Schlüssel eine Oberfläche erreicht, CORE-TEST-04). Hier bleibt nur `set.ep.status.checking` (der UI-eigene Zustand während der Bild-Probe). Der frühere Wächter `tests/i18n-status-keys.test.ts` ist mit dem Tausch (Welle 18) entfallen.
 **Die Lehre gilt über diesen Fall hinaus:** ein Sperrvermerk in einer Datei ist eine Notiz, die
 nur wirkt, wenn jemand sie liest — und Vendoring ist der Vorgang, bei dem niemand liest. Wo ein
 Vermerk „nicht beiläufig nachziehen" sagt, gehört stattdessen etwas hin, das beim Nachziehen
