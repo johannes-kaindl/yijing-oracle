@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.14.0] — 2026-10-12
+
 ### Changed
 
 - **The endpoint row shows the model's context length again.** Under a reachable row with a model it reads "Context: loaded N · max M tokens", or "Context: max M tokens" / "Context: loaded N tokens" when the server names only one of the two; nothing is shown when it names neither. It comes from the shared endpoint list now, not from a line of this plugin. The lookup asks LM Studio first and Ollama second (new), and every attempt gives up after 5 s, so a server that accepts the connection and never answers no longer holds the settings.
