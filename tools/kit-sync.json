@@ -20,7 +20,7 @@
       "dir": "src/vendor/kit",
       "source": "obsidian-kit",
       "from": "src/pure",
-      "modules": ["callout", "endpoint-secret-hook", "endpoint-source"],
+      "modules": ["callout", "endpoint-secret-hook", "endpoint-source", "image-gen-provider"],
       "rewrite": [["../vendor/code-kit/pure/", "./"], ["../vendor/code-kit/web/", "./"]]
     },
     {
