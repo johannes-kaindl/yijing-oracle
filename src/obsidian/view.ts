@@ -422,6 +422,10 @@ export class OracleView extends ItemView {
         onReasoning: (tok) => {
           if (c.interpretation) { c.interpretation.reasoning += tok; this.updateStreamDom(c); }
         },
+        // Gemma schreibt sein Denken ohne Öffner in den Antworttext und meldet es erst mit `<channel|>`: bis dahin gesammelter Text ist Denken.
+        onContentReset: () => {
+          if (c.interpretation) { c.interpretation.answer = ""; this.streamArea?.resetContent(); this.updateStreamDom(c); }
+        },
         signal: this.abortCtrl.signal,
       });
       if (!res.ok) {

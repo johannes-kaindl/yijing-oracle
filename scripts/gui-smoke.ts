@@ -1196,8 +1196,12 @@ async function laufeDeutung(cdp: Cdp, wartenMs = 15000, frage = "Smoke M: Endpun
     cdp,
     `const body = document.querySelector(".yijing-interpretation-body");
      const tail = document.querySelector(".okit-stream-tail");
+     // Ein Modell, das sein Denken in den Antworttext schreibt (gemma4 ohne Öffner), zeigt es bis zum Kanal-Ende als Antwort:
+     // so lange der Text so anfängt und der Denkblock leer ist, ist es noch Denken und zählt nicht als Deutung.
+     const denktText = tail && /^\\s*(Thinking Process|Thought Process|The user wants)/i.test(tail.textContent || "")
+       && !((document.querySelector(".okit-stream-reasoning pre") || { textContent: "" }).textContent || "").trim();
      return (Boolean(body && body.textContent && body.textContent.trim().length > 0)
-       || (${genugZeichen} > 0 && Boolean(tail && tail.textContent && tail.textContent.length >= ${genugZeichen}))) ? true : null;`,
+       || (${genugZeichen} > 0 && !denktText && Boolean(tail && tail.textContent && tail.textContent.length >= ${genugZeichen}))) ? true : null;`,
     wartenMs,
     300,
   );

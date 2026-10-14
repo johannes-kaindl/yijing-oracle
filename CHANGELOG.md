@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Gemma 4 models no longer show their thinking as the interpretation.** `google/gemma-4-e4b` ignores "thinking off" and writes its thoughts into the answer text, closed by `<channel|>`; the interpretation started with "The user wants me to interpret …". The thoughts now go to the collapsible thinking block and the interpretation starts with the actual text. While the model is still thinking, the live view shows that text until the thoughts end, then it moves to the thinking block (`obsidian-kit` 0.60.3, `code-kit` 0.27.2).
+
 ### Changed
 
 - **The meditation image now comes from the Local Image Generator plugin; the plugin's own image connection is gone.** Install and enable Local Image Generator and set up its image backend there; Yijing Oracle hands it the prompt and shows the file it writes into your vault. **Without Local Image Generator there are no images**: the image box does not appear in the panel. Removed settings (their old values are dropped from your settings file when the plugin loads): backend (A1111 / ComfyUI), image endpoint and its connection test, negative prompt, image size, steps, the ComfyUI workflow and the steps override. Server, size and negative prompt are set in Local Image Generator now (a ComfyUI workflow you pasted here belongs there). **Your style suffix stays.** See [Set up image generation](docs/image-generation.md).
@@ -14,7 +18,7 @@ All notable changes to this project are documented here. The format follows
 
 - **The finished interpretation shows the thoughts like the live view did.** After the stream ended, the thoughts used to reappear as a second, differently styled block, collapsed; now they keep the markup of the live view and stay open or closed as you left them.
 - **Settings: the explanation under "Endpoints" matches the row editor.** It no longer says "one base URL per line"; it names the row with address, key and model.
-- Vendored `obsidian-kit` 0.60.1 (was 0.59.1) and `code-kit` 0.27.1 (was 0.24.0). One thing is visible: a hint that lists dropped request parameters now lists them sorted (code-kit 0.26.0). The time stamp of a new reading (`date` in the note) is written by the shared local-time helper and looks exactly as before. Nothing else changes here: the tool-provider contract, share export, per-code manager error texts, the thinking-button style and the helper functions in between are not used by this plugin.
+- Vendored `obsidian-kit` 0.60.3 (was 0.59.1) and `code-kit` 0.27.2 (was 0.24.0). One thing is visible: a hint that lists dropped request parameters now lists them sorted (code-kit 0.26.0). The time stamp of a new reading (`date` in the note) is written by the shared local-time helper and looks exactly as before. Nothing else changes here: the tool-provider contract, share export, per-code manager error texts, the thinking-button style and the helper functions in between are not used by this plugin.
 
 ## [0.14.1] — 2026-10-12
 
