@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.60.1, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.60.3, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -151,6 +151,9 @@ export interface StreamArea {
   /** Zurück auf Anfang: Body leer, Tail leer, Gedankenblock weg. Der nächste Lauf
    *  beginnt sichtbar neu, statt unter den vorigen zu schreiben. */
   reset(): void;
+  /** Nur den Antworttext zurücknehmen: Body und Tail leer, Gedankenblock und seine Zusammenfassung bleiben. Für den Fall, dass
+   *  sich der bisher gezeigte Text als Denken erweist (Gemma 4 ohne Öffner, `onContentReset` des Chat-Clients). */
+  resetContent(): void;
 }
 
 export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): StreamArea {
@@ -247,12 +250,16 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       if (war) scrollEl.scrollTop = scrollEl.scrollHeight ?? 0;
     },
 
-    reset(): void {
+    resetContent(): void {
       // Der Tail wird GELEERT und neu eingehängt, nicht weggeworfen: Consumer halten eine
       // Referenz darauf (koda-agent tut es), die sonst ins Leere zeigte.
       bodyEl.empty();
       tailEl.setText("");
       bodyEl.appendChild(tailEl);
+    },
+
+    reset(): void {
+      this.resetContent();
       reasonSlot.empty();
       reasonPre = null;
       reasonRaw = "";
