@@ -34,6 +34,7 @@
  * # PID merken: beendet wird NUR sie, nie pkill/killall. Je Messlauf frischer Prozess.
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke Zweitinstanz :9400" --exclusive focus --port 9400 --ttl 300
  * npm run smoke:gui -- --port 9400 --vault yijing-oracle    # (b) Restricted Mode, (c) Vertrauensdialog: macht `bereiteInstanzVor`
+ * npm run smoke:gui -- --port 9400 --vault yijing-oracle --model <id>     # M4: genau dieses Modell auf :1234 (ohne Flag das erste geladene)
  * npm run smoke:gui -- --port 9400 --vault yijing-oracle --lig <Ordner>   # D10: gebauter local-image-generator (main.js, manifest.json, styles.css); ohne Flag uebersprungen
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
@@ -1173,6 +1174,8 @@ const MANAGED_TEXT = ["Endpunkte kommen vom LLM Endpoint Manager", "Endpoints co
  *  `.yijing-interpretation-inner .yijing-actions`, solange keine Deutung vorliegt. */
 /** Textlaenge der Deutung beim Ende von `laufeDeutung` (vor einem Abbruch gemessen). */
 let letzteDeutungLaenge = 0;
+/** Die ersten Zeichen der zuletzt beobachteten Deutung (nur fuer das Detail von M4: faengt der Text mit Denktext an?). */
+let letzteDeutungAnfang = "";
 
 async function laufeDeutung(cdp: Cdp, wartenMs = 15000, frage = "Smoke M: Endpunkt-Manager", genugZeichen = 0): Promise<boolean> {
   const offen = await openPanel(cdp);
@@ -1201,6 +1204,7 @@ async function laufeDeutung(cdp: Cdp, wartenMs = 15000, frage = "Smoke M: Endpun
   if (fertig) {
     // Laenge VOR einem Abbruch merken (danach ist die Deutung weg). Noch im Stream und genug Text? Dann
     // Abbrechen klicken (der einzige Knopf in .yijing-actions, solange gestreamt wird).
+    letzteDeutungAnfang = await cdp.evaluate<string>(`return ((document.querySelector(".yijing-interpretation-body")?.textContent ?? "").trim() || (document.querySelector(".okit-stream-tail")?.textContent ?? "")).replace(/\\s+/g, " ").slice(0, 80);`);
     letzteDeutungLaenge = await cdp.evaluate<number>(`return Math.max((document.querySelector(".yijing-interpretation-body")?.textContent ?? "").trim().length, (document.querySelector(".okit-stream-tail")?.textContent ?? "").length);`);
     if (genugZeichen > 0) {
       await cdp.evaluate(`if (document.querySelector(".okit-stream-tail")) document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`);
@@ -1602,12 +1606,13 @@ async function pruefeSchutz(cdp: Cdp, aufraeumen: string[]): Promise<void> {
 /** Ein bereits GELADENES Chat-Modell auf dem lokalen LM-Studio-Endpunkt, sonst `null`. Bewusst nur
  *  ein geladenes: eine Anfrage an ein nicht geladenes Modell loest ein JIT-Laden aus und
  *  verdraengt das Modell, an dem eine andere Sitzung gerade arbeitet. */
-async function geladenesModell(url: string): Promise<string | null> {
+async function geladenesModell(url: string, gewuenscht?: string): Promise<string | null> {
   try {
     const res = await fetch(`${url}/api/v0/models`, { signal: AbortSignal.timeout(3000) });
     if (!res.ok) return null;
     const body = (await res.json()) as { data?: Array<{ id: string; state?: string; type?: string }> };
-    return (body.data ?? []).find((m) => m.state === "loaded" && (m.type === "llm" || m.type === "vlm"))?.id ?? null;
+    // Mit `--model` zaehlt nur genau dieses Modell: bei mehreren geladenen (auch fremden) waehlt sonst die Reihenfolge der Liste.
+    return (body.data ?? []).find((m) => m.state === "loaded" && (m.type === "llm" || m.type === "vlm") && (gewuenscht === undefined || m.id === gewuenscht))?.id ?? null;
   } catch {
     return null;
   }
@@ -1731,11 +1736,11 @@ async function pruefeFolgeRegel(cdp: Cdp): Promise<void> {
 
 /** M4: die Deutung gegen einen ECHTEN Endpunkt — der eigentliche Beleg des Kit-Chat-Clients
  *  (M2/M3 laufen gegen einen Fake-Server mit einem Chunk). Ohne geladenes Modell "nichts gemessen". */
-async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
+async function pruefeEchtenEndpunkt(cdp: Cdp, gewuenschtesModell?: string): Promise<void> {
   console.log("\nM4 · Deutung gegen einen echten Endpunkt");
   const name = "M4 Deutung streamt gegen den echten Endpunkt";
   const url = "http://127.0.0.1:1234";
-  const modell = await geladenesModell(url);
+  const modell = await geladenesModell(url, gewuenschtesModell);
   if (modell === null) { unmeasured(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
   const vorher = await cdp.evaluate<{ eps: unknown; choice: unknown; thinking: unknown }>(`
     const l = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.llm;
@@ -1757,7 +1762,7 @@ async function pruefeEchtenEndpunkt(cdp: Cdp): Promise<void> {
     const ok = await laufeDeutung(cdp, 240_000, "Smoke M: Endpunkt-Manager", 400);
     const dauer = Math.round((Date.now() - t0) / 1000);
     const laenge = letzteDeutungLaenge;
-    record(name, ok && laenge >= 400, ok ? `${laenge} Zeichen Deutung von ${modell} nach ${dauer} s (Stream, danach abgebrochen oder beendet)` : "Deutungslauf lieferte kein Ergebnis");
+    record(name, ok && laenge >= 400, ok ? `${laenge} Zeichen Deutung von ${modell} nach ${dauer} s (Stream, danach abgebrochen oder beendet), Anfang: „${letzteDeutungAnfang}“` : "Deutungslauf lieferte kein Ergebnis");
   } finally {
     await cdp.evaluate(`
       const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
@@ -1791,6 +1796,8 @@ async function main(): Promise<void> {
   const vault = args.value("--vault") ?? PLUGIN_ID;
   // Gebauter local-image-generator (Ordner mit main.js, manifest.json, styles.css) fuer D10; ohne Flag gilt D10 als uebersprungen.
   const ligDir = args.value("--lig");
+  // Optional: das Modell fuer M4 (muss auf :1234 geladen sein); ohne Flag das erste geladene.
+  const modellFlag = args.value("--model");
 
   // `attachTo` waehlt das Fenster mit `app.workspace.rootSplit.doc === document` — `Cdp.attach` nahm das erste
   // Fenster mit passendem Titel und war bei einem Pop-out mit gleichem Titel mehrdeutig.
@@ -1946,7 +1953,7 @@ async function main(): Promise<void> {
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
     await pruefeFolgeRegel(cdp);
-    await pruefeEchtenEndpunkt(cdp);
+    await pruefeEchtenEndpunkt(cdp, modellFlag);
 
     await abschnittBild(cdp, aufraeumen, ligDir);
     await abschnittSpeichern(cdp, aufraeumen);
