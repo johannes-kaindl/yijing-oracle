@@ -7,14 +7,12 @@ Treiber: `scripts/gui-smoke.ts` · Lauf: `npm run smoke:gui -- --port <Port>` (d
 
 ## Warum es das gibt
 
-Die 195 vitest-Fälle prüfen den puren Kern. Drei Dinge können sie strukturell nicht sehen:
+Die vitest-Fälle prüfen den puren Kern. Drei Dinge können sie strukturell nicht sehen:
 
 1. **Die Settings-Migration in Obsidians Lade-Kette.** Der Unit-Test kennt das Objekt, nicht
    `loadData()` → `mergeSettings` → Spread-Reihenfolge gegen eine echte `data.json`.
-2. **Das Umschalten der Bild-Sektion.** Ob `rerender()` die richtigen Felder tauscht, steht
-   im DOM des echten Einstellungen-Fensters.
-3. **Den Bildlauf gegen die echte ComfyUI.** Ein Testdoppel kann nicht 403 antworten, weil es
-   keinen `Origin`-Header prüft — genau daran hing der Befund unten.
+2. **Die Bild-Sektion im echten Einstellungen-Fenster.** Ob die Zeile „Bildquelle“ dem Anbieter folgt, steht im DOM, nicht im Objekt.
+3. **Den Bildweg über den Kit-Vertrag `image-gen-provider`.** Bild-Kasten, Vorschau aus dem Vault, Speichern ohne Kopie und das Wegräumen ungespeicherter Bilder spielen sich im echten Vault und im echten Panel ab. Der Lauf fährt sie gegen einen Fake-Anbieter im Plugin-Register (echtes PNG, kein Server, kein Modell); der echte Anbieter ohne Modell ist D10. Die echte Bilderzeugung gehört in die Modell-Runde.
 
 ## Voraussetzung
 
@@ -30,11 +28,11 @@ npm run smoke:gui -- --port 9400
 python3 ~/.claude/hooks/obsidian-cdp-lock.py release
 ```
 
-Optionen: `--port` (Pflicht) · `--vault` (Default `yijing-oracle`) · `--endpoint` (ComfyUI, Default `http://127.0.0.1:8000`) · `--kein-bild` (D und E gelten als übersprungen, Lauf dauert dann ~20 s statt ~60 s) · `--kein-manager` (M1–M3 und M1b gelten als übersprungen).
+Optionen: `--port` (Pflicht) · `--vault` (Default `yijing-oracle`) · `--lig <Ordner>` (gebauter local-image-generator mit `main.js`, `manifest.json`, `styles.css`; ohne ihn gilt D10 als übersprungen) · `--kein-manager` (M1–M3 und M1b gelten als übersprungen).
 
 ## Bilanz in vier Zuständen
 
-Die letzte Zeile nennt grün · rot · übersprungen · nichts gemessen, bezogen auf die Soll-Liste `PUNKTE` im Treiber (der Nenner). **Übersprungen** heißt „in dieser Lage nicht anwendbar“ (`--kein-bild`, `--kein-manager`, Obsidian ohne native 1.13-Settings-API). **Nichts gemessen** heißt „Gegenstand nicht erreicht“ (kein Modell in LM Studio geladen, ComfyUI nicht erreichbar, Einstellungen nicht zu öffnen, Messung abgebrochen) und setzt Exit 1, ebenso ein roter Punkt. Ein Abbruch vor der ersten Messung ist Exit 2.
+Die letzte Zeile nennt grün · rot · übersprungen · nichts gemessen, bezogen auf die Soll-Liste `PUNKTE` im Treiber (der Nenner). **Übersprungen** heißt „in dieser Lage nicht anwendbar“ (`--lig` fehlt, `--kein-manager`, Obsidian ohne native 1.13-Settings-API). **Nichts gemessen** heißt „Gegenstand nicht erreicht“ (kein Modell in LM Studio geladen, der echte Anbieter ließ sich nicht laden, Einstellungen nicht zu öffnen, Messung abgebrochen) und setzt Exit 1, ebenso ein roter Punkt. Ein Abbruch vor der ersten Messung ist Exit 2.
 
 ## Was der Lauf am Vault ändert — und zurückdreht
 
@@ -52,10 +50,10 @@ Er läuft im Staging-Vault `yijing-oracle` (`$STAGING_VAULTS_DIR`), nie im Arbei
 | # | Prüft | Entspricht Handover-Schritt |
 |---|---|---|
 | A1–A5 | Plugin lädt · Panel öffnet · Wurf zeichnet 6 Linien · Vorschau trägt Text · Frage-Feld ist danach leer | 1 |
-| B0–B9 | Bestands-`data.json` (0.3.0-Form) lädt · `backend` fällt auf `a1111` · Endpunkt, steps/size/negativ, LLM-Liste (jetzt zwei Zeilen mit URL) und API-Schlüssel (jetzt je Zeile im Schlüsselbund unter `yijing-oracle-ep-<id>`) überleben · neue Comfy-Felder bekommen Defaults · `activeEndpoint` kommt nicht zurück · der Altwert verlässt `data.json` · das globale Modell `llm.model` wandert in die Zeilen und verschwindet (B9) | 2 |
-| C1–C7 | Einstellungen-Tab öffnet · A1111-Felder · Umschalten tauscht sie · gültiger Workflow wird erkannt (4 Node-IDs) · kaputtes JSON meldet einen Fehler · leeres Feld schweigt · Zurückschalten stellt wieder her | 3, 6, 9 |
-| D1–D5 | Bild-Kasten erscheint · Generieren startet · PNG kommt an · Anzeige zeigt Fortschritt **oder nennt seinen Grund** · Szenen-Satz steht darunter | 4, 7 |
-| E1–E3 | Speichern legt genau eine Notiz an · Notiz trägt den Text · Bild liegt als Anhang und ist eingebettet | 8 |
+| B0–B9 | Bestands-`data.json` (0.3.0-Form) lädt · der `image`-Block trägt nur noch den Stil-Zusatz (B1), der Stil-Suffix des Bestands bleibt (B2) · LLM-Liste (jetzt zwei Zeilen mit URL) und API-Schlüssel (jetzt je Zeile im Schlüsselbund unter `yijing-oracle-ep-<id>`) überleben · `activeEndpoint` kommt nicht zurück · der Altwert verlässt `data.json` · das globale Modell `llm.model` wandert in die Zeilen und verschwindet (B9) | 2 |
+| C1–C3 | Einstellungen-Tab öffnet (C1b: keine Zeile „Model“) · die Bild-Sektion trägt Bildquelle und Stil-Suffix und keins der Felder der früheren Eigenbau-Anbindung (C2) · der Hinweis folgt dem Anbieter: ohne ihn nennt er das Plugin, mit ihm die Quelle (C3) | 3, 6, 9 |
+| D0–D10 | Ohne Anbieter fehlt der Bild-Kasten (D0) · mit Anbieter erscheint er (D1) · Generieren startet (D2) · die Datei im Vault ist ein PNG und die Vorschau zeigt sie (D3) · während des Laufs steht der Status (D4) · Szenen-Satz darunter (D5) · der Prompt trägt Szene und Stil-Suffix, Zielordner ist der Anhänge-Ordner (D6) · „Neu generieren“ räumt das ungespeicherte Bild weg (D7) · ein Fehlerwert des Anbieters wird als Meldung mit Grund gezeigt, das Bild bleibt (D8) · ein neuer Wurf räumt ein ungespeichertes Bild weg (D9) · der echte local-image-generator ohne Modell: Kasten da, Knopf meldet den Grund (D10, nur mit `--lig`) | 4, 7 (Gegenprobe: `discardArtwork` wirkungslos → D7/D9 rot) |
+| E1–E4 | Speichern legt genau eine Notiz an · Notiz trägt den Text · die Note bettet die vorhandene Bilddatei ein, es entsteht keine Kopie (E3) · das gespeicherte Bild bleibt nach einem neuen Wurf (E4) | 8 |
 | F1–F9 | Tab liefert deklarative Definitionen (und der Host übernimmt sie) · bedingte Zeilen werden weggelassen statt versteckt · die Oberfläche zieht nach einer Wertänderung nach · die Einstellungen erscheinen in Obsidians **Einstellungs-Suche** · der `display()`-Fallback zeichnet dieselbe Struktur · die Endpunkt-Zeile bleibt über Aliase (u. a. „token“) auffindbar · das API-Schlüssel-Feld der Zeile ist maskiert (nach „Schlüssel ändern“) · eine Eingabe landet im Schlüsselbund-Eintrag der Zeile, nicht in `data.json` · die Hilfe-Zeile steht oben | — (F1–F5 neu mit 0.5.0, F6–F7 mit dem Auth-Fix 2026-09-02, F6–F8 mit dem Verbindungs-Tausch auf Schlüssel je Zeile umgeschrieben) |
 | M1–M4, M1b | LLM Endpoint Manager (Fake): M1b: ein Manager, der sich erst nach dem Zeichnen und Cachen des Tabs installiert, erscheint nach einem Tab-Wechsel (nicht nur nach Schließen und Öffnen) · die Einstellungen zeigen den Manager statt der lokalen Liste · ein Lauf nutzt seinen Endpunkt und sein Modell (auch die Wahl) · ohne Manager wieder die lokale Liste · Deutung gegen einen echten Endpunkt (braucht ein geladenes Modell, sonst „nichts gemessen“) | — |
 | L1–L4 | Deutung im Strom (zentraler LLM-Stub, Kit 0.59.0): L1 der Denkblock ist sichtbar und wächst, bevor die Antwort beginnt · L2 Hochscrollen mitten im Strom wird respektiert (die Ansicht springt nicht wieder nach unten) · L3/L4 die Ansicht folgt dem Strom bis zum Ende, mit token- und mit absatzgroßen Stücken; gültig nur bei Überlauf ≥ 80 px, laufendem Strom und mindestens drei Stücken nach der Störung | — (Gegenproben: ohne `scrollEl` in `view.ts` → L3/L4 rot; Kit 0.56.0 → L4 rot; `atBottom` immer wahr → L2 rot; ohne `appendReasoning` → L1 rot) |
@@ -66,12 +64,12 @@ Er läuft im Staging-Vault `yijing-oracle` (`$STAGING_VAULTS_DIR`), nie im Arbei
 > [!bug] M1 war bis 2026-10-09 rot, ohne je gemessen zu haben
 > `wurzelAusdruck(ui)` lieferte im Einstellungen-Fenster `document`, und `Document.textContent` ist immer `null`: M1 las den Leerstring, fand den Manager-Text „nicht“ und blieb rot — die Baseline führte das als vorbestehenden Plugin-Befund. Gemessen wird jetzt an `document.body`, und M1/M3 warten, bis der Tab gezeichnet ist. **Ein Prüfpunkt, der immer rot ist, hat seinen Prüfling vielleicht nie berührt** (CORE-TEST-15). Der Cockpit-Befund „Settings-Tab zeigt einen neu installierten Manager nicht sofort“ stammte aus genau dieser Fehlmessung; M1b misst den Fall (Tab gecacht, Manager danach installiert, Rückkehr von einem anderen Tab) mit gültiger Leseart und ist grün.
 
-**Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen, ob sich das Panel
-flüssig anfühlt, und der Export eines zweiten Workflows aus ComfyUI (Schritte 5, 10, 11 der
-Handover-Note). Der Lauf protokolliert übersprungene Abschnitte ausdrücklich als
+**Nicht automatisiert** (bleibt Hand-Runde): ob die Bilder *gut* aussehen und ob sich das Panel flüssig anfühlt. Die echte Bilderzeugung (Modell, Server) ist nur in der Modell-Runde gemessen, nie hier. Der Lauf protokolliert übersprungene Abschnitte ausdrücklich als
 `⏭️ übersprungen`, damit eine Lücke nicht wie ein bestandener Punkt aussieht.
 
 ## Der Befund, der diesen Smoke gerechtfertigt hat
+
+*Chronik: Die Eigenbau-Anbindung an ComfyUI und A1111, an der dieser Befund hing, ist seit Welle 22 entfernt (die Bilder kommen von local-image-generator). Der Befund bleibt als Begründung stehen, warum der Smoke gegen echte Gegenstellen läuft.*
 
 **ComfyUIs Origin-Prüfung macht den Fortschritts-WebSocket aus Obsidian heraus unmöglich.**
 

@@ -33,8 +33,7 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
   local OpenAI-compatible LLM server (LM Studio, Ollama, …); system prompt,
   endpoints and reasoning display are configurable. Off until you set an endpoint.
 - **Meditation image (optional, local)** — generate one image per reading from the
-  hexagram's curated motif via a local A1111-compatible image server (Draw Things,
-  A1111, Forge, …). Panel preview + note embed. Off until you set an endpoint —
+  hexagram's curated motif, through the Local Image Generator plugin. Panel preview + note embed. Appears once that plugin is installed —
   see [docs/image-generation.md](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md) for setup.
 
 ## Requirements
@@ -45,11 +44,10 @@ searchable, linkable, part of your thinking. Local-first, no cloud, no account.
 - **Optional, for AI interpretation:** an OpenAI-compatible local server (e.g.
   [LM Studio](https://lmstudio.ai) or [Ollama](https://ollama.com)). Endpoint and
   model (one per endpoint row) are set in the plugin settings. CORS on the server is optional: Obsidian's renderer sends `Origin: app://obsidian.md`, and most local servers reject that by default. The plugin then repeats the request without streaming, so the interpretation arrives in one piece instead of word by word. To get the live stream, enable CORS (LM Studio: `lms server start --cors`).
-- **Optional, for meditation images:** an A1111-compatible image server (e.g.
-  [Draw Things](https://drawthings.ai) with its API server enabled). See the
+- **Optional, for meditation images:** the Local Image Generator plugin (it brings the image backend: built-in engine, Draw Things, A1111, ComfyUI, …). Without it there are no images. See the
   [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
-Both optional features stay off until you configure an endpoint. Nothing ever leaves
+Both optional features stay off until you set them up (an endpoint for the interpretation, the Local Image Generator plugin for the image). Nothing ever leaves
 your machine.
 
 ## Install
@@ -126,7 +124,7 @@ Two commands skip the panel entirely and cast straight away:
 | **Note & storage** | Readings folder, filename scheme (`{date}` `{time}` `{hex}` `{resulting}` `{hexpair}` `{question}`), open-after-save. |
 | **Note content** | Frontmatter on/off plus a renameable key per field, Wilhelm's footnotes, per-section callout wrapping. |
 | **AI interpretation** | Endpoints (each row with its own API key and model), system prompt (built-in templates or your own), the **Request** section (temperature and thinking level per model family). |
-| **Image generation** | Backend (A1111/Draw Things or ComfyUI), endpoint, style suffix, negative prompt, size, steps. See the [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
+| **Image generation** | Where the images come from (the Local Image Generator plugin) and the style suffix. Server, size and negative prompt are set in that plugin. See the [setup guide](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md). |
 
 **On endpoints:** add them one row at a time — the **first reachable one wins**, so the order is the priority (**Try this endpoint first** moves a row up). That way one config covers every network (localhost at your desk, LAN IP on the go) without switching anything. Each row has its own **Test connection** button with a plain-language result, and its own optional API key and model.
 

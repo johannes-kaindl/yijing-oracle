@@ -36,13 +36,14 @@
  *    nicht. Der Treiber ersetzt `Math.random` im Renderer fuer die Dauer des Wurfs durch
  *    einen Seed-Generator und stellt es danach zurueck — reproduzierbare Bilder, ohne im
  *    Produktionscode eine Test-Hintertuer zu oeffnen.
- * 2. **Zwei Bilder haengen an fremden Servern** (LLM, ComfyUI). Sie fehlen mit Ansage,
- *    statt einen Platzhalter zu zeigen: ein gestelltes Bild waere schlimmer als keines.
+ * 2. **Zwei Bilder haengen an fremden Quellen** (LLM-Server; das Plugin local-image-generator mit einem Bildmodell, das im
+ *    Aufnahme-Vault installiert und eingerichtet sein muss). Sie fehlen mit Ansage, statt einen Platzhalter zu zeigen:
+ *    ein gestelltes Bild waere schlimmer als keines.
  * 3. **Die Aufnahmesprache ist app-weit** und gehoert deshalb ins Profil der Zweitinstanz (`obsidian.json`, Rezept oben);
  *    der Treiber prueft sie und fasst die obsidian.json der regulaeren Instanz nie an.
  */
 
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 
@@ -331,7 +332,7 @@ const SHOTS: Shot[] = [
         `return Boolean(document.querySelector(".yijing-oracle .yijing-artwork"));`,
       );
       if (!kasten) {
-        console.log("      · kein .yijing-artwork — Bild-Endpunkt in den Einstellungen leer?");
+        console.log("      · kein .yijing-artwork — local-image-generator im Aufnahme-Vault nicht installiert oder nicht aktiv?");
         return null;
       }
       if (!(await klickPanel(cdp, ".yijing-artwork .yijing-actions button", 0))) return null;
@@ -460,7 +461,6 @@ async function main(): Promise<void> {
     throw new Error(`--port <Zahl> (oder SHOTS_PORT) fehlt oder ist ungueltig (${JSON.stringify(portRoh)}). Den Port der eigenen Zweitinstanz angeben (Rezept im Dateikopf, z. B. 9400).`);
   }
   const nur = flag("--only");
-  const bildEndpunkt = flag("--image-endpoint") ?? "http://127.0.0.1:8000";
   const llmEndpunkt = flag("--llm-endpoint") ?? "http://127.0.0.1:1234";
   const modell = flag("--model") ?? "google/gemma-4-e4b";
 
@@ -518,9 +518,6 @@ async function main(): Promise<void> {
   await setPluginSetting(cdp, PLUGIN_ID, "readingLang", "en");
   await cdp.evaluate(`
     const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-    p.settings.image = { ...p.settings.image, backend: "comfyui", endpoint: ${JSON.stringify(bildEndpunkt)},
-      size: 768, comfyStepsOverride: 12,
-      comfyWorkflow: ${JSON.stringify(readFileSync(join(repoRoot, "tests", "fixtures", "comfy-sdxl.json"), "utf-8"))} };
     p.settings.llm = { ...p.settings.llm, endpoints: [{ url: ${JSON.stringify(llmEndpunkt)}, model: ${JSON.stringify(modell)} }] };
     p.llm.invalidate();
     await p.saveSettings();

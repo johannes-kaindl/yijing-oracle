@@ -32,9 +32,7 @@ npm run shots -- --list       # Vertrag anzeigen
 
 ### Was der Lauf voraussetzt
 
-- **ComfyUI** unter `http://127.0.0.1:8000` mit einem SDXL-Workflow — `artwork.png` zeigt
-  ein echt erzeugtes Bild, kein Platzhalter. Fehlt der Server, fehlt das Bild (und
-  `shots:check` meldet es).
+- **Das Plugin local-image-generator** im Aufnahme-Vault, installiert, aktiviert und mit einem laufenden Bildmodell eingerichtet — `artwork.png` zeigt ein echt erzeugtes Bild, kein Platzhalter. Fehlt das Plugin oder ist es nicht bereit, fehlt das Bild (und `shots:check` meldet es). Das Aufnahme-Rezept legt es nicht selbst an.
 - **Ein OpenAI-kompatibler LLM-Endpunkt** unter `http://127.0.0.1:1234` für
   `interpretation.png`. Dasselbe gilt: kein Server, kein Bild.
 - Die Aufnahme-Sprache ist **Englisch**. Sie ist app-weit, nicht vault-weit — der Treiber
@@ -63,7 +61,7 @@ dieses Plugin, damit keine fremden Ribbon-Icons in die Bilder geraten.
 _(Hier stehen Dinge, die beim systematischen Durchgehen der Zustände sichtbar wurden und
 nicht zur Bebilderung gehören. Leer = nichts gefunden.)_
 
-- **2026-08-16:** Der Fortschritts-Balken der Bildmeditation erscheint gegen eine
+- **2026-08-16 (Chronik: die Eigenbau-Anbindung an ComfyUI ist seit Welle 22 entfernt):** Der Fortschritts-Balken der Bildmeditation erscheint gegen eine
   Standard-ComfyUI nie — deren Origin-Prüfung weist den WebSocket aus dem Obsidian-Renderer
   ab. Gefunden vom GUI-Smoke am selben Tag, behoben (das Panel nennt den Grund jetzt);
   Einzelheiten in `docs/SMOKE.md`.

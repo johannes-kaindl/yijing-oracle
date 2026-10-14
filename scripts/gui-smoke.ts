@@ -7,10 +7,12 @@
  * ist teuer genug, dass sie liegen bleibt. Was hier automatisiert ist, kostet beim naechsten
  * Mal einen Befehl.
  *
- * Was er prueft, das die 187 vitest-Faelle strukturell nicht koennen: die **Settings-Migration
+ * Was er prueft, das die vitest-Faelle strukturell nicht koennen: die **Settings-Migration
  * gegen eine echte Bestands-`data.json`** (der Unit-Test kennt nur das Objekt, nicht Obsidians
- * Lade-Kette), das **Umschalten der Bild-Sektion** (Rerender im echten Settings-Modal) und den
- * **Bildlauf gegen die echte ComfyUI**.
+ * Lade-Kette), die **Bild-Sektion im echten Einstellungen-Fenster** und den **Bildweg ueber den
+ * Kit-Vertrag `image-gen-provider`** (Bild-Kasten, Vorschau aus dem Vault, Speichern, Aufraeumen) —
+ * gegen einen Fake-Anbieter, der ein echtes PNG ohne Server und ohne Modell schreibt. Die echte
+ * Bilderzeugung gehoert in die Modell-Runde.
  *
  * ## Zweitinstanz (der richtige Ort fuer diesen Lauf — eigenes Profil, eigener Port)
  *
@@ -32,7 +34,7 @@
  * # PID merken: beendet wird NUR sie, nie pkill/killall. Je Messlauf frischer Prozess.
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke Zweitinstanz :9400" --exclusive focus --port 9400 --ttl 300
  * npm run smoke:gui -- --port 9400 --vault yijing-oracle    # (b) Restricted Mode, (c) Vertrauensdialog: macht `bereiteInstanzVor`
- * npm run smoke:gui -- --port 9400 --vault yijing-oracle --kein-bild   # D und E gelten als uebersprungen (Flag)
+ * npm run smoke:gui -- --port 9400 --vault yijing-oracle --lig <Ordner>   # D10: gebauter local-image-generator (main.js, manifest.json, styles.css); ohne Flag uebersprungen
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
  *
@@ -41,8 +43,8 @@
  * ## Bilanz in vier Zustaenden (CORE-TEST-19)
  *
  * gruen · rot · uebersprungen · nichts gemessen; `PUNKTE` ist der Nenner. Uebersprungen heisst „in dieser
- * Lage nicht anwendbar" (`--kein-bild`, Obsidian ohne native 1.13-Settings-API); „Gegenstand nicht
- * erreicht" (Einstellungen nicht zu oeffnen, kein Modell geladen, ComfyUI nicht erreichbar, Messung
+ * Lage nicht anwendbar" (`--lig` fehlt, Obsidian ohne native 1.13-Settings-API); „Gegenstand nicht
+ * erreicht" (Einstellungen nicht zu oeffnen, kein Modell geladen, Anbieter nicht ladbar, Messung
  * abgebrochen) ist „nichts gemessen" und setzt Exit 1. Abbruch vor der ersten Messung: Exit 2.
  *
  * ⚠️ Chromium drosselt das Rendering nicht-fokussierter Fenster: ohne ein sichtbares Fenster bleibt die Ansicht leer
@@ -78,9 +80,9 @@ const DATA_RESCUE = `.obsidian/plugins/${PLUGIN_ID}/data.json.smoke-rescue`;
 const EP_SECRET_PREFIX = `${PLUGIN_ID}-ep-`;
 const LEGACY_SECRET_ID = "yijing-oracle-llm-api-key";
 
-/** Bestands-`data.json` in der Form von 0.3.0: kennt weder `backend` noch `comfyWorkflow`
- *  noch `comfyStepsOverride`. Genau das ist Schritt 2 der Handover-Checkliste — die Frage
- *  ist nicht, ob die neuen Felder Defaults bekommen, sondern ob die **alten** ueberleben. */
+/** Bestands-`data.json` in der Form von 0.3.0 mit dem alten `image`-Block der Eigenbau-Anbindung (A1111-Endpunkt, Groesse,
+ *  Schritte, Negativ-Prompt). Seit der Ablösung durch local-image-generator bleibt davon nur der Stil-Zusatz; die Frage ist,
+ *  ob der ueberlebt und der Rest beim Laden verschwindet. */
 const BESTAND_030 = {
   register: "neutral",
   readingLang: "auto",
@@ -109,10 +111,8 @@ const PUNKTE = [
   "A5 Frage-Feld ist nach dem Wurf leer",
   "B-1 Kein liegen gebliebener Smoke-Schluessel im Schluesselbund aus einem abgebrochenen Vorlauf",
   "B0 Plugin laedt mit Bestandsdaten",
-  "B1 backend faellt auf a1111",
-  "B2 Bild-Endpunkt unveraendert",
-  "B3 eigene Werte ueberleben (steps/size/negativ)",
-  "B4 neue Comfy-Felder bekommen Defaults",
+  "B1 image-Block traegt nur noch den Stil-Zusatz (die Schluessel der Eigenbau-Anbindung fallen beim Laden weg)",
+  "B2 Stil-Suffix des Bestands ueberlebt",
   "B5 LLM-Endpunktliste unveraendert (jetzt zwei Zeilen mit URL)",
   "B6 API-Schluessel ueberlebt die Migration (je Zeile, im Schluesselbund unter yijing-oracle-ep-<id>)",
   "B7 keine Alt-Leiche activeEndpoint",
@@ -120,12 +120,8 @@ const PUNKTE = [
   "B9 Altwert llm.model wandert in die Zeilen, der Schluessel verschwindet (Speicher und data.json)",
   "C1 Einstellungen-Tab oeffnet",
   "C1b Keine Settings-Zeile „Model“ und keine Option „global model“",
-  "C2 A1111-Ansicht zeigt Schritte, kein Workflow-Feld",
-  "C3 Umschalten auf ComfyUI tauscht die Felder",
-  "C4 gueltiger Workflow wird erkannt",
-  "C5 kaputtes JSON meldet einen Fehler statt zu haengen",
-  "C6 leeres Feld meldet nichts",
-  "C7 Zurueckschalten stellt die A1111-Felder wieder her",
+  "C2 Bild-Sektion: Bildquelle und Stil-Suffix, kein Backend-, Endpunkt-, Workflow- oder Schritte-Feld",
+  "C3 Der Hinweis folgt dem Anbieter: fehlt er, nennt er das Plugin; mit Anbieter nennt er die Quelle",
   "F1 Tab liefert deklarative Definitionen",
   "F2 bedingte Zeilen werden weggelassen, nicht versteckt",
   "F3 Oberflaeche zieht nach einer Wertaenderung nach",
@@ -161,14 +157,21 @@ const PUNKTE = [
   "L5 Wiederaufnahme: steht der Nutzer wieder unten, folgt die Deutung dem Strom wieder",
   "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt",
   "M4 Deutung streamt gegen den echten Endpunkt",
-  "D1 Bild-Kasten erscheint bei gesetztem Endpunkt",
+  "D0 Ohne Bild-Anbieter fehlt der Bild-Kasten",
+  "D1 Mit Bild-Anbieter erscheint der Bild-Kasten",
   "D2 Generieren startet",
-  "D3 Bild kommt an und ist ein PNG",
-  "D4 Anzeige zeigt Fortschritt oder nennt seinen Grund",
+  "D3 Bild kommt an: die Datei im Vault ist ein PNG, die Vorschau zeigt sie",
+  "D4 Waehrend des Laufs steht der Status der Generierung",
   "D5 Szenen-Satz steht unter dem Bild",
+  "D6 Prompt traegt Szene und Stil-Suffix, Zielordner ist der Anhaenge-Ordner",
+  "D7 Neu generieren raeumt das ungespeicherte Bild weg",
+  "D8 Fehlerwert des Anbieters: Meldung mit dem Grund, das Bild bleibt",
+  "D9 Neuer Wurf raeumt ein ungespeichertes Bild weg",
+  "D10 Echter local-image-generator ohne Modell: Bild-Kasten da, Knopf meldet den Grund statt eines Bildes",
   "E1 Speichern legt genau eine Notiz an",
   "E2 Notiz traegt den Reading-Text",
-  "E3 Bild liegt als Anhang im Vault",
+  "E3 Die Note bettet die vorhandene Bilddatei ein, es entsteht keine Kopie",
+  "E4 Das gespeicherte Bild bleibt nach einem neuen Wurf",
 ] as const;
 
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -324,17 +327,8 @@ async function closeSettings(cdp: Cdp, ui: SettingsUi | null): Promise<void> {
   await cdp.evaluate(`app.setting.close(); await new Promise((r) => setTimeout(r, 200)); return true;`);
 }
 
-/**
- * Die Bild-Sektion im Settings-Modal beschreiben — **sprachunabhaengig**.
- *
- * Nicht ueber Beschriftungen: die haengen an der UI-Sprache, und ein Treiber, der in
- * Jays deutschem Obsidian gruen ist und in einem englischen rot, misst die Sprache statt
- * des Verhaltens. Die Platzhalter sind dagegen Konstanten aus dem Code
- * (`DEFAULT_IMAGE_SETTINGS.steps` = 28, Override = "—").
- */
-/** Wurzel-Ausdruck fuer Messungen in der Einstellungen-Oberflaeche. Im eigenen Fenster
- *  ist das `document`, beim Modal dessen Container — damit dieselben Selektoren in
- *  beiden Faellen dasselbe treffen. */
+/** Wurzel-Ausdruck fuer Messungen in der Einstellungen-Oberflaeche. Im eigenen Fenster ist das `document.body`, beim Modal dessen
+ *  Container — damit dieselben Selektoren in beiden Faellen dasselbe treffen. */
 function wurzelAusdruck(ui: SettingsUi): string {
   // `document.body`, nicht `document`: `Document.textContent` ist immer null. M1 las damit seit jeher den
   // Leerstring und war rot, ohne je den Tab gemessen zu haben (gemessen 2026-10-09, Welle 15; die
@@ -342,65 +336,13 @@ function wurzelAusdruck(ui: SettingsUi): string {
   return ui.praefix ? `document.querySelector(".modal.mod-settings")` : `document.body`;
 }
 
-async function bildSektion(ui: SettingsUi): Promise<{
-  workflowArea: boolean;
-  stepsA1111: boolean;
-  stepsOverride: boolean;
-  backendWert: string | null;
-}> {
-  return ui.cdp.evaluate(`
+/** Die Zeile „Bildquelle“ im Settings-Tab: ihr Hinweistext (EN und DE; null = Zeile fehlt). */
+async function bildquelleHinweis(ui: SettingsUi): Promise<string | null> {
+  return ui.cdp.evaluate<string | null>(`
     const modal = ${wurzelAusdruck(ui)};
-    if (!modal) return { workflowArea: false, stepsA1111: false, stepsOverride: false, backendWert: null };
-    const sel = [...modal.querySelectorAll("select")].find(
-      (s) => s.querySelector('option[value="comfyui"]') && s.querySelector('option[value="a1111"]'),
-    );
-    return {
-      workflowArea: Boolean(modal.querySelector(".yijing-workflow-status")),
-      stepsA1111: Boolean(modal.querySelector('input[placeholder="28"]')),
-      stepsOverride: Boolean(modal.querySelector('input[placeholder="—"]')),
-      backendWert: sel ? sel.value : null,
-    };
-  `);
-}
-
-/** Backend ueber das echte Dropdown umschalten (nicht ueber die Settings-API) — geprueft
- *  werden soll ja gerade der Rerender, den `onChange` ausloest. */
-async function setzeBackend(ui: SettingsUi, wert: "a1111" | "comfyui"): Promise<boolean> {
-  const ok = Boolean(await ui.cdp.evaluate<boolean>(`
-    const modal = ${wurzelAusdruck(ui)};
-    if (!modal) return false;
-    const sel = [...modal.querySelectorAll("select")].find(
-      (s) => s.querySelector('option[value="comfyui"]') && s.querySelector('option[value="a1111"]'),
-    );
-    if (!sel) return false;
-    sel.value = ${JSON.stringify(wert)};
-    sel.dispatchEvent(new Event("change"));
-    return true;
-  `));
-  await schlaf(600); // rerender() zeichnet die Sektion neu
-  return ok;
-}
-
-/** Text in die Workflow-Textarea legen und Obsidians `onChange` ausloesen. */
-async function setzeWorkflow(ui: SettingsUi, json: string): Promise<boolean> {
-  const ok = Boolean(await ui.cdp.evaluate<boolean>(`
-    const status = document.querySelector("${ui.praefix}.yijing-workflow-status");
-    const item = status ? status.closest(".setting-item") : null;
-    const ta = item ? item.querySelector("textarea") : null;
-    if (!ta) return false;
-    ta.value = ${JSON.stringify(json)};
-    ta.dispatchEvent(new Event("input"));
-    return true;
-  `));
-  await schlaf(400);
-  return ok;
-}
-
-async function workflowStatus(ui: SettingsUi): Promise<{ ok: boolean; fehler: boolean; text: string } | null> {
-  return ui.cdp.evaluate(`
-    const el = document.querySelector("${ui.praefix}.yijing-workflow-status");
-    if (!el) return null;
-    return { ok: el.classList.contains("is-ok"), fehler: el.classList.contains("is-error"), text: (el.textContent || "").trim() };
+    if (!modal) return null;
+    const row = [...modal.querySelectorAll(".setting-item")].find((r) => /^(image source|bildquelle)$/i.test((r.querySelector(".setting-item-name")?.textContent || "").trim()));
+    return row ? (row.querySelector(".setting-item-description")?.textContent || "").trim() : null;
   `);
 }
 
@@ -496,24 +438,14 @@ async function abschnittMigration(cdp: Cdp): Promise<void> {
   const llm = (s.llm ?? {}) as Record<string, unknown>;
 
   record(
-    "B1 backend faellt auf a1111",
-    img.backend === "a1111",
-    `backend=${JSON.stringify(img.backend)} (erwartet "a1111")`,
+    "B1 image-Block traegt nur noch den Stil-Zusatz (die Schluessel der Eigenbau-Anbindung fallen beim Laden weg)",
+    Object.keys(img).length === 1 && "styleSuffix" in img,
+    `Schluessel des image-Blocks: ${JSON.stringify(Object.keys(img))} (Bestand trug ${JSON.stringify(Object.keys(BESTAND_030.image))})`,
   );
   record(
-    "B2 Bild-Endpunkt unveraendert",
-    img.endpoint === BESTAND_030.image.endpoint,
-    `endpoint=${JSON.stringify(img.endpoint)}`,
-  );
-  record(
-    "B3 eigene Werte ueberleben (steps/size/negativ)",
-    img.steps === 31 && img.size === 1024 && img.negativePrompt === BESTAND_030.image.negativePrompt,
-    `steps=${String(img.steps)} size=${String(img.size)} negativ=${JSON.stringify(img.negativePrompt)}`,
-  );
-  record(
-    "B4 neue Comfy-Felder bekommen Defaults",
-    img.comfyWorkflow === "" && img.comfyStepsOverride === null,
-    `comfyWorkflow=${JSON.stringify(img.comfyWorkflow)} comfyStepsOverride=${JSON.stringify(img.comfyStepsOverride)}`,
+    "B2 Stil-Suffix des Bestands ueberlebt",
+    img.styleSuffix === BESTAND_030.image.styleSuffix,
+    `styleSuffix=${JSON.stringify(img.styleSuffix)}`,
   );
 
   // Seit der Verbindung ist die Liste eine EndpointConfig[] (umgeschrieben: bis 0.10 ein string[]).
@@ -567,7 +499,7 @@ async function abschnittMigration(cdp: Cdp): Promise<void> {
 }
 
 /** C — Bild-Sektion im Settings-Modal (Handover-Schritte 3, 6, 9). */
-async function abschnittSettings(cdp: Cdp, port: number, workflowFixture: string): Promise<void> {
+async function abschnittSettings(cdp: Cdp, port: number): Promise<void> {
   console.log("\n── C · Bild-Sektion im Einstellungen-Fenster ──");
 
   const ui = await openSettingsTab(cdp, port);
@@ -589,57 +521,42 @@ async function abschnittSettings(cdp: Cdp, port: number, workflowFixture: string
     `Zeile „Model“: ${modellUi.zeile ? "da" : "fehlt"} · Option „global model“: ${modellUi.option ? "da" : "fehlt"}`,
   );
 
-  const vorher = await bildSektion(ui);
+  // C2 — sprachunabhaengig, wo es geht: die Reste der Eigenbau-Anbindung am Platzhalter und an der Struktur, die zwei neuen
+  // Zeilen an ihrem (EN/DE) Namen.
+  const m = await ui.cdp.evaluate<{ backendAuswahl: boolean; workflow: boolean; schritte: boolean; endpunktZeile: boolean; quelle: boolean; stil: boolean }>(`
+    const modal = ${wurzelAusdruck(ui)};
+    if (!modal) return { backendAuswahl: false, workflow: false, schritte: false, endpunktZeile: false, quelle: false, stil: false };
+    const namen = [...modal.querySelectorAll(".setting-item-name")].map((n) => (n.textContent || "").trim().toLowerCase());
+    return {
+      backendAuswahl: Boolean([...modal.querySelectorAll("select")].find((x) => x.querySelector('option[value="comfyui"]') || x.querySelector('option[value="a1111"]'))),
+      workflow: Boolean(modal.querySelector(".yijing-workflow-status")),
+      schritte: Boolean(modal.querySelector('input[placeholder="28"]')),
+      endpunktZeile: namen.some((n) => n === "image endpoint" || n === "bild-endpunkt"),
+      quelle: namen.some((n) => n === "image source" || n === "bildquelle"),
+      stil: namen.some((n) => n === "style suffix" || n === "stil-suffix"),
+    };`);
   record(
-    "C2 A1111-Ansicht zeigt Schritte, kein Workflow-Feld",
-    vorher.backendWert === "a1111" && vorher.stepsA1111 && !vorher.workflowArea,
-    `backend=${String(vorher.backendWert)} stepsFeld=${vorher.stepsA1111} workflowFeld=${vorher.workflowArea}`,
+    "C2 Bild-Sektion: Bildquelle und Stil-Suffix, kein Backend-, Endpunkt-, Workflow- oder Schritte-Feld",
+    m.quelle && m.stil && !m.backendAuswahl && !m.workflow && !m.schritte && !m.endpunktZeile,
+    `Bildquelle ${m.quelle} · Stil ${m.stil} · Backend-Auswahl ${m.backendAuswahl} · Workflow-Feld ${m.workflow} · Schritte ${m.schritte} · Endpunkt-Zeile ${m.endpunktZeile}`,
   );
-
-  const umgeschaltet = await setzeBackend(ui, "comfyui");
-  const comfy = await bildSektion(ui);
-  record(
-    "C3 Umschalten auf ComfyUI tauscht die Felder",
-    umgeschaltet && comfy.workflowArea && comfy.stepsOverride && !comfy.stepsA1111,
-    `workflowFeld=${comfy.workflowArea} override=${comfy.stepsOverride} a1111Steps=${comfy.stepsA1111}`,
-  );
-  if (!comfy.workflowArea) return;
-
-  const eingefuegt = await setzeWorkflow(ui, workflowFixture);
-  const ok = await workflowStatus(ui);
-  const idCount = ok ? (ok.text.match(/=\d+/g) ?? []).length : 0;
-  record(
-    "C4 gueltiger Workflow wird erkannt",
-    eingefuegt && Boolean(ok?.ok) && idCount === 4,
-    ok ? `${idCount} Node-IDs · "${ok.text}"` : "keine Statuszeile",
-  );
-
-  await setzeWorkflow(ui, workflowFixture.slice(0, Math.floor(workflowFixture.length / 2)));
-  const kaputt = await workflowStatus(ui);
-  record(
-    "C5 kaputtes JSON meldet einen Fehler statt zu haengen",
-    Boolean(kaputt?.fehler) && (kaputt?.text.length ?? 0) > 0 && kaputt?.text !== ok?.text,
-    kaputt ? `"${kaputt.text}"` : "keine Statuszeile",
-  );
-
-  // Leeres Feld: keine Meldung, kein Fehler — der Zustand "noch nicht eingerichtet".
-  await setzeWorkflow(ui, "");
-  const leer = await workflowStatus(ui);
-  record(
-    "C6 leeres Feld meldet nichts",
-    leer !== null && !leer.ok && !leer.fehler && leer.text === "",
-    leer ? `ok=${leer.ok} fehler=${leer.fehler} text="${leer.text}"` : "keine Statuszeile",
-  );
-
-  await setzeBackend(ui, "a1111");
-  const zurueck = await bildSektion(ui);
-  record(
-    "C7 Zurueckschalten stellt die A1111-Felder wieder her",
-    zurueck.stepsA1111 && !zurueck.workflowArea,
-    `stepsFeld=${zurueck.stepsA1111} workflowFeld=${zurueck.workflowArea}`,
-  );
-
   await closeSettings(cdp, ui);
+
+  // C3 — der Hinweis liest den Anbieter bei jedem Zeichnen: ohne Anbieter (Slot versteckt), mit Anbieter (Fake).
+  await ligSlot(cdp, "verstecken");
+  const uiOhne = await openSettingsTab(cdp, port);
+  const ohne = uiOhne ? await bildquelleHinweis(uiOhne) : null;
+  if (uiOhne) await closeSettings(cdp, uiOhne);
+  await ligSlot(cdp, "fake-ok");
+  const uiMit = await openSettingsTab(cdp, port);
+  const mit = uiMit ? await bildquelleHinweis(uiMit) : null;
+  if (uiMit) await closeSettings(cdp, uiMit);
+  await ligSlot(cdp, "zurueck");
+  record(
+    "C3 Der Hinweis folgt dem Anbieter: fehlt er, nennt er das Plugin; mit Anbieter nennt er die Quelle",
+    ohne !== null && mit !== null && /no images without|ohne das plugin/i.test(ohne) && /images come from|bilder kommen vom plugin/i.test(mit) && ohne !== mit,
+    `ohne Anbieter: ${JSON.stringify(ohne?.slice(0, 70) ?? null)} · mit Anbieter: ${JSON.stringify(mit?.slice(0, 70) ?? null)}`,
+  );
 }
 
 /**
@@ -915,85 +832,239 @@ async function sucheInEinstellungen(ui: SettingsUi, begriff: string): Promise<nu
   `);
 }
 
-/** D — echter Bildlauf gegen ComfyUI (Handover-Schritte 4, 7, 8). Braucht einen
- *  laufenden Server; ohne ihn wird der Abschnitt als uebersprungen protokolliert,
- *  nicht als bestanden. */
-async function abschnittBild(cdp: Cdp, endpoint: string, workflowFixture: string): Promise<void> {
-  console.log("\n── D · Bildlauf gegen die echte ComfyUI ──");
+// --- D · Bildmeditation ueber local-image-generator (Kit-Vertrag `image-gen-provider`) ---------------
 
+const LIG_ID = "local-image-generator";
+
+/** Der Anbieter-Slot im Plugin-Register: `verstecken` (kein Anbieter), `fake-ok` (Fake, liefert nach 0,9 s ein 1×1-PNG in den
+ *  Zielordner), `fake-fehler` (Fake, liefert den Fehlerwert `busy`), `zurueck` (Vorwert wiederherstellen, auch den echten). Der
+ *  Vorwert liegt im Renderer auf `window` (CDP traegt kein Plugin-Objekt nach Node); der Fake zeichnet jeden Aufruf auf. */
+async function ligSlot(cdp: Cdp, aktion: "verstecken" | "fake-ok" | "fake-fehler" | "zurueck"): Promise<void> {
   await cdp.evaluate(`
-    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
-    p.settings.image.backend = "comfyui";
-    p.settings.image.endpoint = ${JSON.stringify(endpoint)};
-    p.settings.image.comfyWorkflow = ${JSON.stringify(workflowFixture)};
-    p.settings.image.size = 512;
-    p.settings.image.comfyStepsOverride = 8;
-    p.llm.invalidate(); await p.saveSettings();
-    return true;
+    const reg = app.plugins.plugins;
+    const id = ${JSON.stringify(LIG_ID)};
+    const aktion = ${JSON.stringify(aktion)};
+    if (aktion === "zurueck") {
+      if ("__ligVorher" in window) {
+        const v = window.__ligVorher;
+        if (v === null || v === undefined) delete reg[id]; else reg[id] = v;
+        delete window.__ligVorher;
+      }
+      delete window.__lig;
+      return { ok: true };
+    }
+    if (!("__ligVorher" in window)) window.__ligVorher = reg[id] ?? null;
+    if (aktion === "verstecken") { delete reg[id]; return { ok: true }; }
+    const PNG = Uint8Array.from(atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="), (c) => c.charCodeAt(0));
+    window.__lig = window.__lig ?? { calls: [], n: 0 };
+    window.__lig.modus = aktion === "fake-fehler" ? "fehler" : "ok";
+    reg[id] = { __fakeLig: true, api: { version: 1, generateImage: async (prompt, o) => {
+      window.__lig.calls.push({ prompt, targetFolder: o.targetFolder });
+      await new Promise((r) => setTimeout(r, 900));
+      if (window.__lig.modus === "fehler") return { error: "busy", message: "generation already running" };
+      const folder = o.targetFolder;
+      if (folder && !app.vault.getAbstractFileByPath(folder)) await app.vault.createFolder(folder);
+      window.__lig.n++;
+      const path = (folder ? folder + "/" : "") + "fake-lig-" + Date.now() + "-" + window.__lig.n + ".png";
+      await app.vault.createBinary(path, PNG.buffer);
+      return path;
+    } } };
+    return { ok: true };
   `);
-  // Das Panel liest die Einstellungen beim Zeichnen — neu aufbauen statt hoffen.
+}
+
+/** Den echten local-image-generator aus einem gebauten Plugin-Ordner (`main.js`, `manifest.json`, `styles.css`) in den Vault legen
+ *  und aktivieren. Ohne Modell: er meldet „nicht bereit“, erzeugt aber nichts und laedt nichts. */
+async function ligEchtInstallieren(cdp: Cdp, dir: string): Promise<boolean> {
+  const fs = await import("node:fs/promises");
+  const dateien: Record<string, string> = {};
+  for (const n of ["main.js", "manifest.json", "styles.css"]) dateien[n] = await fs.readFile(join(dir, n), "utf8").catch(() => "");
+  if (!dateien["main.js"] || !dateien["manifest.json"]) return false;
+  return cdp.evaluate<boolean>(`
+    const id = ${JSON.stringify(LIG_ID)};
+    const ordner = app.vault.configDir + "/plugins/" + id;
+    const dateien = ${JSON.stringify(dateien)};
+    if (!(await app.vault.adapter.exists(ordner))) await app.vault.adapter.mkdir(ordner);
+    for (const [n, text] of Object.entries(dateien)) if (text) await app.vault.adapter.write(ordner + "/" + n, text);
+    window.__ligEchtAngelegt = true;
+    if (app.plugins.setEnable) await app.plugins.setEnable(true);
+    await app.plugins.loadManifests();
+    await app.plugins.enablePlugin(id);
+    await new Promise((r) => setTimeout(r, 1500));
+    return Boolean(app.plugins.plugins[id]?.api);
+  `);
+}
+
+async function ligEchtEntfernen(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    if (!window.__ligEchtAngelegt) return { ok: true };
+    const id = ${JSON.stringify(LIG_ID)};
+    await app.plugins.disablePlugin(id).catch(() => undefined);
+    const ordner = app.vault.configDir + "/plugins/" + id;
+    if (await app.vault.adapter.exists(ordner)) await app.vault.adapter.rmdir(ordner, true);
+    if (app.plugins.manifests) delete app.plugins.manifests[id];
+    delete window.__ligEchtAngelegt;
+    return { ok: true };
+  `).catch(() => null);
+}
+
+/** Panel neu aufbauen (es liest den Anbieter beim Zeichnen) und einen frischen Wurf machen. */
+async function neuesPanelMitWurf(cdp: Cdp): Promise<boolean> {
   await cdp.evaluate(`
     for (const l of app.workspace.getLeavesOfType(${JSON.stringify(PANEL_VIEW)})) l.detach();
     await new Promise((r) => setTimeout(r, 300));
     return true;
   `);
-  await openPanel(cdp);
-  await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+  if (!(await openPanel(cdp))) return false;
+  const ok = await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
   await schlaf(500);
+  return ok;
+}
 
-  const kasten = await cdp.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-artwork"));`);
-  record("D1 Bild-Kasten erscheint bei gesetztem Endpunkt", Boolean(kasten), kasten ? ".yijing-artwork im Panel" : "Kasten fehlt");
-  if (!kasten) return;
+const kastenDa = (cdp: Cdp): Promise<boolean> => cdp.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-artwork"));`);
+const vorschauDatei = (cdp: Cdp): Promise<{ src: string; pfad: string | null }> => cdp.evaluate(`
+  const i = document.querySelector(".yijing-artwork-img");
+  if (!i) return { src: "", pfad: null };
+  const f = app.vault.getFiles().filter((x) => x.extension === "png" && i.src.includes(encodeURI(x.path).replace(/%2F/g, "/"))).map((x) => x.path);
+  return { src: i.src, pfad: f[0] ?? null };
+`);
+
+async function abschnittBild(cdp: Cdp, aufraeumen: string[], ligDir: string | undefined): Promise<void> {
+  console.log("\n── D · Bildmeditation ueber local-image-generator ──");
+
+  // D0 — kein Anbieter: der Kasten fehlt (nicht „leer mit Fehlermeldung“).
+  await ligSlot(cdp, "verstecken");
+  await neuesPanelMitWurf(cdp);
+  const ohne = await kastenDa(cdp);
+  record("D0 Ohne Bild-Anbieter fehlt der Bild-Kasten", !ohne, ohne ? ".yijing-artwork steht trotz fehlendem Anbieter im Panel" : "kein .yijing-artwork im Panel");
+  await ligSlot(cdp, "zurueck");
+
+  // D10 — der echte Anbieter ohne Modell (nur mit --lig <gebauter Plugin-Ordner>).
+  if (ligDir === undefined) {
+    skipped("D10 Echter local-image-generator ohne Modell: Bild-Kasten da, Knopf meldet den Grund statt eines Bildes", "--lig <Ordner> nicht gesetzt (gebauter local-image-generator)");
+  } else {
+    const da = await ligEchtInstallieren(cdp, ligDir);
+    if (!da) {
+      unmeasured("D10 Echter local-image-generator ohne Modell: Bild-Kasten da, Knopf meldet den Grund statt eines Bildes", `local-image-generator aus ${ligDir} liess sich nicht laden (api fehlt)`);
+    } else {
+      await neuesPanelMitWurf(cdp);
+      const kasten = await kastenDa(cdp);
+      const geklickt = kasten && (await clickPanelButton(cdp, ".yijing-artwork .yijing-actions button"));
+      const meldung = geklickt
+        ? await pollUntil<string>(cdp, `const t = [...document.querySelectorAll(".notice")].map((n) => n.textContent || "").find((x) => /image generation failed|bildgenerierung fehlgeschlagen/i.test(x)); return t ?? null;`, 25_000, 500)
+        : null;
+      const bild = await cdp.evaluate<boolean>(`return Boolean(document.querySelector(".yijing-artwork-img"));`);
+      record(
+        "D10 Echter local-image-generator ohne Modell: Bild-Kasten da, Knopf meldet den Grund statt eines Bildes",
+        kasten && meldung !== null && !bild,
+        `Kasten ${kasten} · Meldung ${JSON.stringify(meldung?.slice(0, 110) ?? null)} · Bild im Kasten ${bild}`,
+      );
+      await ligEchtEntfernen(cdp);
+    }
+  }
+
+  // Ab hier der Fake-Anbieter: er erzeugt ein echtes PNG im Vault, ohne Server und ohne Modell.
+  await ligSlot(cdp, "fake-ok");
+  await neuesPanelMitWurf(cdp);
+  const mit = await kastenDa(cdp);
+  record("D1 Mit Bild-Anbieter erscheint der Bild-Kasten", mit, mit ? ".yijing-artwork im Panel" : "Kasten fehlt");
+  if (!mit) return;
 
   const gestartet = await clickPanelButton(cdp, ".yijing-artwork .yijing-actions button");
   record("D2 Generieren startet", gestartet, gestartet ? "Knopf geklickt" : "kein Knopf im Bild-Kasten");
   if (!gestartet) return;
 
-  // Die Anzeige waehrend des Laufs. Zwei Ausgaenge sind richtig — ein Schrittzaehler
-  // (Socket steht) oder der genannte Grund (Socket abgewiesen). Falsch ist nur das
-  // Dritte: ein stummes "Bild wird generiert…", das minutenlang steht und von einem
-  // haengenden Lauf nicht zu unterscheiden ist. Genau das war der Befund vom 2026-08-16.
-  const anzeige = await pollUntil<string>(
-    cdp,
-    `const s = (document.querySelector(".yijing-artwork .yijing-empty")?.textContent || "");
-     if (/\\d+\\s*\\/\\s*\\d+/.test(s)) return "zaehler";
-     if (/cors|origin/i.test(s)) return "erklaert";
-     return null;`,
-    45_000,
-    1000,
-  );
+  // D4 — der Fake haelt 0,9 s: in dieser Zeit steht der Status in der Zeile (kein leerer Kasten, kein altes Bild).
+  const status = await pollUntil<string>(cdp, `const s = (document.querySelector(".yijing-artwork .yijing-empty")?.textContent || "").trim(); return /generating image|bild wird generiert/i.test(s) ? s : null;`, 3000, 100);
+  record("D4 Waehrend des Laufs steht der Status der Generierung", status !== null, status !== null ? JSON.stringify(status) : "kein Status in der Zeile gesehen");
 
-  const bild = await pollUntil<number>(
-    cdp,
-    `const i = document.querySelector(".yijing-artwork-img"); return i && i.src.startsWith("data:image/png;base64,") ? i.src.length : 0;`,
-    240_000,
-    2000,
-  );
+  const bild = await pollUntil<{ src: string; pfad: string | null }>(cdp, `
+    const i = document.querySelector(".yijing-artwork-img");
+    if (!i) return null;
+    const f = app.vault.getFiles().filter((x) => x.extension === "png" && i.src.includes(encodeURI(x.path).replace(/%2F/g, "/"))).map((x) => x.path);
+    return f.length > 0 ? { src: i.src, pfad: f[0] } : null;`, 8000, 200);
+  let png = false;
+  if (bild?.pfad) {
+    aufraeumen.push(bild.pfad);
+    png = await cdp.evaluate<boolean>(`
+      const b = new Uint8Array(await app.vault.adapter.readBinary(${JSON.stringify(bild.pfad)}));
+      return b.length > 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;`);
+  }
   record(
-    "D3 Bild kommt an und ist ein PNG",
-    (bild ?? 0) > 10_000,
-    `${bild ?? 0} Zeichen data:image/png (0 = kein Bild)`,
+    "D3 Bild kommt an: die Datei im Vault ist ein PNG, die Vorschau zeigt sie",
+    bild !== null && png && !bild.src.startsWith("data:"),
+    bild ? `Datei ${bild.pfad} (PNG-Kopf ${png}), Vorschau-URL ${bild.src.slice(0, 40)}…` : "kein Bild mit passender Vault-Datei",
   );
-  record(
-    "D4 Anzeige zeigt Fortschritt oder nennt seinen Grund",
-    anzeige !== null,
-    anzeige === "zaehler"
-      ? "Schrittzaehler gesehen (Socket steht)"
-      : anzeige === "erklaert"
-        ? "kein Socket, aber der Grund steht in der Zeile (ComfyUI-Origin-Pruefung)"
-        : "stummes 'Bild wird generiert…' — sieht aus wie ein haengender Lauf",
-  );
-  if (!bild) return;
+  if (!bild?.pfad) return;
+  const erstesBild = bild.pfad;
 
   const szene = await cdp.evaluate<number>(`return (document.querySelector(".yijing-artwork-scene")?.textContent || "").trim().length;`);
   record("D5 Szenen-Satz steht unter dem Bild", szene > 20, `${szene} Zeichen`);
+
+  // D6 — was der Anbieter bekam.
+  const aufruf = await cdp.evaluate<{ prompt: string; targetFolder: string; erwartet: string; suffix: string; szene: string }>(`
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+    const c = window.__lig.calls[0];
+    const probe = await app.fileManager.getAvailablePathForAttachment("yijing-image.png", p.settings.readingsFolder + "/x.md");
+    const slash = probe.lastIndexOf("/");
+    return { prompt: c.prompt, targetFolder: c.targetFolder, erwartet: slash === -1 ? "" : probe.slice(0, slash), suffix: p.settings.image.styleSuffix, szene: (document.querySelector(".yijing-artwork-scene")?.textContent || "").trim() };
+  `);
+  record(
+    "D6 Prompt traegt Szene und Stil-Suffix, Zielordner ist der Anhaenge-Ordner",
+    aufruf.prompt.endsWith(aufruf.suffix) && aufruf.prompt.includes(aufruf.szene.slice(0, 20)) && aufruf.targetFolder === aufruf.erwartet,
+    `Prompt ${JSON.stringify(aufruf.prompt.slice(0, 60))}… endet mit Suffix: ${aufruf.prompt.endsWith(aufruf.suffix)} · Zielordner ${JSON.stringify(aufruf.targetFolder)} (erwartet ${JSON.stringify(aufruf.erwartet)})`,
+  );
+
+  // D7 — „Neu generieren“: das zweite Bild ersetzt das erste, das erste (nie gespeichert) verschwindet aus dem Vault.
+  await clickPanelButton(cdp, ".yijing-artwork .yijing-actions button");
+  const zweites = await pollUntil<string>(cdp, `
+    const i = document.querySelector(".yijing-artwork-img");
+    if (!i) return null;
+    const f = app.vault.getFiles().filter((x) => x.extension === "png" && i.src.includes(encodeURI(x.path).replace(/%2F/g, "/"))).map((x) => x.path);
+    return f.length > 0 && f[0] !== ${JSON.stringify(erstesBild)} ? f[0] : null;`, 8000, 200);
+  if (zweites) aufraeumen.push(zweites);
+  await schlaf(600);
+  const ersteWeg = await cdp.evaluate<boolean>(`return app.vault.getAbstractFileByPath(${JSON.stringify(erstesBild)}) === null;`);
+  record(
+    "D7 Neu generieren raeumt das ungespeicherte Bild weg",
+    zweites !== null && ersteWeg,
+    `zweites Bild ${zweites ?? "—"} · erstes (${erstesBild}) ${ersteWeg ? "entfernt" : "liegt noch im Vault"}`,
+  );
+  if (!zweites) return;
+
+  // D8 — der Anbieter liefert den Fehlerwert: Meldung mit dem Grund, das vorhandene Bild bleibt.
+  await ligSlot(cdp, "fake-fehler");
+  await clickPanelButton(cdp, ".yijing-artwork .yijing-actions button");
+  const fehlermeldung = await pollUntil<string>(cdp, `const t = [...document.querySelectorAll(".notice")].map((n) => n.textContent || "").find((x) => x.includes("generation already running")); return t ?? null;`, 6000, 200);
+  await schlaf(500);
+  const bleibt = await vorschauDatei(cdp);
+  record(
+    "D8 Fehlerwert des Anbieters: Meldung mit dem Grund, das Bild bleibt",
+    fehlermeldung !== null && bleibt.pfad === zweites,
+    `Meldung ${JSON.stringify(fehlermeldung?.slice(0, 80) ?? null)} · Vorschau zeigt ${bleibt.pfad ?? "kein Bild"} (erwartet ${zweites})`,
+  );
+  await ligSlot(cdp, "fake-ok");
+
+  // D9 — ein neuer Wurf raeumt das ungespeicherte Bild weg.
+  await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+  await schlaf(1000);
+  const zweitesWeg = await cdp.evaluate<boolean>(`return app.vault.getAbstractFileByPath(${JSON.stringify(zweites)}) === null;`);
+  record("D9 Neuer Wurf raeumt ein ungespeichertes Bild weg", zweitesWeg, `${zweites} ${zweitesWeg ? "entfernt" : "liegt noch im Vault"}`);
 }
 
-/** D-Anhang — Speichern samt Anhang (Handover-Schritt 8). Legt eine Notiz im echten
- *  Vault an; sie wandert am Ende in den Papierkorb. */
+/** E — Speichern mit Bild. Legt eine Notiz im Staging-Vault an; Note und Bild wandern am Ende in den Papierkorb. */
 async function abschnittSpeichern(cdp: Cdp, aufraeumen: string[]): Promise<void> {
   console.log("\n── E · Reading speichern ──");
 
+  // Ein frisches Bild fuer diesen Wurf (D9 hat das vorige mit dem Wurf weggeraeumt).
+  await clickPanelButton(cdp, ".yijing-artwork .yijing-actions button");
+  const bild = await pollUntil<string>(cdp, `
+    const i = document.querySelector(".yijing-artwork-img");
+    if (!i) return null;
+    const f = app.vault.getFiles().filter((x) => x.extension === "png" && i.src.includes(encodeURI(x.path).replace(/%2F/g, "/"))).map((x) => x.path);
+    return f[0] ?? null;`, 8000, 200);
+  if (bild) aufraeumen.push(bild);
+  const pngVorher = await cdp.evaluate<number>(`return app.vault.getFiles().filter((f) => f.extension === "png").length;`);
   const vorher = await cdp.evaluate<string[]>(`return app.vault.getMarkdownFiles().map((f) => f.path);`);
   // Die zweite Aktionsreihe unter der Weissagung traegt "Speichern".
   const geklickt = await clickPanelButton(cdp, ".yijing-oracle > .yijing-actions:nth-of-type(2) button");
@@ -1017,16 +1088,23 @@ async function abschnittSpeichern(cdp: Cdp, aufraeumen: string[]): Promise<void>
   `);
   record("E2 Notiz traegt den Reading-Text", inhalt.laenge > 500, `${inhalt.laenge} Zeichen`);
 
-  if (inhalt.bild) {
-    const anhang = await cdp.evaluate<string | null>(`
-      const f = app.metadataCache.getFirstLinkpathDest(${JSON.stringify(inhalt.bild)}, ${JSON.stringify(entstanden[0])});
-      return f ? f.path : null;
-    `);
-    record("E3 Bild liegt als Anhang im Vault", Boolean(anhang), anhang ?? `Einbettung zeigt auf ${inhalt.bild}, Datei fehlt`);
-    if (anhang) aufraeumen.push(anhang);
-  } else {
-    record("E3 Bild liegt als Anhang im Vault", false, "keine ![[…png]]-Einbettung in der Notiz");
-  }
+  const ziel = inhalt.bild
+    ? await cdp.evaluate<string | null>(`
+        const f = app.metadataCache.getFirstLinkpathDest(${JSON.stringify(inhalt.bild)}, ${JSON.stringify(entstanden[0])});
+        return f ? f.path : null;`)
+    : null;
+  const pngNachher = await cdp.evaluate<number>(`return app.vault.getFiles().filter((f) => f.extension === "png").length;`);
+  record(
+    "E3 Die Note bettet die vorhandene Bilddatei ein, es entsteht keine Kopie",
+    bild !== null && ziel === bild && pngNachher === pngVorher,
+    `Einbettung ${JSON.stringify(inhalt.bild)} → ${ziel ?? "keine Datei"} (Bild des Panels: ${bild ?? "keins"}) · PNG im Vault vorher ${pngVorher}, nachher ${pngNachher}`,
+  );
+
+  // E4 — die Note besitzt das Bild jetzt: ein neuer Wurf raeumt es nicht weg.
+  await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+  await schlaf(1000);
+  const bleibt = bild !== null && (await cdp.evaluate<boolean>(`return app.vault.getAbstractFileByPath(${JSON.stringify(bild)}) !== null;`));
+  record("E4 Das gespeicherte Bild bleibt nach einem neuen Wurf", bleibt, bild === null ? "kein Bild zum Speichern" : `${bild} ${bleibt ? "liegt noch im Vault" : "wurde weggeraeumt"}`);
 }
 
 // --- M · LLM Endpoint Manager (optionale Fremd-Quelle) ------------------------------
@@ -1703,9 +1781,6 @@ async function zeilenZahlSelector(ui: SettingsUi, selector: string): Promise<num
 
 // ─── Hauptlauf ─────────────────────────────────────────────────────────────────────
 
-/** D1-D5 (Bildlauf) und E1-E3 (Speichern): haengen beide an der Bildgenerierung. */
-const BILD_NAMEN = PUNKTE.filter((n) => /^[DE]\d/.test(n));
-
 async function main(): Promise<void> {
   const args = parseArgs(process.argv.slice(2));
   const portRoh = args.value("--port");
@@ -1714,19 +1789,8 @@ async function main(): Promise<void> {
     throw new Error(`--port <Zahl> fehlt oder ist ungueltig (${JSON.stringify(portRoh)}). Den Port der eigenen Zweitinstanz angeben (Rezept im Dateikopf, z. B. 9400).`);
   }
   const vault = args.value("--vault") ?? PLUGIN_ID;
-  const endpoint = args.value("--endpoint") ?? "http://127.0.0.1:8000";
-  const keinBild = args.has("--kein-bild");
-
-  // Die Fixture ist dieselbe, die auch die Unit-Tests fuettert — ein zweiter Workflow
-  // waere ein zweiter Wahrheitsbegriff.
-  //
-  // Ueber `process.cwd()`, nicht ueber `import.meta.url`: esbuild legt das Bundle als
-  // `.gui-smoke.mjs` im Paket-Root ab, nicht in `scripts/` — ein Pfad relativ zum Modul
-  // zeigt daher eine Ebene zu hoch und traf beim ersten Lauf ins Dach-Verzeichnis.
-  // `npm run` fuehrt immer im Paket-Root aus.
-  const workflowFixture = await import("node:fs/promises").then((fs) =>
-    fs.readFile(`${process.cwd()}/tests/fixtures/comfy-sdxl.json`, "utf8"),
-  );
+  // Gebauter local-image-generator (Ordner mit main.js, manifest.json, styles.css) fuer D10; ohne Flag gilt D10 als uebersprungen.
+  const ligDir = args.value("--lig");
 
   // `attachTo` waehlt das Fenster mit `app.workspace.rootSplit.doc === document` — `Cdp.attach` nahm das erste
   // Fenster mit passendem Titel und war bei einem Pop-out mit gleichem Titel mehrdeutig.
@@ -1786,6 +1850,9 @@ async function main(): Promise<void> {
   // Exit 130). Der zweite Vergleich „NACH dem Reload“ des alten Handlers entfällt: der Hauptzweig kann nicht mehr schreiben.
   const zustandZurueck = async (): Promise<void> => {
     await removeFakeManager(cdp).catch(() => undefined);
+    // Anbieter-Slot (Fake oder versteckter echter) zurueck, ein fuer D10 angelegter echter local-image-generator wieder weg.
+    await ligSlot(cdp, "zurueck").catch(() => undefined);
+    await ligEchtEntfernen(cdp);
     console.log("\n── Aufraeumen ──");
     for (const pfad of aufraeumen) {
       await cdp.evaluate(`
@@ -1867,7 +1934,7 @@ async function main(): Promise<void> {
     }
 
     await abschnittMigration(cdp);
-    await abschnittSettings(cdp, port, workflowFixture);
+    await abschnittSettings(cdp, port);
     await abschnittDeklarativ(cdp, port);
     if (args.has("--kein-manager")) {
       for (const n of PUNKTE.filter((x) => /^M[123]/.test(x))) skipped(n, "--kein-manager gesetzt");
@@ -1881,19 +1948,8 @@ async function main(): Promise<void> {
     await pruefeFolgeRegel(cdp);
     await pruefeEchtenEndpunkt(cdp);
 
-    if (keinBild) {
-      for (const n of BILD_NAMEN) skipped(n, "--kein-bild gesetzt (Bildlauf und Speichern abgewaehlt)");
-    } else {
-      const erreichbar = await fetch(`${endpoint.replace(/\/+$/, "")}/system_stats`)
-        .then((r) => r.ok)
-        .catch(() => false);
-      if (!erreichbar) {
-        for (const n of BILD_NAMEN) unmeasured(n, `ComfyUI unter ${endpoint} nicht erreichbar`);
-      } else {
-        await abschnittBild(cdp, endpoint, workflowFixture);
-        await abschnittSpeichern(cdp, aufraeumen);
-      }
-    }
+    await abschnittBild(cdp, aufraeumen, ligDir);
+    await abschnittSpeichern(cdp, aufraeumen);
   } finally {
     await zustand.schliesse();
     // Nach einem Abbruch beendet das Modul den Prozess selbst (Bilanz, Exit 130); dieses finally tut dann nichts mehr.

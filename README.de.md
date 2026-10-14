@@ -38,9 +38,7 @@ kein Konto.
   Endpunkte und Reasoning-Anzeige sind konfigurierbar. Aus, bis du einen Endpunkt
   einträgst.
 - **Meditationsbild (optional, lokal)** — ein Bild je Befragung aus dem kuratierten
-  Motiv des Hexagramms erzeugen, über einen lokalen A1111-kompatiblen Bild-Server
-  (Draw Things, A1111, Forge, …). Vorschau im Panel, Einbettung in der Notiz. Aus, bis
-  du einen Endpunkt einträgst — Einrichtung siehe
+  Motiv des Hexagramms erzeugen, über das Plugin Local Image Generator. Vorschau im Panel, Einbettung in der Notiz. Erscheint, sobald dieses Plugin installiert ist — Einrichtung siehe
   [docs/image-generation.md](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
 ## Voraussetzungen
@@ -51,11 +49,10 @@ kein Konto.
 - **Optional, für die KI-Deutung:** ein OpenAI-kompatibler lokaler Server (z.B.
   [LM Studio](https://lmstudio.ai) oder [Ollama](https://ollama.com)). Endpunkt und
   Modell (eins je Endpunkt-Zeile) werden in den Plugin-Einstellungen gesetzt. CORS am Server ist optional: Obsidians Renderer sendet `Origin: app://obsidian.md`, und die meisten lokalen Server weisen das standardmäßig ab. Das Plugin wiederholt die Anfrage dann ohne Streaming, die Deutung erscheint am Stück statt Wort für Wort. Für den Live-Stream CORS aktivieren (LM Studio: `lms server start --cors`).
-- **Optional, für Meditationsbilder:** ein A1111-kompatibler Bild-Server (z.B.
-  [Draw Things](https://drawthings.ai) mit aktiviertem API-Server). Siehe die
+- **Optional, für Meditationsbilder:** das Plugin Local Image Generator (es bringt das Bild-Backend mit: eingebaute Engine, Draw Things, A1111, ComfyUI, …). Ohne es gibt es keine Bilder. Siehe die
   [Einrichtungsanleitung](https://github.com/johannes-kaindl/yijing-oracle/blob/main/docs/image-generation.md).
 
-Beide optionalen Funktionen bleiben aus, bis ein Endpunkt konfiguriert ist. Nichts
+Beide optionalen Funktionen bleiben aus, bis sie eingerichtet sind (ein Endpunkt für die Deutung, das Plugin Local Image Generator für das Bild). Nichts
 verlässt jemals deinen Rechner.
 
 ## Installation
