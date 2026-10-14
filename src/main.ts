@@ -16,7 +16,7 @@ import { loadRequestSettings } from "./vendor/kit/sampling-profiles";
 import { type LlmConnection } from "./vendor/kit-obsidian/llm-connection";
 import { obsidianSecretStore } from "./vendor/kit-obsidian/secrets";
 import { migrateLocalEndpoints } from "./vendor/kit-obsidian/endpoint-secrets";
-import { DEFAULT_IMAGE_SETTINGS } from "./core/image-settings";
+import { normalizeImageSettings } from "./core/image-settings";
 import { type Lang } from "./core/data";
 import {
   DEFAULT_SETTINGS,
@@ -66,8 +66,8 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
     // Aufloesen: mit installiertem Manager wird die lokale Liste gar nicht aufgeloest.
     const secured = migrateLocalEndpoints(this.app, this.manifest.id, llmLoad.llm.endpoints);
     this.settings.llm = { ...llmLoad.llm, endpoints: secured.list };
-    // mergeSettings ist shallow — auch das image-Objekt gegen neue Defaults auffüllen.
-    this.settings.image = { ...DEFAULT_IMAGE_SETTINGS, ...(this.settings.image ?? {}) };
+    // mergeSettings ist shallow; der image-Block wird neu aufgebaut (die Schlüssel der früheren Eigenbau-Anbindung fallen weg).
+    this.settings.image = normalizeImageSettings(this.settings.image);
     this.settings.callouts = mergeCallouts(this.settings.callouts);
     this.llm = createOracleConnection({
       app: this.app,

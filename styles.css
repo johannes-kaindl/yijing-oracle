@@ -242,32 +242,6 @@
 .okit-collapsible-body { padding-top: var(--size-4-2); }
 .okit-collapsible-body.is-collapsed { display: none; }
 
-/* ── Endpunkt-Status + Eingabe-Warnungen ──────────────────────────────────────── */
-.yijing-ep-status {
-  display: inline-flex;
-  align-items: center;
-  margin-right: var(--size-4-2);
-  color: var(--text-muted);
-}
-.yijing-ep-status.is-ok { color: var(--text-success); }
-.yijing-ep-status.is-error { color: var(--text-error); }
-.yijing-ep-status.is-active { color: var(--text-accent); }
-.yijing-ep-warn {
-  display: inline-flex;
-  align-items: center;
-  margin-right: var(--size-4-2);
-  color: var(--text-warning);
-}
-
-/* ── ComfyUI-Workflow: Rückmeldung der Slot-Erkennung ─────────────────────────── */
-.yijing-workflow-status {
-  font-size: var(--font-ui-smaller);
-  margin-top: var(--size-4-1);
-  color: var(--text-muted);
-}
-.yijing-workflow-status.is-ok { color: var(--text-success); }
-.yijing-workflow-status.is-error { color: var(--text-error); }
-
 /* Abschnitt „Anfrage“ (Sampling-Profile) — Kopie von REQUEST_SECTION_CSS aus obsidian-kit 0.51.2
    (src/obsidian/request-section.ts, .okit-request-*). Das Kit injiziert kein CSS selbst; der
    Consumer uebernimmt es (Kit-Vertrag). */

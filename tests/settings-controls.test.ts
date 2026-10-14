@@ -5,7 +5,6 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type PluginSettings } from "../src/core/settings";
 import { DEFAULT_FILENAME_TEMPLATE } from "../src/core/filename";
-import { DEFAULT_IMAGE_SETTINGS } from "../src/core/image-settings";
 import { SETTING_CONTROLS, readControl, writeControl } from "../src/core/settings/controls";
 
 /** Frische Kopie — die Specs mutieren das übergebene Objekt. */
@@ -17,16 +16,16 @@ describe("readControl", () => {
   it("liest flache und verschachtelte Felder über denselben Schlüsselraum", () => {
     const s = fresh();
     s.readingsFolder = "Orakel";
-    s.image.backend = "comfyui";
+    s.image.styleSuffix = "tusche";
 
     expect(readControl(s, "readingsFolder")).toBe("Orakel");
-    expect(readControl(s, "image.backend")).toBe("comfyui");
+    expect(readControl(s, "image.styleSuffix")).toBe("tusche");
   });
 
-  it("liefert Dropdown-Werte als String, weil Obsidian Dropdowns über String-Schlüssel führt", () => {
-    const s = fresh();
-    s.image.size = 1024;
-    expect(readControl(s, "image.size")).toBe("1024");
+  it("kennt die Schlüssel der früheren Bild-Anbindung nicht mehr", () => {
+    for (const k of ["image.backend", "image.endpoint", "image.size", "image.steps", "image.negativePrompt", "image.comfyWorkflow", "image.comfyStepsOverride"]) {
+      expect(() => readControl(fresh(), k), k).toThrow(/Unbekannter Settings-Schlüssel/);
+    }
   });
 
   it("wirft bei einem unbekannten Schlüssel, statt still nichts zu tun", () => {
@@ -44,12 +43,6 @@ describe("writeControl — Normalisierung", () => {
     expect(s.filenameTemplate).toBe(DEFAULT_FILENAME_TEMPLATE);
   });
 
-  it("trimmt den Endpunkt", () => {
-    const s = fresh();
-    writeControl(s, "image.endpoint", " http://127.0.0.1:8000 ");
-    expect(s.image.endpoint).toBe("http://127.0.0.1:8000");
-  });
-
   it("behält einen leeren System-Prompt — leer heißt hier „nimm den Default-Prompt“", () => {
     const s = fresh();
     s.llm.systemPromptDe = "eigener Prompt";
@@ -57,51 +50,10 @@ describe("writeControl — Normalisierung", () => {
     expect(s.llm.systemPromptDe).toBe("");
   });
 
-  it("wandelt Zahlenfelder aus dem Fallback-Textfeld und weist Müll ab", () => {
-    const s = fresh();
-    writeControl(s, "image.steps", "8");
-    expect(s.image.steps).toBe(8);
-
-    writeControl(s, "image.steps", "abc");
-    expect(s.image.steps).toBe(DEFAULT_IMAGE_SETTINGS.steps);
-
-    writeControl(s, "image.steps", -3);
-    expect(s.image.steps).toBe(DEFAULT_IMAGE_SETTINGS.steps);
-
-    writeControl(s, "image.steps", 12.7);
-    expect(s.image.steps).toBe(12);
-  });
-
   it("macht aus einem Objekt keinen Text — es würde sonst als „[object Object]“ gespeichert", () => {
     const s = fresh();
     writeControl(s, "image.styleSuffix", { nope: true });
     expect(s.image.styleSuffix).toBe("");
-  });
-
-  it("hält die Bildgröße als Zahl, obwohl das Dropdown Strings liefert", () => {
-    const s = fresh();
-    writeControl(s, "image.size", "512");
-    expect(s.image.size).toBe(512);
-  });
-
-  it("nimmt für die ComfyUI-Steps leer als gültigen Wert (der Workflow gewinnt)", () => {
-    const s = fresh();
-    writeControl(s, "image.comfyStepsOverride", "4");
-    expect(s.image.comfyStepsOverride).toBe(4);
-
-    writeControl(s, "image.comfyStepsOverride", "");
-    expect(s.image.comfyStepsOverride).toBeNull();
-
-    writeControl(s, "image.comfyStepsOverride", "0");
-    expect(s.image.comfyStepsOverride).toBeNull();
-  });
-
-  it("kennt für das Backend nur die zwei erlaubten Werte", () => {
-    const s = fresh();
-    writeControl(s, "image.backend", "comfyui");
-    expect(s.image.backend).toBe("comfyui");
-    writeControl(s, "image.backend", "irgendwas");
-    expect(s.image.backend).toBe("a1111");
   });
 });
 
@@ -109,7 +61,6 @@ describe("writeControl — Refresh-Meldung", () => {
   it("meldet genau bei den Schlüsseln neu aufzubauen, die die Zeilen-Auswahl ändern", () => {
     const s = fresh();
     expect(writeControl(s, "includeFrontmatter", false)).toBe(true);
-    expect(writeControl(s, "image.backend", "comfyui")).toBe(true);
 
     expect(writeControl(s, "showNotes", false)).toBe(false);
     expect(writeControl(s, "image.styleSuffix", "tusche")).toBe(false);

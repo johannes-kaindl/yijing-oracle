@@ -1,6 +1,6 @@
 // Schreibt ein gerendertes Reading in den Vault — als neue Note ODER an den Cursor der
 // aktiven Note. Einzige Stelle mit Datei-I/O; render.ts bleibt rein.
-import { type App, MarkdownView, Notice, type TFile, base64ToArrayBuffer, normalizePath } from "obsidian";
+import { type App, MarkdownView, Notice, TFile, normalizePath } from "obsidian";
 import { type RenderedReading } from "../core/render";
 import { buildFilename } from "../core/filename";
 import { type Lang } from "../core/data";
@@ -56,7 +56,7 @@ export interface WriteInput {
   /** Optionale KI-Deutung; null → keine Deutung einbetten. */
   interpretation?: InterpretationData | null;
   /** Generiertes Meditationsbild; null/undefined → kein Bild-Abschnitt. */
-  artwork?: { pngBase64: string; scene: string } | null;
+  artwork?: { path: string; scene: string } | null;
   /** Wie Reasoning in die Note wandert. */
   thinkingInNote: ThinkingInNote;
   /** Ist die Note zu diesem Wurf schon vorhanden, wird sie modifiziert statt neu angelegt. */
@@ -72,18 +72,18 @@ function interpretationBlock(input: WriteInput): string | null {
   });
 }
 
-/** Legt das PNG als Attachment neben die Note und setzt den Bild-Block idempotent
- *  in die Note ein. Fehler brechen das Speichern der Note NICHT ab (Spec §Fehler). */
+/** Setzt den Bild-Block idempotent in die Note ein. Die Bilddatei liegt schon im Vault (local-image-generator hat sie
+ *  geschrieben); die Note verweist nur darauf. Fehler brechen das Speichern der Note NICHT ab (Spec §Fehler). */
 async function attachArtwork(
   app: App,
   file: TFile,
-  artwork: { pngBase64: string; scene: string },
+  artwork: { path: string; scene: string },
   lang: Lang,
   settings: PluginSettings,
 ): Promise<void> {
   try {
-    const path = await app.fileManager.getAvailablePathForAttachment(`${file.basename}.png`, file.path);
-    const att = await app.vault.createBinary(path, base64ToArrayBuffer(artwork.pngBase64));
+    const att = app.vault.getAbstractFileByPath(artwork.path);
+    if (!(att instanceof TFile)) throw new Error(`image file missing: ${artwork.path}`);
     const raw = app.fileManager.generateMarkdownLink(att, file.path);
     const embed = raw.startsWith("!") ? raw : `!${raw}`;
     const block = renderArtworkBlock({ embed, scene: artwork.scene, lang, callout: settings.callouts.artwork });

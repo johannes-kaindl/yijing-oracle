@@ -6,7 +6,7 @@ import {
   ItemView,
   MarkdownRenderer,
   Notice,
-  type TFile,
+  TFile,
   TextComponent,
   type WorkspaceLeaf,
   normalizePath,
@@ -21,16 +21,12 @@ import { buildInterpretationMessages } from "../core/llm/prompt";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { effectiveModel } from "../core/llm/settings-defaults";
 import { t } from "../vendor/kit/i18n";
-import { buildSdPrompt, composeImageRequest, hashString } from "../core/image-scene";
+import { buildSdPrompt, composeImageRequest } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
 import { type LlmConnection } from "../vendor/kit-obsidian/llm-connection";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
-import { Txt2ImgClient } from "./image-client";
-import { ComfyClient } from "../core/comfy/client";
-import { ComfyProgressSocket } from "./comfy-progress";
-import { comfyTransport, httpPostJson } from "./http";
-import { normalizeEndpoint } from "../vendor/kit/endpoint";
+import { readImageGenApi } from "./image-gen";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 
@@ -57,8 +53,9 @@ interface CurrentCast {
   lang: Lang;
   /** Erzeugte KI-Deutung (oder null). */
   interpretation: Interpretation | null;
-  /** Generiertes Meditationsbild (oder null). saved verhindert Doppel-Attachments. */
-  artwork: { pngBase64: string; scene: string; saved: boolean } | null;
+  /** Generiertes Meditationsbild (oder null): die Datei im Vault, die local-image-generator geschrieben hat. `saved` heißt:
+   *  die Reading-Note verweist darauf — dann gehört die Datei der Note und wird nie weggeräumt. */
+  artwork: { path: string; scene: string; saved: boolean } | null;
   /** Bereits gespeicherte Note zu diesem Wurf (null → noch nicht gespeichert). */
   file: TFile | null;
 }
@@ -90,13 +87,6 @@ export class OracleView extends ItemView {
   /** Klapp-Zustand des Gedankenblocks — ueberlebt den Re-Render, damit ein Nutzer, der ihn
    *  zuklappt, ihn nicht bei jedem Token wieder aufklappen sieht. */
   private reasoningOpen = true;
-  /** Fortschritt der laufenden Bildgenerierung (nur ComfyUI liefert Schritt-Meldungen). */
-  private imageProgress: { value: number; max: number } | null = null;
-  /** Der Fortschritts-Socket kam nicht zustande — fuer diesen Lauf kommt kein Zaehler
-   *  mehr. Wird angezeigt statt verschwiegen: sonst steht minutenlang "Bild wird
-   *  generiert…" da, was von einem haengenden Lauf nicht zu unterscheiden ist. */
-  private imageProgressBlocked = false;
-  private imageProgressEl: HTMLElement | null = null;
   /** Klapp-Zustände der Kästen (überleben Re-Render). */
   private readingOpen = true;
   private interpretationOpen = true;
@@ -142,6 +132,7 @@ export class OracleView extends ItemView {
       callouts: this.host.settings.callouts,
       includeNotes: this.host.settings.showNotes,
     });
+    this.discardArtwork(this.current);
     this.current = { reading, rendered, question, date, lang, interpretation: null, artwork: null, file: null };
   }
 
@@ -329,29 +320,33 @@ export class OracleView extends ItemView {
       .onClick(() => void this.generateInterpretation());
   }
 
-  /** Bildmeditations-Bereich: Kasten nur bei konfiguriertem Endpoint; Button →
-   *  Vorschau; eigener Regenerate-Button (neuer Zufalls-Seed) unter dem Bild. */
+  /** Bildmeditations-Bereich: Kasten nur, wenn local-image-generator da ist (Kit-Vertrag `image-gen-provider`);
+   *  Button → Vorschau; „Neu generieren“ unter dem Bild. */
   private renderArtworkArea(root: HTMLElement, c: CurrentCast): void {
-    if (!this.host.settings.image.endpoint.trim()) return;
+    if (readImageGenApi(this.app) === null) return;
     const box = root.createEl("details", { cls: "yijing-artwork" });
     box.open = true;
     box.createEl("summary", { text: t("view.artworkHead"), cls: "yijing-box-summary" });
     const area = box.createDiv({ cls: "yijing-artwork-inner" });
 
     if (this.generatingImage) {
-      this.imageProgressEl = area.createEl("p", { text: t("view.generatingImage"), cls: "yijing-empty" });
-      this.updateImageProgressDom();
+      area.createEl("p", { text: t("view.generatingImage"), cls: "yijing-empty" });
       return;
     }
 
     if (c.artwork) {
-      const imgEl = area.createEl("img", { cls: "yijing-artwork-img" });
-      imgEl.src = `data:image/png;base64,${c.artwork.pngBase64}`;
+      const file = this.app.vault.getAbstractFileByPath(c.artwork.path);
+      if (file instanceof TFile) {
+        const imgEl = area.createEl("img", { cls: "yijing-artwork-img" });
+        imgEl.src = this.app.vault.getResourcePath(file);
+      } else {
+        area.createEl("p", { text: t("view.imageMissing"), cls: "yijing-empty" });
+      }
       area.createDiv({ text: c.artwork.scene, cls: "yijing-artwork-scene" });
       const row = area.createDiv({ cls: "yijing-actions" });
       new ButtonComponent(row)
         .setButtonText(t("view.regenerate"))
-        .onClick(() => void this.generateArtwork(Math.floor(Math.random() * 0xffffffff)));
+        .onClick(() => void this.generateArtwork());
       return;
     }
 
@@ -454,13 +449,33 @@ export class OracleView extends ItemView {
     }
   }
 
-  /** Baut Szene+Prompt deterministisch aus dem Wurf und holt das Bild vom Server. */
-  private async generateArtwork(seed?: number): Promise<void> {
+  /** Ordner für das Bild: der Anhänge-Ordner, den Obsidian für eine Note im Lese-Ordner wählen würde (die Note gibt es noch
+   *  nicht, das Bild entsteht vor ihr). */
+  private async imageTargetFolder(): Promise<string> {
+    const probe = await this.app.fileManager.getAvailablePathForAttachment("yijing-image.png", `${normalizePath(this.host.settings.readingsFolder)}/x.md`);
+    const slash = probe.lastIndexOf("/");
+    return slash === -1 ? "" : probe.slice(0, slash);
+  }
+
+  /** Ein noch nicht in eine Note übernommenes Bild ist Wegwerfware dieser Ansicht: weg damit, wenn ein neues kommt oder der
+   *  Wurf wechselt. Ein gespeichertes gehört der Note und bleibt. */
+  private discardArtwork(c: CurrentCast | null): void {
+    const a = c?.artwork;
+    if (!a || a.saved) return;
+    const f = this.app.vault.getAbstractFileByPath(a.path);
+    if (f instanceof TFile) void this.app.fileManager.trashFile(f).catch((e: unknown) => { console.error("[yijing-oracle]", e); });
+  }
+
+  /** Baut Szene+Prompt deterministisch aus dem Wurf und lässt das Bild von local-image-generator erzeugen. */
+  private async generateArtwork(): Promise<void> {
     const c = this.current;
     if (!c || this.generatingImage) return;
+    const api = readImageGenApi(this.app);
+    if (api === null) {
+      new Notice(t("notice.imageNoProvider"));
+      return;
+    }
     const img = this.host.settings.image;
-    const endpoint = img.endpoint.trim();
-    if (!endpoint) return;
 
     const register = this.host.settings.register;
     const primary = getHexagram(c.reading.primaryNumber, c.lang, register);
@@ -473,86 +488,26 @@ export class OracleView extends ItemView {
     });
 
     this.generatingImage = true;
-    this.imageProgress = null;
-    this.imageProgressBlocked = false;
     await this.render();
 
-    const prompt = buildSdPrompt(scene, img.styleSuffix);
-    // Default-Seed = Frage-Hash → gleiche Frage reproduziert dasselbe Bild.
-    const seedValue = seed ?? hashString(c.question);
-    let socket: ComfyProgressSocket | null = null;
-
     try {
-      let png: string;
-
-      if (img.backend === "comfyui") {
-        // EIN client_id für beide Kanäle: der Socket bekommt nur dann Events zu diesem
-        // Lauf, wenn /prompt dieselbe ID trägt. Zwei getrennt erzeugte IDs wären ein
-        // stiller Fehler — das Bild käme, der Balken bliebe für immer bei 0 %.
-        const clientId = crypto.randomUUID();
-        const client = new ComfyClient(endpoint, img.comfyWorkflow, comfyTransport(), {
-          clientId,
-          onProgress: (p) => {
-            this.imageProgress = p;
-            this.updateImageProgressDom();
-          },
-        });
-        socket = new ComfyProgressSocket(
-          normalizeEndpoint(endpoint),
-          clientId,
-          (p) => client.reportProgress(p),
-          () => {
-            this.imageProgressBlocked = true;
-            this.updateImageProgressDom();
-          },
-        );
-        socket.open();
-
-        png = await client.generate({
-          prompt,
-          negativePrompt: img.negativePrompt,
-          width: img.size,
-          height: img.size,
-          steps: img.comfyStepsOverride,
-          seed: seedValue,
-        });
+      const prompt = buildSdPrompt(scene, img.styleSuffix);
+      const res = await api.generateImage(prompt, { targetFolder: await this.imageTargetFolder() });
+      if (typeof res !== "string") {
+        new Notice(t("notice.imageError", res.message));
+        console.error("[yijing-oracle]", res.error, res.message);
       } else {
-        png = await new Txt2ImgClient(endpoint, httpPostJson).generate({
-          prompt,
-          negativePrompt: img.negativePrompt,
-          width: img.size,
-          height: img.size,
-          steps: img.steps,
-          seed: seedValue,
-        });
+        this.discardArtwork(c);
+        c.artwork = { path: res, scene, saved: false };
       }
-
-      c.artwork = { pngBase64: png, scene, saved: false };
     } catch (e) {
+      // Der Vertrag wirft nicht; das hier fängt einen Anbieter, der es trotzdem tut.
       new Notice(t("notice.imageError", String((e as Error)?.message ?? e)));
       console.error("[yijing-oracle]", e);
     } finally {
-      socket?.close();
       this.generatingImage = false;
-      this.imageProgress = null;
-      this.imageProgressBlocked = false;
-      this.imageProgressEl = null;
       await this.render();
     }
-  }
-
-  /** Fortschritt ohne vollständigen Re-Render (kein Flackern), Muster wie updateStreamDom.
-   *  Ohne Fortschrittsdaten bleibt der ursprüngliche Text stehen — der WebSocket kann
-   *  ausfallen, dann läuft die Generierung mit unbestimmter Anzeige weiter. */
-  private updateImageProgressDom(): void {
-    if (!this.imageProgressEl) return;
-    const p = this.imageProgress;
-    if (p) {
-      this.imageProgressEl.setText(t("view.imageProgress", String(p.value), String(p.max)));
-      return;
-    }
-    // Kein Zaehler und kein Socket: den Grund nennen, nicht die Zeile leer lassen.
-    if (this.imageProgressBlocked) this.imageProgressEl.setText(t("view.imageProgressBlocked"));
   }
 
   /** Leichtes Live-Update des Stream-Bereichs ohne vollständigen Re-Render (kein Flackern).

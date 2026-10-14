@@ -9,7 +9,6 @@
 //
 // Pure — kein obsidian-Import (check:pure).
 import { DEFAULT_FILENAME_TEMPLATE } from "../filename";
-import { DEFAULT_IMAGE_SETTINGS } from "../image-settings";
 import { type Register } from "../data";
 import { type ThinkingInNote } from "../llm/interpretation";
 import { DEFAULT_SETTINGS, type OutputMode, type PluginSettings } from "../settings";
@@ -29,14 +28,7 @@ export type ControlKey =
   | "llm.systemPromptDe"
   | "llm.systemPromptEn"
   | "llm.thinkingInNote"
-  | "image.backend"
-  | "image.endpoint"
-  | "image.styleSuffix"
-  | "image.negativePrompt"
-  | "image.size"
-  | "image.steps"
-  | "image.comfyWorkflow"
-  | "image.comfyStepsOverride";
+  | "image.styleSuffix";
 
 export interface ControlSpec {
   get(s: PluginSettings): unknown;
@@ -57,13 +49,6 @@ const asText = (value: unknown): string =>
 
 /** Text mit Rückfall auf einen Default, wenn nach dem Trimmen nichts bleibt. */
 const trimmedOr = (value: unknown, fallback: string): string => asText(value).trim() || fallback;
-
-/** Positive Ganzzahl mit Rückfall — deckt den String ab, den ein Textfeld im Fallback-Pfad
- *  liefert (die klassische Setting-API hat kein Zahlenfeld). */
-const positiveIntOr = (value: unknown, fallback: number): number => {
-  const n = Number(value);
-  return Number.isFinite(n) && n > 0 ? Math.floor(n) : fallback;
-};
 
 export const SETTING_CONTROLS: Record<ControlKey, ControlSpec> = {
   readingLang: {
@@ -135,57 +120,10 @@ export const SETTING_CONTROLS: Record<ControlKey, ControlSpec> = {
     },
   },
 
-  "image.backend": {
-    get: (s) => s.image.backend,
-    set: (s, v) => {
-      s.image.backend = v === "comfyui" ? "comfyui" : "a1111";
-    },
-    refresh: true, // je Backend andere Felder
-  },
-  "image.endpoint": {
-    get: (s) => s.image.endpoint,
-    set: (s, v) => {
-      s.image.endpoint = asText(v).trim();
-    },
-  },
   "image.styleSuffix": {
     get: (s) => s.image.styleSuffix,
     set: (s, v) => {
       s.image.styleSuffix = asText(v);
-    },
-  },
-  "image.negativePrompt": {
-    get: (s) => s.image.negativePrompt,
-    set: (s, v) => {
-      s.image.negativePrompt = asText(v);
-    },
-  },
-  "image.size": {
-    get: (s) => String(s.image.size), // Dropdown-Schlüssel sind Strings
-    set: (s, v) => {
-      s.image.size = positiveIntOr(v, DEFAULT_IMAGE_SETTINGS.size);
-    },
-  },
-  "image.steps": {
-    get: (s) => s.image.steps,
-    set: (s, v) => {
-      s.image.steps = positiveIntOr(v, DEFAULT_IMAGE_SETTINGS.steps);
-    },
-  },
-  "image.comfyWorkflow": {
-    get: (s) => s.image.comfyWorkflow,
-    set: (s, v) => {
-      s.image.comfyWorkflow = asText(v);
-    },
-  },
-  "image.comfyStepsOverride": {
-    // Nullbare Zahl: „leer lassen" heißt „der Workflow gewinnt". Ein leerer String ist
-    // deshalb ein gültiger Wert und darf nicht auf einen Default zurückfallen.
-    get: (s) => (s.image.comfyStepsOverride === null ? "" : String(s.image.comfyStepsOverride)),
-    set: (s, v) => {
-      const raw = asText(v).trim();
-      const n = Number(raw);
-      s.image.comfyStepsOverride = raw === "" || !Number.isFinite(n) || n <= 0 ? null : Math.floor(n);
     },
   },
 };
