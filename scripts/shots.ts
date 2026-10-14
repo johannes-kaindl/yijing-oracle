@@ -90,9 +90,9 @@ async function panelOeffnen(cdp: Cdp, breite = 420): Promise<boolean> {
     await new Promise((r) => setTimeout(r, 500));
     return true;
   `);
-  return Boolean(
-    await pollUntil<boolean>(cdp, `return Boolean(document.querySelector(".yijing-oracle .yijing-title"));`, 8000, 400),
-  );
+  // Das Ergebnis zaehlt: `false` macht aus dem Bild `null` (kein halbes Bild), also kein `requireUntil`, das den Lauf abbraeche.
+  const da = await pollUntil<boolean>(cdp, `return Boolean(document.querySelector(".yijing-oracle .yijing-title"));`, 8000, 400);
+  return Boolean(da);
 }
 
 /**

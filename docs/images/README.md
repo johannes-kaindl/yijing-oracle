@@ -19,31 +19,14 @@ hier **nicht** wiederholt: `_docs/readme/readme-spec.json`, Block `images`.
 
 ## Reproduktionsrezept
 
-⚠️ **Vor dem Quit koordinieren — Obsidian ist geteilte Infrastruktur.** Dieses Rezept
-braucht den frischen Start (ein Bild pro Start, jeder Lauf hinterlässt Zustand); Mitnutzen ist
-hier keine Alternative. Aber Obsidian ist Single-Instance: der Quit trifft die Instanz, an der
-möglicherweise eine andere Session arbeitet, und zerstört deren Zustand. Der eigene Lauf ist
-danach sauber grün; der Schaden fällt nicht auf.
+Aufgenommen wird in einer **Zweitinstanz** mit eigenem Profil und eigenem Port; die reguläre Instanz (9222) wird nie beendet und nie angefasst, sie gehört den anderen Sessions. Das vollständige Startrezept (Profil, `.asar`, Vault eintragen, Start, Lock für den eigenen Port) steht im Kopf von `scripts/shots.ts` und in `tools/obsidian-cdp/README.md` § Frisches Profil vorbereiten.
 
 ```bash
-lsof -nP -iTCP:9222 -sTCP:LISTEN >/dev/null && echo "belegt — erst fragen, wem"
-```
-
-Hört der Port, hängt jemand dran: **erst fragen, dann quitten.** ⚠️ Und die Prüfung ersetzt die
-Frage nicht — sie zeigt aktive CDP-Treiber, aber nicht, wer ein Fenster offen hält oder auf den
-Port wartet; am 2026-08-30 hätte sie einen zwei Stunden alten Reindex nicht gezeigt, denn der
-hing an Ollama, nicht am Port.
-
-```bash
-export STAGING_VAULTS_DIR="$HOME/StagingVaults"   # beliebiges Verzeichnis ausserhalb des Repos   # einmalig
 npm run build && npm run shots -- --setup                    # Vault aus dem Fixture bauen
+# Zweitinstanz starten (Rezept: Kopf von scripts/shots.ts), Vault einmalig als vertrauenswürdig markieren
 
-osascript -e 'quit app "Obsidian"'                           # Handarbeit: Debug-Port
-open -a Obsidian --args --remote-debugging-port=9222
-#   ... den Aufnahme-Vault öffnen und einmalig als vertrauenswürdig markieren
-
-npm run shots                 # alles aufnehmen
-npm run shots -- --only panel.png
+npm run shots -- --port <Port der Zweitinstanz>                  # alles aufnehmen
+npm run shots -- --port <Port der Zweitinstanz> --only panel.png
 npm run shots -- --list       # Vertrag anzeigen
 ```
 
