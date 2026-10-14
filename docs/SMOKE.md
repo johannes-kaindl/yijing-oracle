@@ -96,9 +96,8 @@ des Maintainers hätte neu starten müssen).
 
 **Was das Plugin falsch machte, war das Schweigen darüber:** Die Zeile „Bild wird generiert…"
 stand minutenlang unverändert da und war von einem hängenden Lauf nicht zu unterscheiden.
-Seit 2026-08-16 meldet `ComfyProgressSocket` einen gescheiterten Verbindungsaufbau nach oben
-und das Panel nennt den Grund. Prüfpunkt D4 misst deshalb nicht mehr „läuft der Zähler",
-sondern „Zähler **oder** genannter Grund" — beides ist richtig, stumm ist falsch.
+Seit 2026-08-16 meldete der Fortschritts-Socket des Plugins einen gescheiterten Verbindungsaufbau nach oben
+und das Panel nannte den Grund (Prüfpunkt D4 maß damals „Zähler **oder** genannter Grund": beides richtig, stumm falsch). Mit der Eigenbau-Anbindung ist auch der Socket gegangen; D4 misst jetzt, dass während des Laufs der Status der Generierung in der Zeile steht.
 
 **Warum kein Unit-Test das fand:** Die Live-Verifikation vom 2026-08-04 lief als
 Node-Skript. Node sendet keinen `Origin`. Derselbe Code, dieselbe Instanz, anderes Ergebnis —
