@@ -28,7 +28,7 @@ npm run smoke:gui -- --port 9400
 python3 ~/.claude/hooks/obsidian-cdp-lock.py release
 ```
 
-Optionen: `--port` (Pflicht) · `--vault` (Default `yijing-oracle`) · `--lig <Ordner>` (gebauter local-image-generator mit `main.js`, `manifest.json`, `styles.css`; ohne ihn gilt D10 als übersprungen) · `--model <id>` (M4 nimmt genau dieses auf :1234 geladene Modell statt des ersten der Liste; bei mehreren geladenen Modellen entscheidet sonst die Reihenfolge) · `--kein-manager` (M1–M3 und M1b gelten als übersprungen).
+Optionen: `--port` (Pflicht) · `--vault` (Default `yijing-oracle`) · `--lig <Ordner>` (gebauter local-image-generator mit `main.js`, `manifest.json`, `styles.css`; ohne ihn gilt D10 als übersprungen) · `--model <id>` (M4 nimmt genau dieses auf :1234 geladene Modell; ohne Flag wird nichts angefragt und M4 ist „nichts gemessen“, weil sonst bei mehreren geladenen Modellen die Reihenfolge der Liste ein fremdes Modell träfe) · `--kein-manager` (M1–M3 und M1b gelten als übersprungen).
 
 ## Bilanz in vier Zuständen
 

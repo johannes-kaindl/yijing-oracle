@@ -34,7 +34,7 @@
  * # PID merken: beendet wird NUR sie, nie pkill/killall. Je Messlauf frischer Prozess.
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke Zweitinstanz :9400" --exclusive focus --port 9400 --ttl 300
  * npm run smoke:gui -- --port 9400 --vault yijing-oracle    # (b) Restricted Mode, (c) Vertrauensdialog: macht `bereiteInstanzVor`
- * npm run smoke:gui -- --port 9400 --vault yijing-oracle --model <id>     # M4: genau dieses Modell auf :1234 (ohne Flag das erste geladene)
+ * npm run smoke:gui -- --port 9400 --vault yijing-oracle --model <id>     # M4: genau dieses Modell auf :1234; ohne Flag wird nichts angefragt (M4 nichts gemessen)
  * npm run smoke:gui -- --port 9400 --vault yijing-oracle --lig <Ordner>   # D10: gebauter local-image-generator (main.js, manifest.json, styles.css); ohne Flag uebersprungen
  * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
  * ```
@@ -1744,6 +1744,9 @@ async function pruefeEchtenEndpunkt(cdp: Cdp, gewuenschtesModell?: string): Prom
   console.log("\nM4 · Deutung gegen einen echten Endpunkt");
   const name = "M4 Deutung streamt gegen den echten Endpunkt";
   const url = "http://127.0.0.1:1234";
+  // Ohne `--model` wird nichts angefragt: bei mehreren geladenen Modellen (auch fremden) waehlt sonst die Reihenfolge der Liste,
+  // und der Lauf trifft ein Modell, das ihm nicht gehoert (gemessen 2026-10-14, Welle 22: M4 ohne Flag fragte ein fremdes gemma-4-e2b an).
+  if (gewuenschtesModell === undefined) { unmeasured(name, "--model <id> nicht gesetzt: die Reihenfolge der Modell-Liste ist kein Auswahlkriterium, es wird nichts angefragt"); return; }
   const modell = await geladenesModell(url, gewuenschtesModell);
   if (modell === null) { unmeasured(name, `auf ${url} ist kein Modell geladen oder der Server antwortet nicht (ein Lauf loeste sonst ein JIT-Laden aus)`); return; }
   const vorher = await cdp.evaluate<{ eps: unknown; choice: unknown; thinking: unknown }>(`
