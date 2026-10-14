@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The finished interpretation shows the thoughts like the live view did.** After the stream ended, the thoughts used to reappear as a second, differently styled block, collapsed; now they keep the markup of the live view and stay open or closed as you left them.
+- **Settings: the explanation under "Endpoints" matches the row editor.** It no longer says "one base URL per line"; it names the row with address, key and model.
+- Vendored `obsidian-kit` 0.60.1 (was 0.59.1) and `code-kit` 0.27.1 (was 0.24.0). One thing is visible: a hint that lists dropped request parameters now lists them sorted (code-kit 0.26.0). The time stamp of a new reading (`date` in the note) is written by the shared local-time helper and looks exactly as before. Nothing else changes here: the tool-provider contract, share export, per-code manager error texts, the thinking-button style and the helper functions in between are not used by this plugin.
+
 ## [0.14.1] — 2026-10-12
 
 ### Fixed
