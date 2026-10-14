@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.15.0] — 2026-10-14
+
 ### Fixed
 
 - **Gemma 4 models no longer show their thinking as the interpretation.** `google/gemma-4-e4b` ignores "thinking off" and writes its thoughts into the answer text, closed by `<channel|>`; the interpretation started with "The user wants me to interpret …". The thoughts now go to the collapsible thinking block and the interpretation starts with the actual text. While the model is still thinking, the live view shows that text until the thoughts end, then it moves to the thinking block (`obsidian-kit` 0.60.3, `code-kit` 0.27.2).
