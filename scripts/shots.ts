@@ -314,7 +314,7 @@ const SHOTS: Shot[] = [
       // Denkspur zuklappen: so wird sie ausgeliefert (`<details>` ohne `open`), und
       // aufgeklappt draengt sie die Antwort — die eigentliche Aussage — aus dem Bild.
       await cdp.evaluate(`
-        const d = document.querySelector(".yijing-oracle .yijing-reasoning");
+        const d = document.querySelector(".yijing-oracle .okit-stream-reasoning");
         if (d) d.open = false;
         await new Promise((r) => setTimeout(r, 300));
         return true;

@@ -126,13 +126,6 @@ export class OracleView extends ItemView {
     this.contentEl.empty();
   }
 
-  /** Von außen aufrufbar (Command), um im Panel zu werfen und anzuzeigen. */
-  async castAndShow(question?: string): Promise<void> {
-    if (question !== undefined) this.questionValue = question;
-    this.doCast();
-    await this.render();
-  }
-
   private doCast(): void {
     const lang = this.host.resolveReadingLang();
     const register = this.host.settings.register;
@@ -310,9 +303,15 @@ export class OracleView extends ItemView {
 
     if (c.interpretation) {
       if (c.interpretation.reasoning.trim()) {
-        const det = area.createEl("details", { cls: "yijing-reasoning" });
+        // Dasselbe Markup wie der Streaming-Bereich (Kit `okit-stream-reasoning`): vorher kam nach dem Stream
+        // eine zweite, anders gestaltete Darstellung derselben Gedanken.
+        const det = area.createEl("details", { cls: "okit-stream-reasoning" });
+        det.open = this.reasoningOpen;
+        det.addEventListener("toggle", () => {
+          this.reasoningOpen = det.open;
+        });
         det.createEl("summary", { text: t("view.reasoningHead") });
-        det.createDiv({ text: c.interpretation.reasoning, cls: "yijing-reasoning-body" });
+        det.createEl("pre", { text: c.interpretation.reasoning });
       }
       const body = area.createDiv({ cls: "yijing-interpretation-body" });
       void MarkdownRenderer.render(this.app, neutralizeModelMarkdown(c.interpretation.answer), body, "", this);

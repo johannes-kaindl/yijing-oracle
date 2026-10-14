@@ -176,26 +176,6 @@
   overflow-y: auto;
 }
 
-.yijing-reasoning {
-  margin: var(--size-2-2) 0;
-  font-size: var(--font-ui-small);
-  color: var(--text-muted);
-}
-
-.yijing-reasoning summary {
-  cursor: pointer;
-  color: var(--text-faint);
-}
-
-.yijing-reasoning-body {
-  white-space: pre-wrap;
-  margin-top: var(--size-2-2);
-  padding-left: var(--size-4-2);
-  border-left: 2px solid var(--background-modifier-border);
-  max-height: 30vh;
-  overflow-y: auto;
-}
-
 /* ── Streaming-Antwortbereich (UI-STANDARD §8) ─────────────────────
    Vendored aus obsidian-kit@0.51.2 (src/obsidian/stream-area.ts, STREAM_AREA_CSS) —
    das Kit injiziert kein CSS, der Block gehoert laut Vertrag hierhin. Nie von Hand
