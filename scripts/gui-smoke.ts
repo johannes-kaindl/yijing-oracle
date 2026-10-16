@@ -157,6 +157,7 @@ const PUNKTE = [
   "L4 Kontrolle: die Deutung folgt auch bei absatzgroßen Stücken bis zum Ende",
   "L5 Wiederaufnahme: steht der Nutzer wieder unten, folgt die Deutung dem Strom wieder",
   "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt",
+  "L6 Gemma-Stub: nach dem Kanal-Ende steht im Antwortbereich nur die Antwort, das Denken im Denkblock",
   "M4 Deutung streamt gegen den echten Endpunkt",
   "D0 Ohne Bild-Anbieter fehlt der Bild-Kasten",
   "D1 Mit Bild-Anbieter erscheint der Bild-Kasten",
@@ -1627,6 +1628,7 @@ async function geladenesModell(url: string, gewuenscht?: string): Promise<string
  *  Strom lange genug offen. Gueltig nur, wenn der Strom beim zweiten Messwert noch laeuft (sonst nichts gemessen).
  *  „Folge-Regel“ gibt es hier nicht: `view.ts` baut den Bereich ohne `scrollEl`, der Body ist unbegrenzt hoch
  *  (Befund an den Master, kein Prüfpunkt). */
+const GEMMA_NAME = "L6 Gemma-Stub: nach dem Kanal-Ende steht im Antwortbereich nur die Antwort, das Denken im Denkblock";
 const DENK_NAME = "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt";
 const DENK_MODELL = "smoke-denk-modell";
 
@@ -1726,6 +1728,70 @@ async function pruefeFolgeRegel(cdp: Cdp): Promise<void> {
   } catch (e) {
     for (const n of Object.values(NAMEN)) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
+    if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
+/** L6 — das Gemma-Format (Gemma-Abschluss, Welle 23): gemma-4 auf LM Studio ignoriert „none“ und schreibt sein Denken OHNE Oeffner in den
+ *  Antworttext, beendet es mit `<channel|>` (gemessen 2026-10-14). Der Stub spielt das nach und haelt den Strom danach OFFEN (`nachlaufMs`):
+ *  gemessen wird der Anzeigetext, waehrend der Aufruf noch laeuft, denn am Ende rendert die Ansicht ohnehin `res.content`. Ohne
+ *  `onContentReset` (view.ts) bliebe der Denktext bis dahin im Antwortbereich stehen. Mutationsprobe: Abklemmen von `onContentReset`
+ *  macht den Punkt rot (siehe Commit-Nachricht). */
+async function pruefeGemma(cdp: Cdp): Promise<void> {
+  console.log("\nL6 · Gemma-Kanal");
+  const NAME = GEMMA_NAME;
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  const MODELL = "google/gemma-4-e4b";
+  const DENKEN = "The user wants me to read the hexagram for a question about change.\nI will keep it short.";
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({
+      models: [MODELL],
+      standard: { text: `${DENKEN}<channel|>Sauberer Text der Deutung.`, laenge: 14, takt: 120, nachlaufMs: 6000, model: MODELL },
+    });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: ${JSON.stringify(MODELL)} }]; p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    if (!(await openPanel(cdp))) { unmeasured(NAME, "Panel oeffnet nicht"); return; }
+    await cdp.evaluate(`
+      const q = document.querySelector(".yijing-oracle .yijing-question");
+      if (q) { q.value = "Smoke L6: Gemma"; q.dispatchEvent(new Event("input")); }
+      return true;`);
+    if (!(await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button"))) { unmeasured(NAME, "Wurf-Knopf nicht gefunden"); return; }
+    await schlaf(500);
+    if (!(await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button"))) { unmeasured(NAME, "Deuten-Knopf nicht gefunden"); return; }
+    // Warten, bis die Antwort NACH dem Kanal-Ende im Bereich beginnt; der Strom laeuft danach noch 6 s.
+    const messe = `
+      const wurzel = document.querySelector(".okit-stream");
+      if (!wurzel) return null;
+      const kopie = wurzel.cloneNode(true);
+      kopie.querySelectorAll(".okit-stream-reasoning").forEach((e) => e.remove());
+      const antwort = (kopie.textContent || "").trim();
+      const denk = (document.querySelector(".okit-stream-reasoning pre")?.textContent ?? "");
+      return antwort.includes("Sauber") ? { antwort, denk } : null;`;
+    const m = await pollUntil<{ antwort: string; denk: string }>(cdp, messe, 20000, 100);
+    if (m === null) { unmeasured(NAME, "die Antwort nach dem Kanal-Ende erschien nicht im Antwortbereich (20 s) — Lage nicht hergestellt"); return; }
+    const sauber = !m.antwort.includes("The user wants") && !m.antwort.includes("<channel");
+    const imBlock = m.denk.includes("The user wants");
+    record(NAME, sauber && imBlock,
+      `Antwortbereich ${JSON.stringify(m.antwort.slice(0, 70))} · Denkblock ${imBlock ? "traegt das Denken" : "LEER oder ohne Denken"} (${m.denk.length} Zeichen)`);
+  } catch (e) {
+    unmeasured(NAME, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`).catch(() => null);
     if (stub) await stub.stop().catch(() => undefined);
     if (vorher !== null) {
       await cdp.evaluate(`
@@ -1959,6 +2025,7 @@ async function main(): Promise<void> {
     await pruefeAnfrage(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
+    await pruefeGemma(cdp);
     await pruefeFolgeRegel(cdp);
     await pruefeEchtenEndpunkt(cdp, modellFlag);
 
