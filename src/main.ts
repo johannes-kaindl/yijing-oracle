@@ -109,15 +109,10 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
 
     const settingsTab = new SettingsTab(this.app, this, this, this.llm);
     this.addSettingTab(settingsTab);
-    // Der Host rendert beim Oeffnen des Tabs die bei addSettingTab gecachten Definitionen
-    // (SettingsTab-Kommentar "Fallstrick 2") — installiert sich der LLM Endpoint Manager erst
-    // NACH diesem Zeitpunkt (Plugin-Ladereihenfolge ist nicht garantiert), bliebe die
-    // Endpunkt-Zeile sonst bis zur naechsten eigenen Werteaenderung veraltet. Erst nach
-    // onLayoutReady abonnieren (Kit-Empfehlung in onEndpointManagerChanged): verringert das
-    // Risiko, den Manager zu verpassen, ohne es ganz auszuschliessen.
-    this.app.workspace.onLayoutReady(() => {
-      onEndpointManagerChanged(this.app, () => settingsTab.refresh());
-    });
+    // Der Host rendert beim Oeffnen des Tabs die bei addSettingTab gecachten Definitionen (SettingsTab-Kommentar "Fallstrick 2") —
+    // installiert sich der LLM Endpoint Manager erst NACH diesem Zeitpunkt, bliebe die Endpunkt-Zeile sonst veraltet. Seit Kit 0.61.0
+    // zieht das Abo selbst nach, wenn der Manager erst nach dem Plugin erscheint, und ruft `cb` dann einmal.
+    this.register(onEndpointManagerChanged(this.app, () => settingsTab.refresh()));
   }
 
   resolveReadingLang(): Lang {

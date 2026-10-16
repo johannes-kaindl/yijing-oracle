@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- Vendored `obsidian-kit` 0.61.0 (was 0.60.3) and `code-kit` 0.28.0 (was 0.27.2). You will notice two things:
+- With Gemma 4 in LM Studio and "thinking off" the plugin now sends the lowest thinking level, because LM Studio ignores "none" for this model. The model still thinks a little (a few more tokens and a bit more time). The answer stays clean: the thinking sits in the collapsible thinking block, not in the reading. The settings say so ("cannot be fully turned off here").
+- If the LLM Endpoint Manager is switched on only after Yijing Oracle, the settings pick it up in the same session (the subscription now follows a late manager by itself instead of staying silent).
+- A backend or model family that this version does not know yet no longer makes a request fail; the "Request" section names it.
+
 ## [0.15.0] — 2026-10-14
 
 ### Fixed
