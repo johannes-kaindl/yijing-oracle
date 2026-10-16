@@ -65,7 +65,9 @@ import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
+import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { boxAround, capture } from "../../tools/obsidian-cdp/shot.js";
 
 const PLUGIN_ID = "yijing-oracle";
 /** manifest.json → name. Nicht lokalisiert — taugt als Anker in der Einstellungs-Suche. */
@@ -1740,6 +1742,23 @@ async function pruefeFolgeRegel(cdp: Cdp): Promise<void> {
   }
 }
 
+/** Optional: mit `SHOT_DIR=<ordner>` nimmt der Lauf die Flaeche nach dem Gemma-Punkt auf (Sichtpruefung des Denkblocks). Aufnahmen gehoeren
+ *  unter `--exclusive focus`: unter einem Port-Lock haengt `Page.captureScreenshot` bei verdecktem Fenster. */
+async function haltePanelBild(cdp: Cdp, name: string, selector: string): Promise<void> {
+  const dir = process.env.SHOT_DIR;
+  if (dir === undefined || dir === "") return;
+  try {
+    mkdirSync(dir, { recursive: true });
+    await cdp.evaluate(`const d = document.querySelector(".okit-stream-reasoning, .img2md-reasoning"); if (d) d.open = true; const k = document.querySelector(".okit-stream"); if (k) k.scrollIntoView({ block: "center" }); await new Promise((r) => setTimeout(r, 400)); return true;`);
+    const r = await boxAround(cdp, [selector], 4);
+    const png = await capture(cdp, r ?? undefined, 1, {});
+    writeFileSync(join(dir, `${name}.png`), png);
+    console.log(`  · Bild: ${join(dir, `${name}.png`)}`);
+  } catch (e) {
+    console.log(`  · Bild ${name} nicht aufgenommen: ${(e as Error).message}`);
+  }
+}
+
 /** L6 — das Gemma-Format (Gemma-Abschluss, Welle 23): gemma-4 auf LM Studio ignoriert „none“ und schreibt sein Denken OHNE Oeffner in den
  *  Antworttext, beendet es mit `<channel|>` (gemessen 2026-10-14). Der Stub spielt das nach und haelt den Strom danach OFFEN (`nachlaufMs`):
  *  gemessen wird der Anzeigetext, waehrend der Aufruf noch laeuft, denn am Ende rendert die Ansicht ohnehin `res.content`. Ohne
@@ -1784,6 +1803,7 @@ async function pruefeGemma(cdp: Cdp): Promise<void> {
       return antwort.includes("Sauber") ? { antwort, denk } : null;`;
     const m = await pollUntil<{ antwort: string; denk: string }>(cdp, messe, 20000, 100);
     if (m === null) { unmeasured(NAME, "die Antwort nach dem Kanal-Ende erschien nicht im Antwortbereich (20 s) — Lage nicht hergestellt"); return; }
+    await haltePanelBild(cdp, "gemma-denkblock", ".okit-stream");
     const sauber = !m.antwort.includes("The user wants") && !m.antwort.includes("<channel");
     const imBlock = m.denk.includes("The user wants");
     record(NAME, sauber && imBlock,
