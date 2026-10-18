@@ -65,6 +65,7 @@ import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
+import { gegenprobeErreichbarkeit, gegenprobeFokus, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtBilanz, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { boxAround, capture } from "../../tools/obsidian-cdp/shot.js";
@@ -159,6 +160,13 @@ const PUNKTE = [
   "L4 Kontrolle: die Deutung folgt auch bei absatzgroßen Stücken bis zum Ende",
   "L5 Wiederaufnahme: steht der Nutzer wieder unten, folgt die Deutung dem Strom wieder",
   "L1 Denkblock live: der Reasoning-Text ist waehrend des Stroms sichtbar und waechst, bevor die Antwort beginnt",
+  "L1b Denkblock kopierbar: der Knopf legt den Denktext in die Zwischenablage, der Block klappt nicht um",
+  "L1c Gegenprobe: lehnt die Zwischenablage ab, quittiert der Knopf nicht",
+  "P1 Tippen in die Frage waehrend die Deutung streamt behaelt den Fokus",
+  "P1b Gegenprobe: ein Neuzeichnen mit Fokusverlust macht P1 rot",
+  "P2 jedes Bedienelement ist erreichbar (natuerliche Hoehe)",
+  "P2b jedes Bedienelement ist erreichbar (kurzes Panel, 420 px)",
+  "P2c Gegenprobe: ohne Rollbalken wird etwas unerreichbar",
   "L6 Gemma-Stub: nach dem Kanal-Ende steht im Antwortbereich nur die Antwort, das Denken im Denkblock",
   "M4 Deutung streamt gegen den echten Endpunkt",
   "D0 Ohne Bild-Anbieter fehlt der Bild-Kasten",
@@ -1661,17 +1669,133 @@ async function pruefeDenkblockLive(cdp: Cdp): Promise<void> {
     if (!(await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button"))) { unmeasured(DENK_NAME, "Deuten-Knopf nicht gefunden"); return; }
     const messe = `return { denk: (document.querySelector(".okit-stream-reasoning pre")?.textContent ?? "").length, tail: (document.querySelector(".okit-stream-tail")?.textContent ?? "").length, strom: Boolean(document.querySelector(".okit-stream")), sichtbar: (() => { const d = document.querySelector(".okit-stream-reasoning"); return Boolean(d && d.open); })() };`;
     const erst = await pollUntil<{ denk: number; tail: number; strom: boolean; sichtbar: boolean }>(cdp, `const m = (() => { ${messe} })(); return m.denk > 0 ? m : null;`, 15000, 150);
-    if (!erst) { record(DENK_NAME, false, "kein Reasoning-Text im Denkblock innerhalb von 15 s"); return; }
+    if (!erst) { record(DENK_NAME, false, "kein Reasoning-Text im Denkblock innerhalb von 15 s"); for (const n of [KOPIE_NAME, KOPIE_GEGEN]) unmeasured(n, "L1 beobachtete keinen Denkblock"); return; }
     await schlaf(1000);
     const zweit = await cdp.evaluate<{ denk: number; tail: number; strom: boolean; sichtbar: boolean }>(messe);
-    if (!zweit.strom || zweit.tail > 0) { unmeasured(DENK_NAME, `Strom nicht mehr im Denken beim zweiten Messwert (Strom ${String(zweit.strom)}, Antwort ${zweit.tail} Zeichen) — Lage nicht hergestellt`); return; }
+    if (!zweit.strom || zweit.tail > 0) { for (const n of [KOPIE_NAME, KOPIE_GEGEN]) unmeasured(n, "L1 stand beim zweiten Messwert nicht mehr im Denken"); unmeasured(DENK_NAME, `Strom nicht mehr im Denken beim zweiten Messwert (Strom ${String(zweit.strom)}, Antwort ${zweit.tail} Zeichen) — Lage nicht hergestellt`); return; }
     record(DENK_NAME, erst.tail === 0 && erst.sichtbar && zweit.denk > erst.denk,
       `Denktext ${erst.denk} → ${zweit.denk} Zeichen, Antwort ${erst.tail} → ${zweit.tail} Zeichen, Block offen: ${erst.sichtbar ? "ja" : "nein"}`);
+    await messeDenkblockKopierbar(cdp);
   } catch (e) {
     unmeasured(DENK_NAME, `Messung abgebrochen: ${(e as Error).message}`);
   } finally {
     await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`).catch(() => null);
     if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
+const KOPIE_NAME = "L1b Denkblock kopierbar: der Knopf legt den Denktext in die Zwischenablage, der Block klappt nicht um";
+const KOPIE_GEGEN = "L1c Gegenprobe: lehnt die Zwischenablage ab, quittiert der Knopf nicht";
+
+/** L1b/L1c — der Kopier-Knopf am Gedankenblock (Kit 0.63.0). `navigator.clipboard.writeText` wird im Renderer aufgezeichnet (die echte
+ *  Zwischenablage haengt am Fenster-Fokus), danach wiederhergestellt. L1c: lehnt `writeText` ab, darf der Knopf nicht quittieren —
+ *  sonst waere die Quittung von L1b kein Beleg fuers Kopieren. Gleiche Messung wie lingotuner C8c/C8d. */
+async function messeDenkblockKopierbar(cdp: Cdp): Promise<void> {
+  if ((await cdp.evaluate<number>(`return document.querySelectorAll(".okit-stream-reasoning-copy").length;`)) === 0) {
+    for (const n of [KOPIE_NAME, KOPIE_GEGEN]) unmeasured(n, "der Denkblock traegt keinen Kopier-Knopf (.okit-stream-reasoning-copy)");
+    return;
+  }
+  const probe = (modus: "ok" | "ablehnen"): string => `
+    const alt = Object.getOwnPropertyDescriptor(navigator.clipboard, "writeText");
+    window.__yjKopie = { text: null, n: 0 };
+    window.__yjKopieAlt = alt || null;
+    Object.defineProperty(navigator.clipboard, "writeText", { configurable: true, value: (t) => { window.__yjKopie.n += 1; window.__yjKopie.text = t; return ${modus === "ok" ? "Promise.resolve()" : 'Promise.reject(new Error("abgelehnt"))'}; } });
+    const d = document.querySelector(".okit-stream-reasoning");
+    const offenVorher = d.open;
+    document.querySelector(".okit-stream-reasoning-copy").click();
+    await new Promise((r) => setTimeout(r, 400));
+    const pre = d.querySelector("pre");
+    const btn = document.querySelector(".okit-stream-reasoning-copy");
+    return { n: window.__yjKopie.n, text: window.__yjKopie.text, preText: pre ? pre.textContent : "", offenVorher, offenNachher: d.open, quittiert: !!btn && btn.classList.contains("is-copied") };
+  `;
+  const aufraeumen = `
+    if (window.__yjKopieAlt) Object.defineProperty(navigator.clipboard, "writeText", window.__yjKopieAlt); else delete navigator.clipboard.writeText;
+    delete window.__yjKopie; delete window.__yjKopieAlt; return true;`;
+  try {
+    const ok = await cdp.evaluate<{ n: number; text: string | null; preText: string; offenVorher: boolean; offenNachher: boolean; quittiert: boolean }>(probe("ok"));
+    await cdp.evaluate(aufraeumen);
+    // Der Strom laeuft: der Block darf seit dem Klick gewachsen sein, der Kopierte ist sein Anfang.
+    const gleich = ok.n === 1 && ok.text !== null && ok.text.trim() !== "" && ok.preText.trim().startsWith(ok.text.trim());
+    record(KOPIE_NAME, gleich && ok.offenVorher === ok.offenNachher && ok.quittiert,
+      `${ok.n}× kopiert, ${ok.text === null ? "kein Text" : `${ok.text.length} Zeichen`} (Block jetzt ${ok.preText.length}, der Kopierte ist sein Anfang), Block ${ok.offenVorher === ok.offenNachher ? "unveraendert" : "UMGEKLAPPT"}, Quittung ${ok.quittiert ? "da" : "fehlt"}`);
+    await pollUntil<boolean>(cdp, `const b = document.querySelector(".okit-stream-reasoning-copy"); return b && !b.classList.contains("is-copied") ? true : null;`, 4000, 150);
+    const nein = await cdp.evaluate<{ n: number; quittiert: boolean }>(probe("ablehnen"));
+    record(KOPIE_GEGEN, nein.n === 1 && !nein.quittiert, `writeText abgelehnt (${nein.n}× aufgerufen): Knopf ${nein.quittiert ? "quittiert trotzdem" : "quittiert nicht"}`);
+  } catch (e) {
+    for (const n of [KOPIE_NAME, KOPIE_GEGEN]) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    await cdp.evaluate(aufraeumen).catch(() => null);
+  }
+}
+
+/** Die Bilanz, wie der Baustein `pflichtpunkte` sie braucht (`zeichnePflicht`). */
+const pflichtBilanz: PflichtBilanz = {
+  record: (name, passed, detail) => record(name, passed, detail ?? ""),
+  unmeasured: (name, grund) => unmeasured(name, grund),
+};
+
+const P_NAMEN = {
+  fokus: "P1 Tippen in die Frage waehrend die Deutung streamt behaelt den Fokus",
+  fokusGegen: "P1b Gegenprobe: ein Neuzeichnen mit Fokusverlust macht P1 rot",
+  erreich: "P2 jedes Bedienelement ist erreichbar (natuerliche Hoehe)",
+  erreichKurz: "P2b jedes Bedienelement ist erreichbar (kurzes Panel, 420 px)",
+  erreichGegen: "P2c Gegenprobe: ohne Rollbalken wird etwas unerreichbar",
+} as const;
+
+/** P1/P2 — die Pflichtpunkte aus `tools/obsidian-cdp/pflichtpunkte.ts` (Skill `gui-smoke-setup` § 3a) fuer die Deutung: ein offener Strom
+ *  (der Stub haelt ihn nach dem Text offen), waehrend dessen der Nutzer in die Frage tippt (Fokus) und alle Bedienelemente des Panels
+ *  erreichbar bleiben muessen, wenn die Deutung lang wird (EIN Rollbereich: `.view-content`). */
+async function pruefePflicht(cdp: Cdp): Promise<void> {
+  console.log("\nP · Pflichtpunkte (Fokus-Erhalt, Erreichbarkeit)");
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let vorher: unknown = null;
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({
+      models: [DENK_MODELL],
+      standard: { text: Array.from({ length: 30 }, (_, i) => `Zeile ${i + 1}: Die Linien wandeln sich.\n\n`).join(""), laenge: 30, takt: 200, nachlaufMs: 90_000 },
+    });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: ${JSON.stringify(DENK_MODELL)} }]; p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    if (!(await openPanel(cdp))) { for (const n of Object.values(P_NAMEN)) unmeasured(n, "Panel oeffnet nicht"); return; }
+    await cdp.evaluate(`
+      const q = document.querySelector(".yijing-oracle .yijing-question");
+      if (q) { q.value = "Smoke P: Pflichtpunkte"; q.dispatchEvent(new Event("input")); }
+      return true;`);
+    if (!(await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button"))) { for (const n of Object.values(P_NAMEN)) unmeasured(n, "Wurf-Knopf nicht gefunden"); return; }
+    await schlaf(500);
+    if (!(await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button"))) { for (const n of Object.values(P_NAMEN)) unmeasured(n, "Deuten-Knopf nicht gefunden"); return; }
+    // Der Strom steht, sobald Text im Antwort-Tail ankommt; ab dann ist der Bereich lang genug zum Rollen.
+    const laeuft = await pollUntil<boolean>(cdp, `return (document.querySelector(".okit-stream-tail")?.textContent ?? "").length > 40 ? true : null;`, 15000, 200);
+    if (laeuft === null) { for (const n of Object.values(P_NAMEN)) unmeasured(n, "der Strom kam nicht an (kein Text im Antwortbereich)"); return; }
+
+    zeichnePflicht(pflichtBilanz, P_NAMEN.fokus, await messeFokusErhalt(cdp, { selector: ".yijing-question" }));
+    zeichnePflicht(pflichtBilanz, P_NAMEN.fokusGegen, await gegenprobeFokus(cdp, { selector: ".yijing-question" }));
+
+    const BEDIENELEMENTE = [".yijing-question", ".yijing-oracle > .yijing-actions button", ".yijing-interpretation-inner .yijing-actions button"];
+    const opts = { selektoren: BEDIENELEMENTE, fuelle: { in: ".okit-stream-body" }, ueberlauf: ".view-content.yijing-oracle", erforderlich: BEDIENELEMENTE };
+    zeichnePflicht(pflichtBilanz, P_NAMEN.erreich, await messeErreichbarkeit(cdp, opts));
+    const kurz = await mitHoehe<PflichtTeilurteil>(cdp, { element: ".workspace-leaf", enthaelt: ".yijing-oracle", hoehe: 420 }, () => messeErreichbarkeit(cdp, opts));
+    zeichnePflicht(pflichtBilanz, P_NAMEN.erreichKurz, kurz);
+    zeichnePflicht(pflichtBilanz, P_NAMEN.erreichGegen, await gegenprobeErreichbarkeit(cdp, { selektoren: BEDIENELEMENTE, rollbereich: ".view-content.yijing-oracle", fuelle: { in: ".okit-stream-body" } }));
+  } catch (e) {
+    for (const n of Object.values(P_NAMEN)) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
+  } finally {
+    await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`).catch(() => null);
+    if (stub) { await stub.trenneAlle(); await stub.stop().catch(() => undefined); }
     if (vorher !== null) {
       await cdp.evaluate(`
         const v = ${JSON.stringify(vorher)}; const p = ${P};
@@ -2047,6 +2171,7 @@ async function main(): Promise<void> {
     await pruefeDenkblockLive(cdp);
     await pruefeGemma(cdp);
     await pruefeFolgeRegel(cdp);
+    await pruefePflicht(cdp);
     await pruefeEchtenEndpunkt(cdp, modellFlag);
 
     await abschnittBild(cdp, aufraeumen, ligDir);
