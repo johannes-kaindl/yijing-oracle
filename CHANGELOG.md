@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.16.0] — 2026-10-18
+
 ### Changed
 - Vendored `obsidian-kit` 0.63.0 (was 0.61.0) and `code-kit` 0.31.0 (was 0.28.0). You will notice four things:
 - The thinking block of the interpretation has a copy button next to its title. It copies the thought as plain text and shows a check mark for a moment; clicking it does not open or close the block.
