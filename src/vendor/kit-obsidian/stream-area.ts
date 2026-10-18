@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.61.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.63.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -74,10 +74,23 @@
  *    schlicht unerreichbar. *Nicht selbst reproduziert; die Zahlen stammen aus deren Sweep.*
  */
 
-/** Sichtbare Texte. Kein Default: das Kit schreibt keine Sprache fest (UI-STANDARD §10). */
+import { setIcon } from "obsidian";
+import { copyToClipboard } from "./clipboard";
+import { realClock, type ClockPort } from "./clock";
+
+/** Wie lange der Kopier-Knopf nach dem Kopieren das Häkchen zeigt. */
+const COPIED_FLASH_MS = 1500;
+
+/** Sichtbare Texte. Kein Default außer dem Knopf-Label: das Kit schreibt keine Sprache fest (UI-STANDARD §10). */
 export interface StreamAreaStrings {
   /** `<summary>` des Gedankenblocks, z. B. „Denkt nach…". */
   reasoning: string;
+  /** `aria-label` des Kopier-Knopfs am Gedankenblock. Default `"Copy thinking"`: der Knopf ist seit 0.63.0 immer da,
+   *  eine Übersetzung kommt vom Consumer wie jeder andere Text. */
+  copyReasoning?: string;
+  /** Notice nach dem Kopieren. **Kein Default** — weggelassen heißt: nur die Quittung am Knopf (Icon `check`),
+   *  wie bei `copyToClipboard`. */
+  copiedReasoning?: string;
 }
 
 export interface StreamAreaOptions {
@@ -107,6 +120,8 @@ export interface StreamAreaOptions {
    *  2026-09-11). Kein Rezept-Satz, weil ein Satz beim nächsten Consumer wieder überlesen
    *  wird (CORE-META-17) — die Option ändert den Default nicht. */
   bodyCls?: string;
+  /** Timer für die Quittung am Kopier-Knopf; Default `realClock`. Tests injizieren. */
+  clock?: ClockPort;
 }
 
 export interface StreamArea {
@@ -184,7 +199,12 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
   let reasonPre: HTMLElement | null = null;
   let reasonRaw = "";
   let reasonSummaryEl: HTMLElement | null = null;
+  /** Der Text der Zusammenfassung steht in einem eigenen Span: `setText` auf dem `<summary>` selbst risse den Kopier-Knopf mit. */
+  let reasonLabelEl: HTMLElement | null = null;
   let reasonSummaryText = opts.strings.reasoning;
+  const clock = opts.clock ?? realClock;
+  let reasonCopyBtn: HTMLElement | null = null;
+  let copiedTimer: number | null = null;
 
   /** Legt den Gedankenblock einmalig an. Lazy, weil ein leeres `<details>` vor dem ersten
    *  Gedanken sichtbarer Ballast ist. */
@@ -192,11 +212,54 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
     if (reasonPre !== null) return reasonPre;
     const det = reasonSlot.createEl("details", { cls: "okit-stream-reasoning" });
     det.open = openByDefault;
-    reasonSummaryEl = det.createEl("summary", { text: reasonSummaryText });
+    reasonSummaryEl = det.createEl("summary");
+    reasonLabelEl = reasonSummaryEl.createSpan({ cls: "okit-stream-reasoning-label", text: reasonSummaryText });
     reasonPre = det.createEl("pre");
     const cb = opts.onReasoningToggle;
     if (cb !== undefined) det.addEventListener("toggle", () => { cb(det.open); });
     return reasonPre;
+  };
+
+  const clearCopiedTimer = (): void => {
+    if (copiedTimer !== null) { clock.clearTimeout(copiedTimer); copiedTimer = null; }
+  };
+
+  /** Quittung am Knopf: Häkchen statt Kopier-Symbol, dann zurück. Eine Notice ist optional (`strings.copiedReasoning`). */
+  const flashCopied = (btn: HTMLElement): void => {
+    clearCopiedTimer();
+    setIcon(btn, "check");
+    btn.addClass("is-copied");
+    copiedTimer = clock.setTimeout(() => {
+      copiedTimer = null;
+      setIcon(btn, "copy");
+      btn.removeClass("is-copied");
+    }, COPIED_FLASH_MS);
+  };
+
+  /** Der Kopier-Knopf sitzt in der Zusammenfassung und erscheint erst, wenn der Block Text trägt (und verschwindet, wenn
+   *  ein Snapshot den Text wieder leert). Der Klick klappt den Block nicht auf oder zu: `preventDefault` am `<summary>`-Klick. */
+  const syncCopyButton = (): void => {
+    if (reasonSummaryEl === null) return;
+    if (reasonRaw === "") {
+      reasonCopyBtn?.remove();
+      reasonCopyBtn = null;
+      clearCopiedTimer();
+      return;
+    }
+    if (reasonCopyBtn !== null) return;
+    const btn = reasonSummaryEl.createEl("button", {
+      cls: "clickable-icon okit-stream-reasoning-copy",
+      attr: { type: "button", "aria-label": opts.strings.copyReasoning ?? "Copy thinking" },
+    });
+    setIcon(btn, "copy");
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const copyOpts: Parameters<typeof copyToClipboard>[1] = { onCopied: () => { flashCopied(btn); } };
+      if (opts.strings.copiedReasoning !== undefined) copyOpts.copiedMessage = opts.strings.copiedReasoning;
+      void copyToClipboard(reasonRaw, copyOpts);
+    });
+    reasonCopyBtn = btn;
   };
 
   const atBottom = (): boolean => {
@@ -220,6 +283,7 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
         const pre = ensureReasoning();
         reasonRaw += text;
         pre.setText(reasonRaw);
+        syncCopyButton();
       });
     },
     setReasoning(text: string): void {
@@ -227,12 +291,13 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
         const pre = ensureReasoning();
         reasonRaw = text;
         pre.setText(reasonRaw);
+        syncCopyButton();
       });
     },
     reasoningText(): string { return reasonRaw; },
     setReasoningSummary(text: string): void {
       reasonSummaryText = text;
-      reasonSummaryEl?.setText(text);
+      reasonLabelEl?.setText(text);
     },
 
     setTail(text: string): void { this.withFollow(() => { tailEl.setText(text); }); },
@@ -261,9 +326,12 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
     reset(): void {
       this.resetContent();
       reasonSlot.empty();
+      clearCopiedTimer();
       reasonPre = null;
       reasonRaw = "";
       reasonSummaryEl = null;
+      reasonLabelEl = null;
+      reasonCopyBtn = null;
       reasonSummaryText = opts.strings.reasoning;
     },
   };
@@ -282,7 +350,8 @@ export const STREAM_AREA_CSS = `
 .okit-stream--host-scroll .okit-stream-body { flex: 0 0 auto; min-height: auto; overflow-y: visible; }
 .okit-stream-block > :first-child { margin-top: 0; }
 .okit-stream-block > :last-child { margin-bottom: 0; }
-.okit-stream-tail { white-space: pre-wrap; color: var(--text-muted); }
+/* overflow-wrap: eine lange Zeile ohne Leerzeichen (JSON im Antwort-Tail) lief rechts aus dem Panel (3d-codeblocks, Welle 23). */
+.okit-stream-tail { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted); }
 .okit-stream-status {
   flex: 0 0 auto;
   display: flex; align-items: center; gap: var(--size-4-1);
@@ -293,6 +362,14 @@ export const STREAM_AREA_CSS = `
   font-size: var(--font-ui-smaller); color: var(--text-muted);
 }
 .okit-stream-reasoning > summary { cursor: var(--cursor); color: var(--text-faint); }
+/* Der Kopier-Knopf sitzt IN der Zusammenfassung, bleibt inline und nimmt der Zeile keine Höhe. */
+.okit-stream-reasoning-copy {
+  display: inline-flex; vertical-align: middle; margin-inline-start: var(--size-4-2);
+  height: auto; padding: var(--size-2-1) var(--size-2-2);
+  color: var(--text-faint);
+}
+.okit-stream-reasoning-copy.is-copied { color: var(--text-success); }
+.okit-stream-reasoning-copy .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-stream-reasoning > pre {
   max-height: 12em; overflow-y: auto; white-space: pre-wrap;
   background: var(--background-secondary); padding: var(--size-4-2);

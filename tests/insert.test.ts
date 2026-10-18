@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { insertInterpretation, MARKER_START, MARKER_END } from "../src/core/llm/insert";
+import { BrokenZoneError, insertInterpretation, MARKER_START, MARKER_END } from "../src/core/llm/insert";
 
 const block = "## KI-Deutung\n\nHallo.";
 
@@ -28,5 +28,18 @@ describe("insertInterpretation", () => {
     const out = insertInterpretation("# T\n\nnur Text", block);
     expect(out).toContain(MARKER_START);
     expect(out.trim().endsWith(MARKER_END)).toBe(true);
+  });
+
+  it("ein Start-Marker ohne Ende wirft, statt einen zweiten Block anzuhängen (Text unter dem Marker bleibt)", () => {
+    const body = `# T\n\n${MARKER_START}\n## Mein eigener Text\n\nbleibt`;
+    expect(() => insertInterpretation(body, block)).toThrow(BrokenZoneError);
+  });
+
+  it("ein Ende-Marker allein ist keine Zone: der Block kommt vor die Überschrift, der fremde Marker bleibt stehen", () => {
+    const body = `# T\n\n${MARKER_END}\n## Das Urteil`;
+    const out = insertInterpretation(body, block);
+    expect(out).toContain(`${MARKER_START}\n${block}\n${MARKER_END}`);
+    expect((out.match(new RegExp(MARKER_END, "g")) ?? []).length).toBe(2);
+    expect(out.indexOf(MARKER_START)).toBeLessThan(out.indexOf("## Das Urteil"));
   });
 });

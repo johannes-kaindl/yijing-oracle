@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Vendored `obsidian-kit` 0.63.0 (was 0.61.0) and `code-kit` 0.31.0 (was 0.28.0). You will notice four things:
+- The thinking block of the interpretation has a copy button next to its title. It copies the thought as plain text and shows a check mark for a moment; clicking it does not open or close the block.
+- A long line in the streaming interpretation wraps instead of running out of the panel on the right.
+- A failed image generation now says why: busy (try again later), not available (switch the provider on), refused, took too long. Before, every failure read "Image generation failed".
+- Settings, "Request" section: for a Claude endpoint the field reads "Thinking effort (effort)" instead of "(reasoning_effort)"; a button "Set family in manager" sits at the note "model family detected"; and a warning appears when the model you send is not loaded in LM Studio and sending would unload another one. With LM Studio, thinking and image support of a model are read from its own metadata instead of only guessed from its name.
+
+### Fixed
+- **A reading note whose marker block lost its end marker is no longer written to twice.** If you delete only the closing `<!-- yijing:deutung:end -->` (or `…bild:end -->`) line and then add an interpretation or an image, the plugin used to append a second block, and the next run replaced everything between the first marker and the new end, including text you had written there. It now leaves the note untouched and says which block is broken; add the end marker or remove the start marker and try again.
+
 ## [0.15.1] — 2026-10-16
 
 ### Changed

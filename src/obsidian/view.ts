@@ -20,13 +20,14 @@ import { type FieldId } from "../core/frontmatter";
 import { buildInterpretationMessages } from "../core/llm/prompt";
 import { DEFAULT_SYSTEM_PROMPT } from "../core/llm/defaults";
 import { effectiveModel } from "../core/llm/settings-defaults";
-import { t } from "../vendor/kit/i18n";
+import { getLang, t } from "../vendor/kit/i18n";
 import { buildSdPrompt, composeImageRequest } from "../core/image-scene";
 import { type OutputMode, type PluginSettings } from "./settings";
 import { writeReading } from "./reading-writer";
 import { type LlmConnection } from "../vendor/kit-obsidian/llm-connection";
 import { neutralizeModelMarkdown } from "../vendor/kit/safe-markdown";
-import { readImageGenApi } from "./image-gen";
+import { imageGenErrorText } from "../vendor/kit/provider-error-texts";
+import { readImageGenApi } from "../vendor/kit-obsidian/capability-apis";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 
@@ -498,7 +499,7 @@ export class OracleView extends ItemView {
       const prompt = buildSdPrompt(scene, img.styleSuffix);
       const res = await api.generateImage(prompt, { targetFolder: await this.imageTargetFolder() });
       if (typeof res !== "string") {
-        new Notice(t("notice.imageError", res.message));
+        new Notice(imageGenErrorText(res, getLang()));
         console.error("[yijing-oracle]", res.error, res.message);
       } else {
         this.discardArtwork(c);

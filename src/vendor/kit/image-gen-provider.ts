@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.61.0, src/pure/image-gen-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.63.0, src/pure/image-gen-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Öffentlicher Vertrag des Fähigkeits-Besitzers `local-image-generator` (Bildgenerierung) —
  *  Muster `pure/endpoint-source.ts`: EINE Quelle, der Besitzer re-exportiert sie, Konsumenten
  *  vendoren. Fehler sind Werte (`ImageGenProviderError`), Methoden fangen selbst — nie werfen.
@@ -9,6 +9,8 @@
  *  Mobil ist der Kurzbefehl-Weg das EINZIGE Backend (Kernversprechen, nicht Kür): stilisierte
  *  Ausgaben (Animation/Illustration/Sketch), keine Fotorealistik, keine Negativ-Prompts/Maße. */
 export const IMAGE_GEN_PROVIDER_API_VERSION = 1;
+/** Plugin-ID des Besitzers (`local-image-generator`): dort liegt die API unter `app.plugins.plugins[id].api`; gelesen mit `readImageGenApi`. */
+export const IMAGE_GEN_PLUGIN_ID = "local-image-generator";
 
 export type ImageGenProviderErrorCode = "backend-unavailable" | "timeout" | "busy" | "refused" | "failed";
 export interface ImageGenProviderError { error: ImageGenProviderErrorCode; message: string }

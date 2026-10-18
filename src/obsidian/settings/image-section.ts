@@ -2,7 +2,7 @@
 // und der Hinweis, woher die Bilder kommen.
 import { t } from "../../vendor/kit/i18n";
 import { DEFAULT_IMAGE_SETTINGS } from "../../core/image-settings";
-import { readImageGenApi } from "../image-gen";
+import { readImageGenApi } from "../../vendor/kit-obsidian/capability-apis";
 import { type SectionCtx, type SettingRow } from "./section-ctx";
 
 export function imageRows(ctx: SectionCtx): SettingRow[] {

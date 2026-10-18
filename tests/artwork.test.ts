@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ARTWORK_MARKER_END, ARTWORK_MARKER_START, insertArtwork, renderArtworkBlock } from "../src/core/artwork";
-import { MARKER_END, MARKER_START } from "../src/core/llm/insert";
+import { BrokenZoneError, MARKER_END, MARKER_START } from "../src/core/llm/insert";
 
 const CAL = { enabled: true, type: "quote" };
 
@@ -49,5 +49,10 @@ describe("insertArtwork", () => {
   it("sonst ans Ende", () => {
     const out = insertArtwork("nur text\n", block);
     expect(out.endsWith(`${ARTWORK_MARKER_START}\nBLOCK\n${ARTWORK_MARKER_END}`)).toBe(true);
+  });
+
+  it("ein Start-Marker ohne Ende wirft, statt einen zweiten Bild-Block anzuhängen", () => {
+    const body = `kopf\n\n${ARTWORK_MARKER_START}\nmein Text\n\n## Ursprungsbild`;
+    expect(() => insertArtwork(body, "BLOCK")).toThrow(BrokenZoneError);
   });
 });

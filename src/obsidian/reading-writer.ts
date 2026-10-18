@@ -5,7 +5,7 @@ import { type RenderedReading } from "../core/render";
 import { buildFilename } from "../core/filename";
 import { type Lang } from "../core/data";
 import { renderInterpretationBlock, type InterpretationData, type ThinkingInNote } from "../core/llm/interpretation";
-import { insertInterpretation } from "../core/llm/insert";
+import { BrokenZoneError, insertInterpretation } from "../core/llm/insert";
 import { insertArtwork, renderArtworkBlock } from "../core/artwork";
 import { t } from "../vendor/kit/i18n";
 import { type OutputMode, type PluginSettings } from "./settings";
@@ -89,7 +89,7 @@ async function attachArtwork(
     const block = renderArtworkBlock({ embed, scene: artwork.scene, lang, callout: settings.callouts.artwork });
     await app.vault.process(file, (cur) => insertArtwork(cur, block));
   } catch (e) {
-    new Notice(t("notice.imageSaveError"));
+    new Notice(e instanceof BrokenZoneError ? t("notice.zoneBroken", t("zone.bild")) : t("notice.imageSaveError"));
     console.error("[yijing-oracle]", e);
   }
 }
@@ -129,7 +129,12 @@ export async function writeReading(
   if (input.existingFile) {
     const block = interpretationBlock(input);
     if (block) {
-      await app.vault.process(input.existingFile, (cur) => insertInterpretation(cur, block));
+      try {
+        await app.vault.process(input.existingFile, (cur) => insertInterpretation(cur, block));
+      } catch (e) {
+        if (!(e instanceof BrokenZoneError)) throw e;
+        new Notice(t("notice.zoneBroken", t("zone.deutung")));
+      }
     }
     if (input.artwork) await attachArtwork(app, input.existingFile, input.artwork, input.lang, settings);
     return { file: input.existingFile, mode: "note" };
