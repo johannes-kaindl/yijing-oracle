@@ -60,12 +60,12 @@
  */
 
 
-import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, istAbgebrochen, entferneFakeManager, installFakeManager as installZentralFakeManager, pollUntil, requireVisible } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, beimAbbruch, bereiteInstanzVor, istAbgebrochen, entferneFakeManager, installFakeManager as installZentralFakeManager, pollUntil, requireVisible, schliesseEinstellungen } from "../../tools/obsidian-cdp/cdp.js";
 import { startLlmStub } from "../../tools/obsidian-cdp/llm-stub.js";
 import { messeFolge, zeichneFolge } from "../../tools/obsidian-cdp/folge.js";
 import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bilanz.js";
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
-import { gegenprobeErreichbarkeit, gegenprobeFokus, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichnePflicht, type PflichtBilanz, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
+import { gegenprobeErreichbarkeit, gegenprobeFokus, messeDenkblockKopierbar as messeDenkblockZentral, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichneDenkblock, zeichnePflicht, type PflichtBilanz, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { boxAround, capture } from "../../tools/obsidian-cdp/shot.js";
@@ -336,7 +336,8 @@ async function openSettingsTab(cdp: Cdp, port: number): Promise<SettingsUi | nul
  *  wurde im zweiten. */
 async function closeSettings(cdp: Cdp, ui: SettingsUi | null): Promise<void> {
   if (ui?.eigenesFenster) ui.cdp.close();
-  await cdp.evaluate(`app.setting.close(); await new Promise((r) => setTimeout(r, 200)); return true;`);
+  await schliesseEinstellungen(cdp);
+  await schlaf(200);
 }
 
 /** Wurzel-Ausdruck fuer Messungen in der Einstellungen-Oberflaeche. Im eigenen Fenster ist das `document.body`, beim Modal dessen
@@ -1695,45 +1696,11 @@ async function pruefeDenkblockLive(cdp: Cdp): Promise<void> {
 const KOPIE_NAME = "L1b Denkblock kopierbar: der Knopf legt den Denktext in die Zwischenablage, der Block klappt nicht um";
 const KOPIE_GEGEN = "L1c Gegenprobe: lehnt die Zwischenablage ab, quittiert der Knopf nicht";
 
-/** L1b/L1c — der Kopier-Knopf am Gedankenblock (Kit 0.63.0). `navigator.clipboard.writeText` wird im Renderer aufgezeichnet (die echte
- *  Zwischenablage haengt am Fenster-Fokus), danach wiederhergestellt. L1c: lehnt `writeText` ab, darf der Knopf nicht quittieren —
- *  sonst waere die Quittung von L1b kein Beleg fuers Kopieren. Gleiche Messung wie lingotuner C8c/C8d. */
+/** L1b/L1c — der Kopier-Knopf am Gedankenblock (Kit 0.63.0). Die Messung ist die der Brücke (`messeDenkblockKopierbar` in `pflichtpunkte.ts`, seit Welle 25
+ *  zentral; hier war es eine lokale Fassung, gleich lingotuner C8c/C8d): `navigator.clipboard.writeText` wird aufgezeichnet und danach wiederhergestellt,
+ *  L1c ist die Gegenprobe (lehnt `writeText` ab, darf der Knopf nicht quittieren). Neu gegenüber der lokalen Fassung: der Knopf muss ein aria-label tragen. */
 async function messeDenkblockKopierbar(cdp: Cdp): Promise<void> {
-  if ((await cdp.evaluate<number>(`return document.querySelectorAll(".okit-stream-reasoning-copy").length;`)) === 0) {
-    for (const n of [KOPIE_NAME, KOPIE_GEGEN]) unmeasured(n, "der Denkblock traegt keinen Kopier-Knopf (.okit-stream-reasoning-copy)");
-    return;
-  }
-  const probe = (modus: "ok" | "ablehnen"): string => `
-    const alt = Object.getOwnPropertyDescriptor(navigator.clipboard, "writeText");
-    window.__yjKopie = { text: null, n: 0 };
-    window.__yjKopieAlt = alt || null;
-    Object.defineProperty(navigator.clipboard, "writeText", { configurable: true, value: (t) => { window.__yjKopie.n += 1; window.__yjKopie.text = t; return ${modus === "ok" ? "Promise.resolve()" : 'Promise.reject(new Error("abgelehnt"))'}; } });
-    const d = document.querySelector(".okit-stream-reasoning");
-    const offenVorher = d.open;
-    document.querySelector(".okit-stream-reasoning-copy").click();
-    await new Promise((r) => setTimeout(r, 400));
-    const pre = d.querySelector("pre");
-    const btn = document.querySelector(".okit-stream-reasoning-copy");
-    return { n: window.__yjKopie.n, text: window.__yjKopie.text, preText: pre ? pre.textContent : "", offenVorher, offenNachher: d.open, quittiert: !!btn && btn.classList.contains("is-copied") };
-  `;
-  const aufraeumen = `
-    if (window.__yjKopieAlt) Object.defineProperty(navigator.clipboard, "writeText", window.__yjKopieAlt); else delete navigator.clipboard.writeText;
-    delete window.__yjKopie; delete window.__yjKopieAlt; return true;`;
-  try {
-    const ok = await cdp.evaluate<{ n: number; text: string | null; preText: string; offenVorher: boolean; offenNachher: boolean; quittiert: boolean }>(probe("ok"));
-    await cdp.evaluate(aufraeumen);
-    // Der Strom laeuft: der Block darf seit dem Klick gewachsen sein, der Kopierte ist sein Anfang.
-    const gleich = ok.n === 1 && ok.text !== null && ok.text.trim() !== "" && ok.preText.trim().startsWith(ok.text.trim());
-    record(KOPIE_NAME, gleich && ok.offenVorher === ok.offenNachher && ok.quittiert,
-      `${ok.n}× kopiert, ${ok.text === null ? "kein Text" : `${ok.text.length} Zeichen`} (Block jetzt ${ok.preText.length}, der Kopierte ist sein Anfang), Block ${ok.offenVorher === ok.offenNachher ? "unveraendert" : "UMGEKLAPPT"}, Quittung ${ok.quittiert ? "da" : "fehlt"}`);
-    await pollUntil<boolean>(cdp, `const b = document.querySelector(".okit-stream-reasoning-copy"); return b && !b.classList.contains("is-copied") ? true : null;`, 4000, 150);
-    const nein = await cdp.evaluate<{ n: number; quittiert: boolean }>(probe("ablehnen"));
-    record(KOPIE_GEGEN, nein.n === 1 && !nein.quittiert, `writeText abgelehnt (${nein.n}× aufgerufen): Knopf ${nein.quittiert ? "quittiert trotzdem" : "quittiert nicht"}`);
-  } catch (e) {
-    for (const n of [KOPIE_NAME, KOPIE_GEGEN]) if (!aufgezeichnet(n)) unmeasured(n, `Messung abgebrochen: ${(e as Error).message}`);
-  } finally {
-    await cdp.evaluate(aufraeumen).catch(() => null);
-  }
+  zeichneDenkblock(pflichtBilanz, { kopie: KOPIE_NAME, gegen: KOPIE_GEGEN }, await messeDenkblockZentral(cdp, { erwartetKnopf: true }));
 }
 
 /** Die Bilanz, wie der Baustein `pflichtpunkte` sie braucht (`zeichnePflicht`). */

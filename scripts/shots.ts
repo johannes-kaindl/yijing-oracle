@@ -47,7 +47,7 @@ import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { argv, cwd, env, exit } from "node:process";
 
-import { Cdp, attachTo, openExisting, pollUntil, setAppConfig, setPluginSetting } from "../../tools/obsidian-cdp/cdp.js";
+import { Cdp, attachTo, openExisting, pollUntil, schliesseEinstellungen, setAppConfig, setPluginSetting } from "../../tools/obsidian-cdp/cdp.js";
 import { boxOf, capture, setWindowSize, withMetrics, writeShot, type Rect, type ShotOptions } from "../../tools/obsidian-cdp/shot.js";
 import { buildVault, stagingVaultDir } from "../../tools/obsidian-cdp/vault.js";
 
@@ -415,7 +415,7 @@ async function settingsBild(cdp: Cdp, port: number, opts: ShotOptions): Promise<
     });
   } finally {
     if (fenster !== cdp) fenster.close();
-    await cdp.evaluate(`app.setting.close(); return true;`);
+    await schliesseEinstellungen(cdp);
   }
 }
 
