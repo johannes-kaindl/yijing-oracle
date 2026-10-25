@@ -31,6 +31,6 @@ Two commands cast straight away, without a question: **Cast a reading into a new
 ## Where to go next
 
 - Choose the reading language, the classic (Wilhelm) or gender-neutral register and what goes into the note: **Settings → Yijing Oracle**, sections *General*, *Note & storage* and *Note content*.
-- Add an optional local AI interpretation: enter an OpenAI-compatible server under **AI interpretation → Endpoints**. Without CORS on the server the interpretation arrives in one piece instead of streaming, see [Troubleshooting](troubleshooting.md#interpretation-failed).
+- Add an optional local AI interpretation: enter an OpenAI-compatible server under **AI interpretation → Endpoints**. Without CORS on the server the interpretation arrives in one piece instead of streaming, see [Troubleshooting](troubleshooting.md#interpretation-failed). The model and the thinking level are then one click away in the model row at the top of the panel.
 - Add an optional meditation image: [Set up image generation](image-generation.md).
 - Something went wrong? [Troubleshooting](troubleshooting.md).

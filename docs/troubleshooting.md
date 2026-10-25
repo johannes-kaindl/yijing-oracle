@@ -8,7 +8,7 @@ Each entry starts with what you see — the wording is the plugin's own English 
 
 **Cause:** **Interpret with AI** found no endpoint that answers, or the endpoint offers no model. The list under **AI interpretation → Endpoints** is tried top to bottom and the first reachable one wins.
 
-**Fix:** start your server and load a model, then press **Test connection** on the row in the settings. The row says why it fails:
+**Fix:** start your server and load a model, then press **Test connection** on the row in the settings. If the endpoint answers but the model is missing, pick one in the **model row** at the top of the panel (the reload button next to it asks the endpoint again). The row says why it fails:
 
 | Row status | Meaning |
 |---|---|
@@ -27,6 +27,14 @@ Local servers almost always need a port, for example `http://127.0.0.1:1234`. Wi
 **Cause:** the chat request to the endpoint failed: the server is off or the port is wrong, the key is missing or invalid, or the model is not available. The connection test in the settings only checks that something answers; the chat request can still fail.
 
 **Fix:** check the endpoint, key and model in the settings (**AI interpretation → Endpoints**) and the developer console (Ctrl+Shift+I, or Cmd+Option+I on macOS), then press **Interpret with AI** again.
+
+## The model row is greyed out
+
+> The model dropdown, the reload button and the thinking toggle at the top of the panel cannot be used.
+
+**Cause:** an interpretation is starting or running; the row is locked until it ends. A start that stops early (no endpoint, no model) frees it again at once.
+
+**Fix:** wait for the interpretation or press **Cancel**. For a Claude entry the thinking toggle offers no "off" and reads "Thinking: low" or higher: Claude models always think, so the plugin cannot switch it off.
 
 ## The interpretation appears all at once instead of streaming
 
