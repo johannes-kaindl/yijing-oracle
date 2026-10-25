@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.63.0, src/pure/audio-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.70.0, src/pure/audio-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Öffentlicher Vertrag des Fähigkeits-Besitzers `audio-interface` (Transkription + TTS) — Muster
  *  `pure/endpoint-source.ts`: EINE Quelle, der Besitzer re-exportiert sie, Konsumenten vendoren.
  *  Fehler sind Werte (`AudioProviderError`), Methoden fangen selbst — nie werfen.

@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Vendored `obsidian-kit` 0.70.0 (was 0.63.0) and `code-kit` 0.37.5 (was 0.31.0). What you may notice:
+- Claude models now count as models that take images and always think (code-kit 0.33.0): in Settings, "Request", the thinking control for a Claude endpoint no longer offers "off" and reads "Thinking: low" or higher. A local model that only has "claude" in its name (such as a distill) does not count.
+- The endpoint list knows the role "used for search, does not write" (code-kit 0.36.0). yijing-oracle never sets it, so no row changes.
+- The list of models of an endpoint no longer reports to its listeners when nothing changed (obsidian-kit 0.70.0); the panel has no listener that could have looped, so nothing changes on screen.
+- The streaming area builds its thinking block through a new routine in the kit (obsidian-kit 0.65.0); the block looks and behaves as before.
+- The kit's new link protection and chat window, its Anthropic context limit and its text-level changes (frontmatter patch, redline, review list, version list, crop dialog) are not used by this plugin or do not touch it.
+
 ## [0.16.0] — 2026-10-18
 
 ### Changed

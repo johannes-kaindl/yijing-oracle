@@ -1,7 +1,7 @@
 {
   "source": "obsidian-kit",
-  "version": "0.63.0",
-  "sha": "9209efa",
-  "vendored": "anthropic-transport.ts, backend-probe.ts, capability-apis.ts, chat-client.ts, chat-transport.ts, clipboard.ts, clock.ts, collapsible.ts, embedding-connection.ts, endpoint-list.ts, endpoint-plumbing.ts, endpoint-secrets.ts, endpoint-source.ts, endpoint-status-text.ts, folder-suggest.ts, help-setting.ts, llm-connection.ts, llm-connection-strings.ts, model-picker.ts, plugin-api.ts, request-section.ts, request-session.ts, secrets.ts, settings_walker.ts, shortcuts-bridge.ts, stream-area.ts",
+  "version": "0.70.0",
+  "sha": "86a2d2d",
+  "vendored": "anthropic-transport.ts, backend-probe.ts, capability-apis.ts, chat-client.ts, chat-transport.ts, clipboard.ts, clock.ts, collapsible.ts, dom-guard.ts, embedding-connection.ts, endpoint-list.ts, endpoint-plumbing.ts, endpoint-secrets.ts, endpoint-source.ts, endpoint-status-text.ts, folder-suggest.ts, help-setting.ts, link-settings.ts, llm-connection.ts, llm-connection-strings.ts, model-bar.ts, model-bar-strings.ts, model-picker.ts, plugin-api.ts, request-section.ts, request-session.ts, secrets.ts, settings_walker.ts, shortcuts-bridge.ts, stream-area.ts, thinking-control.ts",
   "note": "Verbatim snapshot. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit. Eigene Ablage neben src/vendor/kit/, weil diese Module \"obsidian\" importieren. endpoint-list.ts wird bewusst NICHT vendoriert (Bruch, siehe AGENTS.md § UI-Abweichungen). secrets.ts ist seit Welle 12 kein Vendoring mehr — die Hand-Anpassung (app.secretStorage-Feature-Check, minAppVersion 1.8.7 < 1.11.4) macht sie zu eigenem Code, siehe src/obsidian/secret-store.ts."
 }

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.63.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.70.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -147,6 +147,11 @@ export interface StreamArea {
    *  `setReasoning` bleibt er lazy (s. Dateikopf); der Text wird dann für den nächsten
    *  entstehenden Block vorgemerkt. `reset()` setzt auf `strings.reasoning` zurück. */
   setReasoningSummary(text: string): void;
+  /** Gedankenblock auf- oder zuklappen — zum Beispiel am Ende des Laufs zu, damit die fertige Antwort nicht von ihren Gedanken
+   *  überragt wird. Ohne Block gilt der Wert für den, der später entsteht. `reset()` stellt `reasoningOpen` wieder her. Löst
+   *  `onReasoningToggle` aus wie eine Handlung des Nutzers (das `toggle`-Ereignis unterscheidet nicht): wer dort die Wahl des
+   *  Nutzers speichert, schaltet nicht ohne Not um. */
+  setReasoningOpen(open: boolean): void;
   /** Den laufenden Absatz setzen. */
   setTail(text: string): void;
   tailText(): string;
@@ -171,16 +176,130 @@ export interface StreamArea {
   resetContent(): void;
 }
 
+/** Obsidians addClass wirft bei einem Leerzeichen (InvalidCharacterError) — mehrere Klassen einzeln. */
+function addClasses(el: HTMLElement, cls: string | undefined): void {
+  for (const c of (cls ?? "").split(/\s+/)) if (c !== "") el.addClass(c);
+}
+
+interface ReasoningBlockConfig {
+  summary: string;
+  copyLabel: string | undefined;
+  copiedMessage: string | undefined;
+  open: boolean;
+  cls: string | undefined;
+  onToggle: ((open: boolean) => void) | undefined;
+  clock: ClockPort;
+  /** Der Denktext, den der Kopier-Knopf liefert — wird beim Klick gelesen, nicht beim Bau (der Strom wächst). */
+  getText: () => string;
+}
+
+/** Der Aufbau des Gedankenblocks, EINMAL: `details.okit-stream-reasoning > summary(label, Kopier-Knopf) + pre`.
+ *  Der Strom-Bereich (`buildStreamArea`) und der Block nach dem Strom (`buildReasoningBlock`) bauen beide hierüber —
+ *  zwei Bauplätze für dieselbe Form liefen auseinander (koda-agent hatte den zweiten, Doppelbau-Befund Runde 24). */
+function createReasoningBlock(parent: HTMLElement, cfg: ReasoningBlockConfig): {
+  det: HTMLDetailsElement; pre: HTMLElement; labelEl: HTMLElement; syncCopyButton: (hasText: boolean) => void; dispose: () => void;
+} {
+  const det = parent.createEl("details", { cls: "okit-stream-reasoning" });
+  addClasses(det, cfg.cls);
+  det.open = cfg.open;
+  const summaryEl = det.createEl("summary");
+  /** Der Text der Zusammenfassung steht in einem eigenen Span: `setText` auf dem `<summary>` selbst risse den Kopier-Knopf mit. */
+  const labelEl = summaryEl.createSpan({ cls: "okit-stream-reasoning-label", text: cfg.summary });
+  const pre = det.createEl("pre");
+  const cb = cfg.onToggle;
+  if (cb !== undefined) det.addEventListener("toggle", () => { cb(det.open); });
+
+  let copyBtn: HTMLElement | null = null;
+  let copiedTimer: number | null = null;
+
+  const clearCopiedTimer = (): void => {
+    if (copiedTimer !== null) { cfg.clock.clearTimeout(copiedTimer); copiedTimer = null; }
+  };
+
+  /** Quittung am Knopf: Häkchen statt Kopier-Symbol, dann zurück. Eine Notice ist optional (`copiedMessage`). */
+  const flashCopied = (btn: HTMLElement): void => {
+    clearCopiedTimer();
+    setIcon(btn, "check");
+    btn.addClass("is-copied");
+    copiedTimer = cfg.clock.setTimeout(() => {
+      copiedTimer = null;
+      setIcon(btn, "copy");
+      btn.removeClass("is-copied");
+    }, COPIED_FLASH_MS);
+  };
+
+  /** Der Kopier-Knopf sitzt in der Zusammenfassung und erscheint erst, wenn der Block Text trägt (und verschwindet, wenn
+   *  ein Snapshot den Text wieder leert). Der Klick klappt den Block nicht auf oder zu: `preventDefault` am `<summary>`-Klick. */
+  const syncCopyButton = (hasText: boolean): void => {
+    if (!hasText) {
+      copyBtn?.remove();
+      copyBtn = null;
+      clearCopiedTimer();
+      return;
+    }
+    if (copyBtn !== null) return;
+    const btn = summaryEl.createEl("button", {
+      cls: "clickable-icon okit-stream-reasoning-copy",
+      attr: { type: "button", "aria-label": cfg.copyLabel ?? "Copy thinking" },
+    });
+    setIcon(btn, "copy");
+    btn.addEventListener("click", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const copyOpts: Parameters<typeof copyToClipboard>[1] = { onCopied: () => { flashCopied(btn); } };
+      if (cfg.copiedMessage !== undefined) copyOpts.copiedMessage = cfg.copiedMessage;
+      void copyToClipboard(cfg.getText(), copyOpts);
+    });
+    copyBtn = btn;
+  };
+
+  return { det, pre, labelEl, syncCopyButton, dispose: clearCopiedTimer };
+}
+
+export interface ReasoningBlockOptions {
+  /** Der gespeicherte Denktext. Er steht unverändert im `<pre>` und ist das, was der Kopier-Knopf kopiert. */
+  text: string;
+  /** Dieselben Strings wie im Strom; `strings.reasoning` heißt hier `summary`, weil die Zeile nach dem Strom meist anders
+   *  lautet als „Denkt nach…" (z. B. „Gedacht"). */
+  strings: { summary: string; copyReasoning?: string; copiedReasoning?: string };
+  /** Startzustand. Default `false` (zugeklappt): der Block gehört zu einer fertigen Antwort, nicht zu einem laufenden Strom. */
+  open?: boolean;
+  /** Zusätzliche Klassen am `<details>`, durch Leerraum getrennt — der Design-Scope des Consumers. */
+  cls?: string;
+  /** Auf-/Zu-Wechsel, damit der Consumer ihn persistieren kann. Das Kit speichert nichts. */
+  onToggle?: (open: boolean) => void;
+  /** Timer für die Quittung am Kopier-Knopf; Default `realClock`. Tests injizieren. */
+  clock?: ClockPort;
+}
+
+/** Der Denkblock einer FERTIGEN Antwort aus gespeichertem Text — für alle, die einen Verlauf neu zeichnen, wenn die
+ *  Stream-Blase längst weg ist. Gleiche DOM-Form, gleiche Klassen (`okit-stream-reasoning*`, CSS in `STREAM_AREA_CSS`) und
+ *  derselbe Kopier-Knopf wie im Strom, sodass beide Zustände gleich aussehen. Gibt das `<details>` zurück.
+ *  Wer keinen Gedanken hat, ruft die Funktion nicht auf: ein leerer Block ist Ballast (der Strom legt ihn deshalb lazy an). */
+export function buildReasoningBlock(parent: HTMLElement, opts: ReasoningBlockOptions): HTMLElement {
+  const { det, pre, syncCopyButton } = createReasoningBlock(parent, {
+    summary: opts.strings.summary,
+    copyLabel: opts.strings.copyReasoning,
+    copiedMessage: opts.strings.copiedReasoning,
+    open: opts.open ?? false,
+    cls: opts.cls,
+    onToggle: opts.onToggle,
+    clock: opts.clock ?? realClock,
+    getText: () => opts.text,
+  });
+  pre.setText(opts.text);
+  syncCopyButton(opts.text !== "");
+  return det;
+}
+
 export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): StreamArea {
   const follow = opts.follow ?? true;
   const threshold = opts.followThreshold ?? 40;
   const openByDefault = opts.reasoningOpen ?? true;
+  /** Wie der nächste Gedankenblock beginnt; `setReasoningOpen` verstellt es, `reset()` stellt `openByDefault` wieder her. */
+  let openNow = openByDefault;
 
   const rootEl = parent.createDiv({ cls: "okit-stream" });
-  // Obsidians addClass wirft bei einem Leerzeichen (InvalidCharacterError) — mehrere Klassen einzeln.
-  const addClasses = (el: HTMLElement, cls: string | undefined): void => {
-    for (const c of (cls ?? "").split(/\s+/)) if (c !== "") el.addClass(c);
-  };
   addClasses(rootEl, opts.cls);
 
   // Reihenfolge ist Teil des Vertrags: Gedanken über dem Text, Status unter beidem.
@@ -196,70 +315,25 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
   const tailEl = bodyEl.createDiv({ cls: "okit-stream-tail" });
   const statusEl = rootEl.createDiv({ cls: "okit-stream-status" });
 
-  let reasonPre: HTMLElement | null = null;
+  let reasonBlock: ReturnType<typeof createReasoningBlock> | null = null;
   let reasonRaw = "";
-  let reasonSummaryEl: HTMLElement | null = null;
-  /** Der Text der Zusammenfassung steht in einem eigenen Span: `setText` auf dem `<summary>` selbst risse den Kopier-Knopf mit. */
-  let reasonLabelEl: HTMLElement | null = null;
   let reasonSummaryText = opts.strings.reasoning;
   const clock = opts.clock ?? realClock;
-  let reasonCopyBtn: HTMLElement | null = null;
-  let copiedTimer: number | null = null;
 
   /** Legt den Gedankenblock einmalig an. Lazy, weil ein leeres `<details>` vor dem ersten
    *  Gedanken sichtbarer Ballast ist. */
-  const ensureReasoning = (): HTMLElement => {
-    if (reasonPre !== null) return reasonPre;
-    const det = reasonSlot.createEl("details", { cls: "okit-stream-reasoning" });
-    det.open = openByDefault;
-    reasonSummaryEl = det.createEl("summary");
-    reasonLabelEl = reasonSummaryEl.createSpan({ cls: "okit-stream-reasoning-label", text: reasonSummaryText });
-    reasonPre = det.createEl("pre");
-    const cb = opts.onReasoningToggle;
-    if (cb !== undefined) det.addEventListener("toggle", () => { cb(det.open); });
-    return reasonPre;
-  };
-
-  const clearCopiedTimer = (): void => {
-    if (copiedTimer !== null) { clock.clearTimeout(copiedTimer); copiedTimer = null; }
-  };
-
-  /** Quittung am Knopf: Häkchen statt Kopier-Symbol, dann zurück. Eine Notice ist optional (`strings.copiedReasoning`). */
-  const flashCopied = (btn: HTMLElement): void => {
-    clearCopiedTimer();
-    setIcon(btn, "check");
-    btn.addClass("is-copied");
-    copiedTimer = clock.setTimeout(() => {
-      copiedTimer = null;
-      setIcon(btn, "copy");
-      btn.removeClass("is-copied");
-    }, COPIED_FLASH_MS);
-  };
-
-  /** Der Kopier-Knopf sitzt in der Zusammenfassung und erscheint erst, wenn der Block Text trägt (und verschwindet, wenn
-   *  ein Snapshot den Text wieder leert). Der Klick klappt den Block nicht auf oder zu: `preventDefault` am `<summary>`-Klick. */
-  const syncCopyButton = (): void => {
-    if (reasonSummaryEl === null) return;
-    if (reasonRaw === "") {
-      reasonCopyBtn?.remove();
-      reasonCopyBtn = null;
-      clearCopiedTimer();
-      return;
-    }
-    if (reasonCopyBtn !== null) return;
-    const btn = reasonSummaryEl.createEl("button", {
-      cls: "clickable-icon okit-stream-reasoning-copy",
-      attr: { type: "button", "aria-label": opts.strings.copyReasoning ?? "Copy thinking" },
+  const ensureReasoning = (): ReturnType<typeof createReasoningBlock> => {
+    reasonBlock ??= createReasoningBlock(reasonSlot, {
+      summary: reasonSummaryText,
+      copyLabel: opts.strings.copyReasoning,
+      copiedMessage: opts.strings.copiedReasoning,
+      open: openNow,
+      cls: undefined,
+      onToggle: opts.onReasoningToggle,
+      clock,
+      getText: () => reasonRaw,
     });
-    setIcon(btn, "copy");
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const copyOpts: Parameters<typeof copyToClipboard>[1] = { onCopied: () => { flashCopied(btn); } };
-      if (opts.strings.copiedReasoning !== undefined) copyOpts.copiedMessage = opts.strings.copiedReasoning;
-      void copyToClipboard(reasonRaw, copyOpts);
-    });
-    reasonCopyBtn = btn;
+    return reasonBlock;
   };
 
   const atBottom = (): boolean => {
@@ -280,24 +354,24 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       // ersten Adoption, 2026-09-11: lingotuner rief followTail() bisher selbst nach
       // appendReasoning auf). „Unten?“ wird VOR dem Wachsen gemessen (Welle 20, kuro).
       this.withFollow(() => {
-        const pre = ensureReasoning();
+        const block = ensureReasoning();
         reasonRaw += text;
-        pre.setText(reasonRaw);
-        syncCopyButton();
+        block.pre.setText(reasonRaw);
+        block.syncCopyButton(reasonRaw !== "");
       });
     },
     setReasoning(text: string): void {
       this.withFollow(() => {
-        const pre = ensureReasoning();
+        const block = ensureReasoning();
         reasonRaw = text;
-        pre.setText(reasonRaw);
-        syncCopyButton();
+        block.pre.setText(reasonRaw);
+        block.syncCopyButton(reasonRaw !== "");
       });
     },
     reasoningText(): string { return reasonRaw; },
     setReasoningSummary(text: string): void {
       reasonSummaryText = text;
-      reasonLabelEl?.setText(text);
+      reasonBlock?.labelEl.setText(text);
     },
 
     setTail(text: string): void { this.withFollow(() => { tailEl.setText(text); }); },
@@ -315,6 +389,11 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
       if (war) scrollEl.scrollTop = scrollEl.scrollHeight ?? 0;
     },
 
+    setReasoningOpen(open: boolean): void {
+      openNow = open;
+      if (reasonBlock !== null) reasonBlock.det.open = open;
+    },
+
     resetContent(): void {
       // Der Tail wird GELEERT und neu eingehängt, nicht weggeworfen: Consumer halten eine
       // Referenz darauf (koda-agent tut es), die sonst ins Leere zeigte.
@@ -326,13 +405,11 @@ export function buildStreamArea(parent: HTMLElement, opts: StreamAreaOptions): S
     reset(): void {
       this.resetContent();
       reasonSlot.empty();
-      clearCopiedTimer();
-      reasonPre = null;
+      reasonBlock?.dispose();
+      reasonBlock = null;
       reasonRaw = "";
-      reasonSummaryEl = null;
-      reasonLabelEl = null;
-      reasonCopyBtn = null;
       reasonSummaryText = opts.strings.reasoning;
+      openNow = openByDefault;
     },
   };
 }

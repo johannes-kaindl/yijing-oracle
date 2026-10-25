@@ -1,6 +1,6 @@
 {
   "source": "obsidian-kit",
-  "version": "0.63.0",
-  "sha": "9209efa",
+  "version": "0.70.0",
+  "sha": "86a2d2d",
   "vendored": "kit-css.ts, obsidian-mock.ts"
 }
