@@ -36,6 +36,11 @@ export interface PluginSettings {
   callouts: CalloutConfig;
   /** Wilhelms Fußnoten als Anmerkungen-Abschnitt in die Note schreiben. */
   showNotes: boolean;
+  /** Linkschutz der Deutung (Kit `dom-guard`, seit obsidian-kit 0.70.0): `obsidian://`-Links in der Antwort behalten? Default aus,
+   *  eine Antwort soll keine Obsidian-Aktion auslösen (etwa einen anderen Vault öffnen). */
+  allowObsidianLinks: boolean;
+  /** Lokale Bilder aus dem Vault in der Antwort zeigen? Default aus; entfernte Bilder bleiben immer gesperrt. */
+  allowLocalImages: boolean;
   /** Legacy: Auf-/Zu-Zustand der früher einklappbaren Settings-Sektionen. Seit dem
    *  Wegfall der Collapsibles (2026-07-20) liest den Wert kein Codepfad mehr; das Feld
    *  bleibt, damit gespeicherte Konfigurationen ohne Migration laden. */
@@ -56,6 +61,8 @@ export const DEFAULT_SETTINGS: PluginSettings = {
   image: DEFAULT_IMAGE_SETTINGS,
   callouts: DEFAULT_CALLOUTS,
   showNotes: true,
+  allowObsidianLinks: false,
+  allowLocalImages: false,
   uiCollapsed: {},
 };
 

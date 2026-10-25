@@ -31,6 +31,7 @@ import { readImageGenApi } from "../vendor/kit-obsidian/capability-apis";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
 import { ModelRowSlot } from "./model-row";
+import { renderMarkdownGuarded } from "../vendor/kit-obsidian/dom-guard";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
 
@@ -328,7 +329,11 @@ export class OracleView extends ItemView {
         det.createEl("pre", { text: c.interpretation.reasoning });
       }
       const body = area.createDiv({ cls: "yijing-interpretation-body" });
-      void MarkdownRenderer.render(this.app, neutralizeModelMarkdown(c.interpretation.answer), body, "", this);
+      // Modelltext: hinter der Regex-Neutralisierung läuft der Wächter des Kits (gefährliche Link-Ziele, `obsidian://` und lokale Bilder je nach Schalter).
+      void renderMarkdownGuarded(this.app, neutralizeModelMarkdown(c.interpretation.answer), body, "", this, {
+        allowObsidianLinks: this.host.settings.allowObsidianLinks,
+        allowLocalImages: this.host.settings.allowLocalImages,
+      });
       const row = area.createDiv({ cls: "yijing-actions" });
       new ButtonComponent(row)
         .setButtonText(t("view.saveInterpretation"))

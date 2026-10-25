@@ -14,7 +14,7 @@
 // Aufgegeben, weil einklappbare Sektionen und die deklarative API sich ausschließen:
 // SettingDefinitionGroup kennt kein Collapse. Suchbarkeit löst das Auffinden besser.
 import { type App, type Plugin, PluginSettingTab, type SettingDefinitionItem } from "obsidian";
-import { t } from "../../vendor/kit/i18n";
+import { getLang, t } from "../../vendor/kit/i18n";
 import { refreshSettingsTab, renderSettingDefinitions } from "../../vendor/kit-obsidian/settings_walker";
 import { type ControlKey, readControl, writeControl } from "../../core/settings/controls";
 import {
@@ -26,6 +26,8 @@ import {
 } from "./note-section";
 import { helpDefinition } from "./help-row";
 import { llmRows } from "./llm-section";
+import { linkRows } from "./link-section";
+import { resolveLinkSettingsStrings } from "../../vendor/kit-obsidian/link-settings";
 import { imageRows } from "./image-section";
 import { type SectionCtx } from "./section-ctx";
 import { type SettingsHost } from "../../core/settings";
@@ -61,6 +63,7 @@ export class SettingsTab extends PluginSettingTab {
       { type: "group", heading: t("set.secNoteContent"), items: noteContentRows() },
       { type: "group", heading: t("set.calloutHead"), items: calloutRows(ctx) },
       { type: "group", heading: t("set.llmHead"), items: llmRows(ctx) },
+      { type: "group", heading: resolveLinkSettingsStrings({ lang: getLang() }).heading, items: linkRows(ctx) },
       { type: "group", heading: t("set.imgHead"), items: imageRows(ctx) },
     ];
   }

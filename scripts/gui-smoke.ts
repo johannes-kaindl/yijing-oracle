@@ -195,6 +195,9 @@ const PUNKTE = [
   "Z-g Modell- und Denkstufen-Wechsel ausserhalb der Zeile erscheinen in ihr, ohne dass das Panel neu zeichnet",
   "Z-h Nach Wurf, Deutung und Neuzeichnen bleibt es bei einer Zeile",
   "Z-i Nach einem Start ohne Endpunkt (Fruehausstieg, kein Neuzeichnen) ist die Zeile wieder frei",
+  "K-a Linkschutz im Default: obsidian://-, file:- und app:-Links der Deutung verlieren ihr Ziel, ein https-Link behaelt es",
+  "K-b Mit dem Schalter bleibt der obsidian://-Link, file: und app: gehen weiter",
+  "K-c Die zwei Zeilen stehen im Einstellungen-Tab, ein Klick auf den Schalter schreibt sein Feld",
 ] as const;
 
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -1699,6 +1702,80 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
   }
 }
 
+/** K — Linkschutz der Deutung (Kit `dom-guard`, seit obsidian-kit 0.70.0): was ein Modell an Link-Zielen in die Antwort schreibt, kommt im Panel
+ *  nur an, wenn der Wächter es zulaesst. Gemessen am Attribut `href` der Anker in der fertigen Deutung (kein Klick). `javascript:` entfernt
+ *  Obsidian selbst, `file:`, `app:` und `obsidian:` behielte es: dort wirkt der Wächter. */
+const K_ANTWORT = "Siehe [OB](obsidian://open?vault=smoke-k) und [FI](file:///etc/hosts) und [AP](app://obsidian.md/x) und [HT](https://example.com/seite).";
+
+async function pruefeLinkschutz(cdp: Cdp, port: number): Promise<void> {
+  console.log("\nK · Linkschutz der Deutung");
+  const NAMEN = PUNKTE.filter((n) => n.startsWith("K-"));
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let ui: SettingsUi | null = null;
+  let vorher: unknown = null;
+  const hrefs = (): Promise<Record<string, string | null>> => cdp.evaluate(`
+    const out = {};
+    for (const a of document.querySelectorAll(".yijing-interpretation-body a")) out[a.textContent.trim()] = a.getAttribute("href");
+    return out;`);
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({ models: ["link-modell"], standard: { text: K_ANTWORT, model: "link-modell" } });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; const s = ${P}.settings; return { eps: l.endpoints, choice: l.choice ?? null, request: s.request, ol: s.allowObsidianLinks, li: s.allowLocalImages };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: "link-modell" }]; p.settings.llm.choice = {};
+      p.settings.allowObsidianLinks = false; p.settings.allowLocalImages = false;
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+
+    // K-a — Default: die fertige Deutung traegt nur den https-Link mit Ziel.
+    const lief = await laufeDeutung(cdp, 20000, "Smoke K: Linkschutz");
+    await schlaf(500);
+    const a = await hrefs();
+    const aOk = lief && a["OB"] === null && a["FI"] === null && a["AP"] === null && (a["HT"] ?? "").startsWith("https://example.com/");
+    record(NAMEN[0]!, aOk, lief ? `href: ${JSON.stringify(a)}` : "Deutungslauf lieferte kein Ergebnis");
+
+    // K-b — Schalter an (Wert direkt gesetzt, das Panel liest ihn je Antwort): obsidian:// bleibt, file: und app: nie.
+    await cdp.evaluate(`${P}.settings.allowObsidianLinks = true; await ${P}.saveSettings(); return true;`);
+    const lief2 = await laufeDeutung(cdp, 20000, "Smoke K: Linkschutz mit Schalter");
+    await schlaf(500);
+    const b = await hrefs();
+    record(NAMEN[1]!, lief2 && (b["OB"] ?? "").startsWith("obsidian://") && b["FI"] === null && b["AP"] === null && (b["HT"] ?? "").startsWith("https://"),
+      lief2 ? `href: ${JSON.stringify(b)}` : "Deutungslauf lieferte kein Ergebnis");
+    await cdp.evaluate(`${P}.settings.allowObsidianLinks = false; await ${P}.saveSettings(); return true;`);
+
+    // K-c — die Zeilen im Tab; ein Klick auf den Schalter der Links-Zeile schreibt allowObsidianLinks.
+    ui = await openSettingsTab(cdp, port);
+    if (!ui) { unmeasured(NAMEN[2]!, "Settings-Oberflaeche nicht gefunden"); return; }
+    const w = wurzelAusdruck(ui);
+    const zeilen = await ui.cdp.evaluate<{ links: boolean; bilder: boolean }>(`
+      const namen = [...(${w}).querySelectorAll(".setting-item-name")].map((n) => n.textContent || "");
+      return { links: namen.some((n) => /obsidian:\\/\\/|obsidian-links/i.test(n)), bilder: namen.some((n) => /local images|lokale bilder/i.test(n)) };`);
+    await ui.cdp.evaluate(`
+      const item = [...(${w}).querySelectorAll(".setting-item")].find((i) => /obsidian:\\/\\//i.test(i.querySelector(".setting-item-name")?.textContent || ""));
+      item?.querySelector(".checkbox-container")?.click();
+      return true;`);
+    const geschrieben = await pollUntil<boolean>(cdp, `return ${P}.settings.allowObsidianLinks === true ? true : null;`, 4000, 200);
+    record(NAMEN[2]!, zeilen.links && zeilen.bilder && geschrieben === true,
+      `Zeilen im Tab: Links ${zeilen.links ? "da" : "FEHLT"}, Bilder ${zeilen.bilder ? "da" : "FEHLT"}; Klick schrieb allowObsidianLinks: ${geschrieben ? "ja" : "NEIN"}`);
+  } catch (err) {
+    for (const nm of NAMEN) if (!aufgezeichnet(nm)) unmeasured(nm, `Messung abgebrochen: ${(err as Error).message}`);
+  } finally {
+    if (ui) await closeSettings(cdp, ui);
+    if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.settings.request = v.request; p.settings.allowObsidianLinks = v.ol; p.settings.allowLocalImages = v.li;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
 /** V1–V6: die Verbindung nach dem Tausch (Kit 0.51.2) — Schluessel je Zeile, Schwaerzung, Neutralisierung.
  *  Gegen einen Fake-Endpunkt, der den Request-Body aufzeichnet und das Platzhalter-Token aus der
  *  Anfrage in seine Antwort spiegelt (eine Bild-URL, ein dataviewjs-Block): so sieht der Treiber, was
@@ -2337,6 +2414,7 @@ async function main(): Promise<void> {
     }
     await pruefeAnfrage(cdp, port);
     await pruefeModellzeile(cdp);
+    await pruefeLinkschutz(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
     await pruefeGemma(cdp);
