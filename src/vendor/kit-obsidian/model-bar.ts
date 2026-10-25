@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.0, src/obsidian/model-bar.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.70.1, src/obsidian/model-bar.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Modellzeile (UI-STANDARD § 8, neu in 0.67.0): eine Zeile, in der man sieht, welches Modell eine Aufgabe benutzt, und es wechselt — Dropdown mit den Modellen
  * des aktiven Endpunkts, „Anderer Endpunkt …“, Neu-laden-Knopf und optional die Denk-Steuerung. Läuft eigenständig in jeder Seitenleiste und im

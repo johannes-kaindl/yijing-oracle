@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Vendored `obsidian-kit` 0.70.1 (was 0.70.0), `code-kit` stays at 0.37.5. A patch of the kit: its lint now also checks the vendored `code-kit` copy, `resolve()` called synchronously from `onResolved` no longer loops, and the thinking control gains an optional `locked` state. This plugin uses none of that (no `onResolved`, no `locked`), so nothing changes on screen or in the settings.
+
 ## [0.17.0] — 2026-10-25
 
 ### Added

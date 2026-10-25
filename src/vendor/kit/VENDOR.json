@@ -4,7 +4,7 @@
   "sha": "2bfd6dd",
   "vendored": "backend-probe.ts, capabilities.ts, endpoint.ts, endpoint_config.ts, embeddings-client.ts, endpoint_diagnostics.ts, error_body.ts, filename-template.ts, i18n.ts, local-stamp.ts, marker-zone.ts, model-choice.ts, model-context.ts, model-list-cache.ts, reasoning.ts, redact.ts, safe-markdown.ts, sampling-profiles.ts, secrets.ts, settings.ts, sse.ts, think-splitter.ts, timeout.ts, clipboard.ts, link-guard.ts, remote-resources.ts",
   "note": "Verbatim snapshot aus ZWEI Quellen (obsidian-kit + code-kit); welche Datei woher stammt, sagt ihr eigener Kopf. Pins in tools/kit-sync.json, re-vendor via tools/sync-kit.sh (zentrales kit-sync im Dach). Never hand-edit.",
-  "obsidian_kit_version": "0.70.0",
-  "obsidian_kit_sha": "86a2d2d",
+  "obsidian_kit_version": "0.70.1",
+  "obsidian_kit_sha": "4a64e81",
   "obsidian_kit_vendored": "anthropic-wire.ts, audio-provider.ts, callout.ts, endpoint-secret-hook.ts, endpoint-source.ts, image-gen-provider.ts, ocr-provider.ts, override-guard.ts, provider-error-texts.ts"
 }

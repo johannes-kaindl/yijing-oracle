@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.0, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.70.1, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { DropdownComponent, setIcon } from "obsidian";
 import { THINKING_LEVELS, familyThinking, type BackendId, type FamilyId, type ThinkingLevel } from "../kit/sampling-profiles";
 
@@ -30,6 +30,20 @@ export function thinkingOffTexts(lang: string): ThinkingOffTexts {
   return lang.toLowerCase().startsWith("de") ? THINKING_OFF_TEXTS_DE : THINKING_OFF_TEXTS_EN;
 }
 
+/** Kit-Text für den gesperrten Zustand „immer an“ (`ThinkingControlOptions.locked`), seit 0.70.1: das Modell denkt immer (gpt-oss), der Knopf kann nichts umschalten. */
+export const THINKING_LOCKED_TEXTS_EN: ThinkingOffTexts = {
+  label: "Thinking: always on",
+  hint: "This model always thinks; thinking can't be turned off here.",
+};
+export const THINKING_LOCKED_TEXTS_DE: ThinkingOffTexts = {
+  label: "Denken: immer an",
+  hint: "Dieses Modell denkt immer; das Denken lässt sich hier nicht abschalten.",
+};
+/** Die Kit-Fassung für `ThinkingControlOptions.locked`; `lang` beginnt mit `de` → Deutsch, sonst Englisch. */
+export function thinkingLockedTexts(lang: string): ThinkingOffTexts {
+  return lang.toLowerCase().startsWith("de") ? THINKING_LOCKED_TEXTS_DE : THINKING_LOCKED_TEXTS_EN;
+}
+
 export interface ThinkingControlOptions {
   containerEl: HTMLElement;
   family(): FamilyId | null;
@@ -41,6 +55,11 @@ export interface ThinkingControlOptions {
   setLevel(l: ThinkingLevel): Promise<void>;
   levelPicker(): boolean;
   strings: ThinkingControlStrings;
+  /** Seit 0.70.1, optional: der gesperrte Zustand „immer an“ (das Modell denkt immer, gpt-oss; koda-agent). Liefert es einen Text, zeigt der Knopf `label`, ist `disabled`,
+   *  trägt `aria-pressed="true"` und `label. hint` als `aria-label`, und ein Klick schreibt nichts (`setLevel` wird nie gerufen); mit `levelPicker()` ist das Dropdown gesperrt
+   *  und trägt den Grund im `aria-label`. Gilt unabhängig von `current()` und gewinnt gegen `strings.offNotPossible`. Wird bei jedem Zeichnen gelesen (`refresh()` nach einem
+   *  Modellwechsel). Der Wirt liefert den Grund (gpt-oss, anderes Backend); der Kit-Text ist `thinkingLockedTexts(lang)`. Ohne das Feld ändert sich nichts. */
+  locked?(): ThinkingOffTexts | undefined;
 }
 
 export function buildThinkingControl(opts: ThinkingControlOptions): { refresh(): void } {
@@ -50,24 +69,27 @@ export function buildThinkingControl(opts: ThinkingControlOptions): { refresh():
     const level = opts.current();
     const fam = opts.family();
     const offNotPossible = level === "off" && fam !== null && !familyThinking(fam, opts.backend?.()).canTurnOff;
+    const locked = opts.locked?.();
     if (opts.levelPicker()) {
       const dd = new DropdownComponent(root);
-      dd.selectEl.setAttribute("aria-label", opts.strings.pickerLabel);
+      dd.selectEl.setAttribute("aria-label", locked !== undefined ? `${opts.strings.pickerLabel}. ${locked.label}. ${locked.hint}` : opts.strings.pickerLabel);
+      if (locked !== undefined) dd.setDisabled(true);
       for (const l of THINKING_LEVELS) dd.addOption(l, opts.strings.level(l));
       dd.setValue(level).onChange((v) => { void opts.setLevel(v as ThinkingLevel).then(render); });
       return;
     }
-    const on = level !== "off";
+    const on = locked !== undefined || level !== "off";
     const btn = root.createEl("button", { cls: "clickable-icon okit-thinking-toggle" });
+    if (locked !== undefined) btn.disabled = true;
     btn.setAttribute("aria-pressed", String(on));
     btn.toggleClass("is-off", !on);
     const icon = btn.createSpan();
     setIcon(icon, on ? "brain-cog" : "brain");
-    const offText = offNotPossible ? opts.strings.offNotPossible : undefined;
+    const offText = locked ?? (offNotPossible ? opts.strings.offNotPossible : undefined);
     btn.createSpan({ text: offText !== undefined ? offText.label : opts.strings.button(level, offNotPossible) });
     // Der Grund steht im Namen des Knopfs (Obsidian zeigt `aria-label` als Tooltip); die sichtbare Beschriftung bleibt sein Anfang.
     if (offText !== undefined) btn.setAttribute("aria-label", `${offText.label}. ${offText.hint}`);
-    btn.addEventListener("click", () => { void opts.setLevel(on ? "off" : opts.onLevel()).then(render); });
+    if (locked === undefined) btn.addEventListener("click", () => { void opts.setLevel(on ? "off" : opts.onLevel()).then(render); });
   };
   render();
   return { refresh: render };

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.0, src/pure/image-gen-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.70.1, src/pure/image-gen-provider.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /** Öffentlicher Vertrag des Fähigkeits-Besitzers `local-image-generator` (Bildgenerierung) —
  *  Muster `pure/endpoint-source.ts`: EINE Quelle, der Besitzer re-exportiert sie, Konsumenten
  *  vendoren. Fehler sind Werte (`ImageGenProviderError`), Methoden fangen selbst — nie werfen.
