@@ -112,7 +112,10 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
     // Der Host rendert beim Oeffnen des Tabs die bei addSettingTab gecachten Definitionen (SettingsTab-Kommentar "Fallstrick 2") —
     // installiert sich der LLM Endpoint Manager erst NACH diesem Zeitpunkt, bliebe die Endpunkt-Zeile sonst veraltet. Seit Kit 0.61.0
     // zieht das Abo selbst nach, wenn der Manager erst nach dem Plugin erscheint, und ruft `cb` dann einmal.
-    this.register(onEndpointManagerChanged(this.app, () => settingsTab.refresh()));
+    this.register(onEndpointManagerChanged(this.app, () => {
+      settingsTab.refresh();
+      this.eachView((v) => v.reloadModelRow());
+    }));
   }
 
   resolveReadingLang(): Lang {
@@ -121,6 +124,14 @@ export default class YijingOraclePlugin extends Plugin implements OracleHost {
 
   async saveSettings(): Promise<void> {
     await this.saveData(this.settings);
+    // Endpunkt, Modell und Denkstufe ändern sich auch in den Einstellungen: die Modellzeile des offenen Panels zieht nach.
+    this.eachView((v) => v.syncModelRow());
+  }
+
+  private eachView(fn: (v: OracleView) => void): void {
+    for (const leaf of this.app.workspace.getLeavesOfType(VIEW_TYPE_YIJING)) {
+      if (leaf.view instanceof OracleView) fn(leaf.view);
+    }
   }
 
   /** getLanguage() ist ab Obsidian 1.8.0 verfügbar (manifest minAppVersion 1.8.7). */

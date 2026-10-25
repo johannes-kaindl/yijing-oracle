@@ -30,6 +30,7 @@ import { imageGenErrorText } from "../vendor/kit/provider-error-texts";
 import { readImageGenApi } from "../vendor/kit-obsidian/capability-apis";
 import { buildStreamArea, type StreamArea } from "../vendor/kit-obsidian/stream-area";
 import { nowStamp } from "./clock";
+import { ModelRowSlot } from "./model-row";
 
 export const VIEW_TYPE_YIJING = "yijing-oracle-panel";
 
@@ -38,6 +39,8 @@ export interface OracleHost {
   resolveReadingLang(): Lang;
   /** Die LLM-Verbindung (Kit): Quelle, Modellliste, Anfrage-Parameter, Client, Sitzung. */
   llm: LlmConnection;
+  /** Schreibt die Einstellungen (die Modellzeile speichert damit die Denkstufe). */
+  saveSettings(): Promise<void>;
 }
 
 interface Interpretation {
@@ -92,12 +95,15 @@ export class OracleView extends ItemView {
   private readingOpen = true;
   private interpretationOpen = true;
   private historyOpen = false;
+  /** Die Modellzeile (Kit `buildModelBar`) unter dem Titel; sie sperrt sich, solange eine Deutung startet oder läuft. */
+  private readonly modelRow: ModelRowSlot;
 
   constructor(
     leaf: WorkspaceLeaf,
     private readonly host: OracleHost,
   ) {
     super(leaf);
+    this.modelRow = new ModelRowSlot(this.app, host, () => this.streaming || this.starting);
   }
 
   getViewType(): string {
@@ -114,7 +120,18 @@ export class OracleView extends ItemView {
     await this.render();
   }
   async onClose(): Promise<void> {
+    this.modelRow.destroy();
     this.contentEl.empty();
+  }
+
+  /** Das Plugin ruft das, wenn sich Endpunkt, Modell oder Denkstufe außerhalb der Zeile ändern (Einstellungen). */
+  syncModelRow(): void {
+    this.modelRow.sync();
+  }
+
+  /** Der Endpunkt-Manager kam oder ging: die Modell-Liste neu laden. */
+  reloadModelRow(): void {
+    this.modelRow.reload();
   }
 
   private doCast(): void {
@@ -171,10 +188,15 @@ export class OracleView extends ItemView {
 
   private async render(): Promise<void> {
     const root = this.contentEl;
+    // Die Zeile hält Zustand und gibt ihre Wurzel nicht von selbst frei: vor dem Leeren abmelden, danach genau eine neue.
+    this.modelRow.destroy();
     root.empty();
     root.addClass("yijing-oracle");
 
     root.createEl("h2", { text: t("view.title"), cls: "yijing-title" });
+
+    // ── Modellzeile (Kit) ──────────────────────────────────────────────────
+    this.modelRow.mount(root);
 
     // ── Frage-Eingabe ──────────────────────────────────────────────────────
     const q = new TextComponent(root);
@@ -364,10 +386,13 @@ export class OracleView extends ItemView {
     // Aufloesen, Modell-Liste und Persistieren dauern (bis 5 s je toter Zeile): ein zweiter Klick wuerde
     // sonst einen parallelen Lauf starten, bevor `streaming` gesetzt ist.
     this.starting = true;
+    // Das nächste `render()` kommt erst nach Auflösen und Modell-Liste (bis 5 s je toter Zeile): bis dahin sperrt die Zeile nur durch dies.
+    this.modelRow.sync();
     try {
       await this.generateInterpretationNow(c);
     } finally {
       this.starting = false;
+      this.modelRow.sync();
     }
   }
 

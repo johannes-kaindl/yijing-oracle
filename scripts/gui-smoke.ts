@@ -67,6 +67,7 @@ import { createBilanz, parseArgs, runDriver } from "../../tools/obsidian-cdp/bil
 import { requireEigenerBuild } from "../../tools/obsidian-cdp/vault.js";
 import { gegenprobeErreichbarkeit, gegenprobeFokus, messeDenkblockKopierbar as messeDenkblockZentral, messeErreichbarkeit, messeFokusErhalt, mitHoehe, zeichneDenkblock, zeichnePflicht, type PflichtBilanz, type PflichtTeilurteil } from "../../tools/obsidian-cdp/pflichtpunkte.js";
 import { mkdirSync, writeFileSync } from "node:fs";
+import { createServer, connect, type Server } from "node:net";
 import { join } from "node:path";
 import { boxAround, capture } from "../../tools/obsidian-cdp/shot.js";
 
@@ -184,6 +185,16 @@ const PUNKTE = [
   "E2 Notiz traegt den Reading-Text",
   "E3 Die Note bettet die vorhandene Bilddatei ein, es entsteht keine Kopie",
   "E4 Das gespeicherte Bild bleibt nach einem neuen Wurf",
+  "Z-a Die Modellzeile steht genau einmal direkt unter dem Titel und traegt ein aria-label",
+  "Z-b Das Dropdown listet die Modelle des Endpunkts plus Automatisch",
+  "Z-c Ein Wechsel wirkt: die naechste Deutung geht mit dem gewaehlten Modell an den Draht",
+  "Z-d Waehrend eine Deutung streamt, sind Dropdown und Neu-laden gesperrt, danach wieder frei",
+  "Z-d2 Im Fenster zwischen Klick und Streambeginn (verzoegerte Aufloesung) ist die Zeile schon gesperrt",
+  "Z-e Die Denk-Steuerung steht in der Zeile, es gibt keinen zweiten Denk-Knopf im Panel",
+  "Z-f Bei 260 px Panelbreite laeuft die Zeile nicht ueber",
+  "Z-g Modell- und Denkstufen-Wechsel ausserhalb der Zeile erscheinen in ihr, ohne dass das Panel neu zeichnet",
+  "Z-h Nach Wurf, Deutung und Neuzeichnen bleibt es bei einer Zeile",
+  "Z-i Nach einem Start ohne Endpunkt (Fruehausstieg, kein Neuzeichnen) ist die Zeile wieder frei",
 ] as const;
 
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -1080,7 +1091,13 @@ async function abschnittSpeichern(cdp: Cdp, aufraeumen: string[]): Promise<void>
   const pngVorher = await cdp.evaluate<number>(`return app.vault.getFiles().filter((f) => f.extension === "png").length;`);
   const vorher = await cdp.evaluate<string[]>(`return app.vault.getMarkdownFiles().map((f) => f.path);`);
   // Die zweite Aktionsreihe unter der Weissagung traegt "Speichern".
-  const geklickt = await clickPanelButton(cdp, ".yijing-oracle > .yijing-actions:nth-of-type(2) button");
+  // Nicht ueber nth-of-type: das zaehlt alle <div> unter der Wurzel, und die Modellzeile unter dem Titel verschiebt sie.
+  const geklickt = await cdp.evaluate<boolean>(`
+    const b = document.querySelectorAll(".yijing-oracle > .yijing-actions")[1]?.querySelector("button");
+    if (!b) return false;
+    b.click();
+    await new Promise((r) => setTimeout(r, 400));
+    return true;`);
   await schlaf(1500);
 
   const neu = await cdp.evaluate<string[]>(`return app.vault.getMarkdownFiles().map((f) => f.path);`);
@@ -1485,6 +1502,191 @@ async function pruefeAnfrage(cdp: Cdp, port: number): Promise<void> {
   } finally {
     if (ui) await closeSettings(cdp, ui);
     if (fake) await fake.close().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.settings.request = v.request;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
+/** Z — die Modellzeile (Kit `buildModelBar`) unter dem Titel des Panels, Aufgabe „Deutung“. Gegen einen Stub mit drei Modellen; Z-d2 braucht
+ *  eine verzoegerte Aufloesung (der Stub verzoegert nur Chat-Antworten): ein kleiner TCP-Vorsatz haelt jede Anfrage `ms` zurueck, auch auf einer wiederverwendeten Verbindung. */
+async function verzoegernderVorsatz(ziel: number, ms: number): Promise<{ port: number; close: () => Promise<void> }> {
+  const sockets = new Set<import("node:net").Socket>();
+  const server: Server = createServer((client) => {
+    const hinten = connect(ziel, "127.0.0.1");
+    sockets.add(client);
+    sockets.add(hinten);
+    // Jedes Stueck des Clients (auch auf einer wiederverwendeten Verbindung) kommt `ms` spaeter beim Stub an, in gleicher Reihenfolge.
+    client.on("data", (d) => { setTimeout(() => { if (!hinten.destroyed) hinten.write(d); }, ms); });
+    client.on("end", () => { setTimeout(() => { if (!hinten.destroyed) hinten.end(); }, ms); });
+    hinten.pipe(client);
+    client.on("error", () => hinten.destroy());
+    hinten.on("error", () => client.destroy());
+  });
+  await new Promise<void>((r) => server.listen(0, "127.0.0.1", () => r()));
+  const port = (server.address() as { port: number }).port;
+  return { port, close: () => new Promise<void>((r) => { for (const so of sockets) so.destroy(); server.close(() => r()); }) };
+}
+
+const ZEILE = ".yijing-oracle .okit-model-bar";
+
+async function pruefeModellzeile(cdp: Cdp): Promise<void> {
+  console.log("\nZ · Modellzeile im Panel (Kit buildModelBar, Aufgabe „Deutung“)");
+  const NAMEN = PUNKTE.filter((n) => n.startsWith("Z-"));
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  const MODELLE = ["zeile-a", "zeile-b", "zeile-c"];
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let vorsatz: Awaited<ReturnType<typeof verzoegernderVorsatz>> | null = null;
+  let vorher: unknown = null;
+  const letztesModell = (): string | null => ((stub?.letzte("chat")?.json as { model?: string } | null)?.model) ?? null;
+  const zeile = (js: string): Promise<unknown> => cdp.evaluate(`const r = document.querySelector(${JSON.stringify(ZEILE)}); const sel = r?.querySelector(".okit-model-bar-select"); ${js}`);
+  const gesperrt = (): Promise<{ da: boolean; select: boolean; neuLaden: boolean; stream: boolean }> => cdp.evaluate(`
+    const r = document.querySelector(${JSON.stringify(ZEILE)});
+    return { da: Boolean(r), select: Boolean(r?.querySelector(".okit-model-bar-select")?.disabled), neuLaden: Boolean(r?.querySelector(".okit-model-bar-refresh")?.disabled), stream: Boolean(document.querySelector(".yijing-stream, .okit-stream")) };`);
+  try {
+    await removeFakeManager(cdp);
+    stub = await startLlmStub({ models: MODELLE, standard: { text: "Wort ".repeat(40), laenge: 5, takt: 120, model: MODELLE[0] } });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null, request: ${P}.settings.request };`);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub.url)}, model: ${JSON.stringify(MODELLE[0])} }]; p.settings.llm.choice = {};
+      p.settings.request = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    console.log(`  Stub: ${stub.url} (Modelle ${MODELLE.join(", ")})`);
+
+    // Frisches Panel, damit die Zeile mit den eben gesetzten Einstellungen gebaut wird.
+    if (!(await neuesPanelMitWurf(cdp))) { for (const n of NAMEN) unmeasured(n, "Panel liess sich nicht oeffnen"); return; }
+    const geladen = await pollUntil<boolean>(cdp, `return document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")}).length >= 4 ? true : null;`, 6000, 200);
+
+    // Z-a — genau eine Zeile, direkt unter dem Titel, mit aria-label.
+    const a = await cdp.evaluate<{ n: number; vorTitel: boolean; aria: string | null }>(`
+      const rows = document.querySelectorAll(${JSON.stringify(ZEILE)});
+      const r = rows[0];
+      return { n: rows.length, vorTitel: Boolean(r?.previousElementSibling?.classList.contains("yijing-title")), aria: r?.querySelector(".okit-model-bar-select")?.getAttribute("aria-label") ?? null };`);
+    record(NAMEN[0]!, a.n === 1 && a.vorTitel && Boolean(a.aria && a.aria.includes("Interpretation")),
+      `${a.n} Zeile(n), direkt unter dem Titel: ${a.vorTitel}, aria-label ${JSON.stringify(a.aria)}`);
+
+    // Z-b — Dropdown: die Modelle des Stub plus Automatisch (value "").
+    const opts = await cdp.evaluate<string[]>(`return [...document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")})].map((o) => o.value);`);
+    record(NAMEN[1]!, geladen === true && opts.includes("") && MODELLE.every((m) => opts.includes(m)) && opts.length === MODELLE.length + 1,
+      `Optionen: ${JSON.stringify(opts)}`);
+
+    // Z-e — Denk-Steuerung IN der Zeile, kein zweiter Knopf.
+    const e = await cdp.evaluate<{ inZeile: number; imPanel: number }>(`
+      return { inZeile: document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-thinking-control")}).length, imPanel: document.querySelectorAll(".yijing-oracle .okit-thinking-control, .yijing-oracle .okit-thinking-toggle").length };`);
+    record(NAMEN[5]!, e.inZeile === 1 && e.imPanel >= 1 && (await cdp.evaluate<number>(`return document.querySelectorAll(".yijing-oracle .okit-thinking-control").length;`)) === 1,
+      `Denk-Steuerung in der Zeile: ${e.inZeile}, im ganzen Panel: ${e.imPanel}`);
+
+    // Z-c — Wechsel auf zeile-b, dann eine Deutung: der Draht nennt zeile-b.
+    await zeile(`sel.value = ${JSON.stringify(MODELLE[1])}; sel.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
+    const gewechselt = await pollUntil<boolean>(cdp, `return ${P}.llm.modelInUse() === ${JSON.stringify(MODELLE[1])} ? true : null;`, 4000, 200);
+    stub.loescheMitschnitt();
+    const lief = await laufeDeutung(cdp, 20000, "Smoke Z: Modellzeile", 15);
+    await schlaf(300);
+    record(NAMEN[2]!, gewechselt === true && lief && letztesModell() === MODELLE[1],
+      `modelInUse ${gewechselt ? "= " + MODELLE[1] : "nicht gewechselt"}, Deutung ${lief ? "lief" : "lief nicht"}, Draht-Modell ${JSON.stringify(letztesModell())}`);
+
+    // Z-d — gesperrt waehrend des Streams. Neuer Wurf, Deutung starten, mitten im Strom messen, abbrechen.
+    await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+    await schlaf(500);
+    await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+    const imStrom = await pollUntil<boolean>(cdp, `return document.querySelector(".okit-stream-tail")?.textContent?.length > 5 ? true : null;`, 15000, 200);
+    const waehrend = await gesperrt();
+    await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`);
+    await pollUntil<boolean>(cdp, `return document.querySelector(".yijing-stream, .okit-stream") ? null : true;`, 8000, 200);
+    await schlaf(300);
+    const danach = await gesperrt();
+    record(NAMEN[3]!, imStrom === true && waehrend.select && waehrend.neuLaden && waehrend.stream && !danach.select && !danach.neuLaden,
+      `im Strom: Dropdown ${waehrend.select ? "gesperrt" : "FREI"}, Neu-laden ${waehrend.neuLaden ? "gesperrt" : "FREI"}; danach: Dropdown ${danach.select ? "gesperrt" : "frei"}, Neu-laden ${danach.neuLaden ? "gesperrt" : "frei"}`);
+
+    // Z-g — Aenderungen ausserhalb der Zeile: das Panel zeichnet NICHT neu (Marke an der Zeile bleibt), die Zeile zieht nach.
+    await zeile(`r.dataset.smokeMarke = "1"; return true;`);
+    const toggleAn = await cdp.evaluate<string | null>(`return document.querySelector(${JSON.stringify(ZEILE + " .okit-thinking-toggle")})?.getAttribute("aria-pressed") ?? null;`);
+    await cdp.evaluate(`
+      const p = ${P};
+      await p.llm.setModel(${JSON.stringify(MODELLE[2])});
+      p.settings.request = { ...p.settings.request, thinking: { ...p.settings.request.thinking, creative: "off" } };
+      await p.saveSettings();
+      return true;`);
+    const nach = await pollUntil<{ marke: boolean; modell: string | null; an: string | null }>(cdp, `
+      const r = document.querySelector(${JSON.stringify(ZEILE)});
+      const modell = r?.querySelector(".okit-model-bar-select")?.value ?? null;
+      const an = r?.querySelector(".okit-thinking-toggle")?.getAttribute("aria-pressed") ?? null;
+      return modell === ${JSON.stringify(MODELLE[2])} && an === "false" ? { marke: r?.dataset.smokeMarke === "1", modell, an } : null;`, 4000, 200);
+    record(NAMEN[7]!, nach !== null && nach.marke && toggleAn === "true",
+      nach ? `Zeile zeigt ${JSON.stringify(nach.modell)}, Denken aria-pressed ${String(toggleAn)} → ${String(nach.an)}, Panel neu gezeichnet: ${nach.marke ? "nein" : "JA"}` : "Zeile zog nicht nach (Modell oder Denkstufe)");
+
+    // Z-f — 260 px Panelbreite: nichts laeuft ueber den Rand; ein Bild der Zeile fuer die Sichtung.
+    await cdp.evaluate(`app.workspace.rightSplit?.setSize?.(260); await new Promise((r) => setTimeout(r, 700)); return true;`);
+    const breit = await cdp.evaluate<{ panel: number; zeileRechts: number; scroll: number; client: number; kinder: { cls: string; rechts: number }[] }>(`
+      const panel = document.querySelector(".yijing-oracle").getBoundingClientRect();
+      const r = document.querySelector(${JSON.stringify(ZEILE)});
+      const rr = r.getBoundingClientRect();
+      return { panel: panel.right, zeileRechts: rr.right, scroll: r.scrollWidth, client: r.clientWidth,
+        kinder: [...r.children].map((k) => ({ cls: k.className, rechts: k.getBoundingClientRect().right })) };`);
+    const ueber = breit.kinder.filter((k) => k.rechts > breit.panel + 1);
+    record(NAMEN[6]!, breit.zeileRechts <= breit.panel + 1 && breit.scroll <= breit.client + 1 && ueber.length === 0,
+      `Panel rechts ${Math.round(breit.panel)}, Zeile rechts ${Math.round(breit.zeileRechts)}, scrollWidth ${breit.scroll} / clientWidth ${breit.client}${ueber.length ? ", darueber hinaus: " + ueber.map((k) => k.cls).join(", ") : ""}`);
+    await haltePanelBild(cdp, "zeile-260", ".yijing-oracle .yijing-title, " + ZEILE);
+    await cdp.evaluate(`app.workspace.rightSplit?.setSize?.(420); await new Promise((r) => setTimeout(r, 400)); return true;`);
+
+    // Z-d2 — Fenster `starting`: jede Verbindung zum Stub haelt der Vorsatz 1,5 s zurueck; 250 ms nach dem Klick ist das Panel noch nicht im
+    // Strom (kein Stream-Bereich), die Zeile muss aber schon gesperrt sein.
+    vorsatz = await verzoegernderVorsatz(stub.port, 1500);
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = [{ url: ${JSON.stringify(`http://127.0.0.1:${vorsatz.port}`)}, model: "" }];
+      p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    await neuesPanelMitWurf(cdp);
+    await pollUntil<boolean>(cdp, `return document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")}).length >= 4 ? true : null;`, 12000, 300);
+    await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+    await schlaf(250);
+    const fenster = await gesperrt();
+    record(NAMEN[4]!, fenster.da && !fenster.stream && fenster.select && fenster.neuLaden,
+      `250 ms nach dem Klick: im Strom ${fenster.stream ? "ja" : "nein"}, Dropdown ${fenster.select ? "gesperrt" : "FREI"}, Neu-laden ${fenster.neuLaden ? "gesperrt" : "FREI"}`);
+    // Lauf zu Ende kommen lassen (Abbrechen, sobald der Strom steht), damit der naechste Schritt ein ruhiges Panel hat.
+    await pollUntil<boolean>(cdp, `return document.querySelector(".yijing-stream, .okit-stream") ? true : null;`, 15000, 200);
+    await cdp.evaluate(`document.querySelector(".yijing-interpretation-inner .yijing-actions button")?.click(); return true;`);
+    await pollUntil<boolean>(cdp, `return document.querySelector(".yijing-stream, .okit-stream") ? null : true;`, 8000, 200);
+
+    // Z-i — Fruehausstieg: ohne Endpunkt kehrt die Deutung nach der Ansage zurueck, OHNE dass das Panel neu zeichnet. Die Sperre aus
+    // dem Start muss im `finally` wieder fallen, sonst bleibt die Zeile bis zum naechsten Anstrich tot.
+    await cdp.evaluate(`
+      const p = ${P};
+      p.settings.llm.endpoints = []; p.settings.llm.choice = {};
+      p.llm.invalidate(); await p.saveSettings();
+      return true;`);
+    await neuesPanelMitWurf(cdp);
+    await schlaf(600);
+    await zeile(`r.dataset.smokeMarke = "1"; return true;`);
+    await clickPanelButton(cdp, ".yijing-interpretation-inner .yijing-actions button");
+    await schlaf(1500);
+    const frei = await cdp.evaluate<{ da: boolean; marke: boolean; select: boolean; stream: boolean }>(`
+      const r = document.querySelector(${JSON.stringify(ZEILE)});
+      return { da: Boolean(r), marke: r?.dataset.smokeMarke === "1", select: Boolean(r?.querySelector(".okit-model-bar-select")?.disabled), stream: Boolean(document.querySelector(".yijing-stream, .okit-stream")) };`);
+    record(NAMEN[9]!, frei.da && frei.marke && !frei.stream && !frei.select,
+      `nach der Ansage: Zeile ${frei.da ? "da" : "WEG"}, Panel nicht neu gezeichnet: ${frei.marke}, im Strom: ${frei.stream ? "ja" : "nein"}, Dropdown ${frei.select ? "GESPERRT" : "frei"}`);
+
+    // Z-h — nach all den Neuzeichnungen (Wurf, Deutung, Abbruch) bleibt es bei EINER Zeile.
+    await clickPanelButton(cdp, ".yijing-oracle .yijing-actions button");
+    await schlaf(600);
+    const n = await cdp.evaluate<number>(`return document.querySelectorAll(${JSON.stringify(ZEILE)}).length;`);
+    record(NAMEN[8]!, n === 1, `${n} Zeile(n) im Panel`);
+  } catch (err) {
+    for (const nm of NAMEN) if (!aufgezeichnet(nm)) unmeasured(nm, `Messung abgebrochen: ${(err as Error).message}`);
+  } finally {
+    if (vorsatz) await vorsatz.close().catch(() => undefined);
+    if (stub) await stub.stop().catch(() => undefined);
+    await cdp.evaluate(`app.workspace.rightSplit?.setSize?.(420); return true;`).catch(() => null);
     if (vorher !== null) {
       await cdp.evaluate(`
         const v = ${JSON.stringify(vorher)}; const p = ${P};
@@ -2134,6 +2336,7 @@ async function main(): Promise<void> {
       await pruefeTabWechsel(cdp, port);
     }
     await pruefeAnfrage(cdp, port);
+    await pruefeModellzeile(cdp);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
     await pruefeGemma(cdp);
