@@ -10,8 +10,8 @@ hier **nicht** wiederholt: `_docs/readme/readme-spec.json`, Block `images`.
 
 | Datei | Klasse | referenziert von | muss zeigen |
 |---|---|---|---|
-| `hero.png` | hero | `README.md`, `README.de.md` | Das ganze Fenster: eine gespeicherte Befragung als Notiz im Lesemodus, rechts das Orakel-Panel mit demselben Wurf. Die Aussage ist die Verbindung — Orakel **und** Vault-Notiz, nicht nur ein Panel. |
-| `panel.png` | detail | `README.md`, `README.de.md` | Das Panel allein: Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien, Name und Zeichen, die Weissagungs-Vorschau, Speichern-Knöpfe. Hoch und schmal — als Vorschaubild eingebettet. |
+| `hero.png` | hero | `README.md`, `README.de.md` | Das ganze Fenster: eine gespeicherte Befragung als Notiz im Lesemodus, rechts das Orakel-Panel mit demselben Wurf und der Modellzeile. Die Aussage ist die Verbindung — Orakel **und** Vault-Notiz, nicht nur ein Panel. |
+| `panel.png` | detail | `README.md`, `README.de.md` | Das Panel allein: die Modellzeile (Modell-Dropdown des Endpunkts und Denk-Schalter) unter dem Titel, Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien, Name und Zeichen, die Weissagungs-Vorschau, Speichern-Knöpfe. Hoch und schmal — als Vorschaubild eingebettet. |
 | `reading-note.png` | feature | `README.md`, `README.de.md` | Die erzeugte Notiz im Lesemodus, so weit sichtbar, dass die Gliederung erkennbar ist: Frage, Überblick, Wandlung, die Callouts für Ursprung und wandelnde Linien. |
 | `interpretation.png` | feature | `README.md`, `README.de.md` | Den Deutungs-Kasten im Panel mit einer **fertigen** Antwort eines lokalen Modells, darüber die aufklappbare Denkspur. Belegt, dass die Deutung im Panel lebt und nicht in einem Modal. |
 | `artwork.png` | feature | `README.md`, `README.de.md` | Den Bildmeditations-Kasten mit einem **echt erzeugten** Bild, darunter den Szenen-Satz und den Knopf zum Neu-Generieren. |
@@ -35,6 +35,7 @@ npm run shots -- --list       # Vertrag anzeigen
 - **Das Plugin local-image-generator** im Aufnahme-Vault, installiert, aktiviert und mit einem laufenden Bildmodell eingerichtet — `artwork.png` zeigt ein echt erzeugtes Bild, kein Platzhalter. Fehlt das Plugin oder ist es nicht bereit, fehlt das Bild (und `shots:check` meldet es). Das Aufnahme-Rezept legt es nicht selbst an.
 - **Ein OpenAI-kompatibler LLM-Endpunkt** unter `http://127.0.0.1:1234` für
   `interpretation.png`. Dasselbe gilt: kein Server, kein Bild.
+- Die Modellzeile in `hero.png` und `panel.png` zeigt das Modell, das der Endpunkt unter `--llm-endpoint` listet (`--model <id>` wählt eines aus der Liste; ohne Angabe ein Eintrag, den der Server nicht führt, mit dem Zusatz „gespeichert“). Aufgenommen mit `--model qwen/qwen3.6-27b` gegen den LM Studio des Maintainers; `interpretation.png` und `artwork.png` schneiden nur ihren Kasten aus und zeigen die Zeile nicht, sie ändern sich mit ihr nicht.
 - Die Aufnahme-Sprache ist **Englisch**. Sie ist app-weit, nicht vault-weit — der Treiber
   stellt sie um und **nach dem Lauf wieder zurück**, sonst startet der Arbeits-Vault des
   Maintainers auf Englisch.

@@ -63,6 +63,8 @@ Er läuft im Staging-Vault `yijing-oracle` (`$STAGING_VAULTS_DIR`), nie im Arbei
 | N1–N6 | Abschnitt „Anfrage“ (Sampling-Profile, Modus creative): klappt auf · Bearbeitungen bleiben offen · gesendeter Body folgt Defaults und Einstellungen · Zurücksetzen · „Letzte Anfrage“ | — |
 | V1–V9 | Verbindung (Kit 0.53.0): eine Zeile mit Klartext-Schlüssel landet nach `resolve` im Schlüsselbund und nicht in `data.json` · der Schlüssel geht als Bearer an den Endpunkt · ein Geheimnis in der Frage geht als Platzhalter an den Draht (nicht im Klartext) und kommt in der Deutung im Original zurück · eine Antwort mit Bild-URL und Platzhalter erzeugt kein `img` · ein `dataviewjs`-Block rendert als Text · V9: eine Zeile ohne Modell bekommt das erste Listenmodell über `setModel` | — (neu mit dem Verbindungs-Tausch; Gegenproben: Neutralisierung entfernt → V5/V6 rot, `redact: false` → V3/V4 rot) |
 | V7–V8 | Gespeicherte Deutung: die Notiz trägt die entschärfte Form (```` ```text ```` statt `dataviewjs` und `mermaid`, kein Fernbild, auch nicht als Referenz-Definition mit Zeilenumbruch im Label), und der Zähler am Draht des Fake-Servers bleibt beim Speichern 0 | — (Gegenprobe code-kit 0.16.0 im Vendor: V7/V8 rot, `GET /pixel` 2) |
+| Z-a–Z-i | Modellzeile (Kit `buildModelBar`, Welle 27; Stub mit drei Modellen): genau eine Zeile direkt unter dem Titel mit `aria-label` (a) · das Dropdown listet die Modelle plus Automatisch (b) · ein Wechsel geht als Modell an den Draht (c) · gesperrt, solange die Deutung streamt, danach frei (d) · gesperrt auch im Fenster zwischen Klick und Streambeginn (ein TCP-Vorsatz verzögert jede Anfrage um 1,5 s; der Stream-Bereich ist da noch nicht gebaut) (d2) · die Denk-Steuerung steht in der Zeile, kein zweiter Knopf (e) · bei 260 px Panelbreite läuft nichts über den Rand (f) · ein Modell- und Denkstufen-Wechsel außerhalb der Zeile erscheint in ihr, ohne dass das Panel neu zeichnet (Marke am Element bleibt) (g) · nach Wurf, Deutung und Abbruch bleibt es bei einer Zeile (h) · nach einem Start ohne Endpunkt (Frühausstieg ohne Neuzeichnen) ist die Zeile wieder frei (i) | — (Welle 27; Mutationsproben unten) |
+| K-a–K-c | Linkschutz der Deutung (Kit `dom-guard`, obsidian-kit 0.70.0): im Default verlieren `obsidian://`-, `file:`- und `app:`-Links der fertigen Deutung ihr Ziel, ein https-Link behält es (a) · mit dem Schalter bleibt der `obsidian://`-Link, `file:` und `app:` gehen weiter (b) · die zwei Zeilen stehen im Einstellungen-Tab, ein Klick auf den Schalter schreibt sein Feld (c) | — (Welle 27) |
 
 > [!bug] M1 war bis 2026-10-09 rot, ohne je gemessen zu haben
 > `wurzelAusdruck(ui)` lieferte im Einstellungen-Fenster `document`, und `Document.textContent` ist immer `null`: M1 las den Leerstring, fand den Manager-Text „nicht“ und blieb rot — die Baseline führte das als vorbestehenden Plugin-Befund. Gemessen wird jetzt an `document.body`, und M1/M3 warten, bis der Tab gezeichnet ist. **Ein Prüfpunkt, der immer rot ist, hat seinen Prüfling vielleicht nie berührt** (CORE-TEST-15). Der Cockpit-Befund „Settings-Tab zeigt einen neu installierten Manager nicht sofort“ stammte aus genau dieser Fehlmessung; M1b misst den Fall (Tab gecacht, Manager danach installiert, Rückkehr von einem anderen Tab) mit gültiger Leseart und ist grün.
@@ -213,10 +215,30 @@ beide**:
 > Fehler, die in ihm stecken** — der zweite war zwei Wochen unsichtbar, weil der erste ihn nie
 > zur Ausführung kommen ließ.
 
+
+## Mutationsproben der Modellzeile und des Linkschutzes (Welle 27, 2026-10-25)
+
+Je eine Änderung im Quelltext, ein voller Lauf, danach zurückgestellt. Ergebnis „n von m“ = rote Punkte, die dazugehören, von allen roten.
+
+| Probe | Ergebnis |
+|---|---|
+| `bar.update()` nach `starting = true` entfernt | Z-d2 rot, 1 von 1 |
+| `bar.update()` im `finally` entfernt (Frühausstieg) | Z-i rot, 1 von 1 |
+| Nachziehen in `saveSettings` entfernt | Z-g rot, 1 von 1 |
+| `disabled` der Zeile entfernt | Z-d und Z-d2 rot, 2 von 2 |
+| `setModel` der Zeile wirkungslos | Z-c rot, 1 von 1 |
+| `destroy()` der alten Zeile vor dem Neubau entfernt | Smoke nicht unterscheidbar (0 rot): `root.empty()` entfernt die alte Wurzel im Panel ohnehin; die Unit-Probe (a) ist rot, 1 von 1 |
+| Wächter durch `MarkdownRenderer.render` ersetzt | K-a und K-b rot, 2 von 2 |
+| `allowObsidianLinks` im Aufruf fest `false` | K-b rot, 1 von 1 |
+| Gruppe „Links und Bilder in Antworten“ aus dem Tab entfernt | K-c rot, 1 von 1 |
+
+Die Unit-Tests (`tests/model-row.test.ts`, `tests/link-settings.test.ts`) fahren eigene Proben: acht an der Modellzeile (alle rot), fünf an den Link-Einstellungen (alle rot).
+
 ## Durchläufe
 
 | Datum | Obsidian | Ergebnis | Gegenprobe |
 |---|---|---|---|
+| 2026-10-25 | 1.14.5, Pin obsidian-kit 0.70.0 / code-kit 0.37.5, Lock `focus` bestätigt | **87 grün · 0 rot · 1 übersprungen (D10 ohne `--lig`) · 1 nichts gemessen (M4 ohne `--model`) von 89** (Baseline vor der Welle 74/0/1/1 von 76; neu Z-a–Z-i und K-a–K-c) | ✅ Mutationsproben der Modellzeile und des Linkschutzes: Tabelle oben. Die Proben liefen ohne bestätigten Lock (Skriptfehler, behoben), der Lauf in dieser Zeile unter bestätigtem Lock |
 | 2026-09-02 (3) | 1.13.7 (Catalyst), ohne Bildlauf | **27/27 · 2 Abschnitte nicht gelaufen** | ✅ Guard-Platzierung korrigiert (vor dem `try` → früh **im** `try`) und verifiziert: der Abbruchlauf zeigt jetzt die Aufräum-Ausgabe, `cdp.close()` läuft. Dabei fiel die `0/0 bestanden`-Bilanz auf (Exit wäre 0 gewesen) — behoben, Abbruch meldet jetzt „KEIN Pruefpunkt gelaufen“ mit Exit 1. Bestätigungslauf danach: 27/27, `npm-exit=0` |
 | 2026-09-02 (2) | 1.13.7 (Catalyst), ohne Bildlauf | **27/27 · 2 Abschnitte nicht gelaufen** | ✅ **Herkunfts-Guard im Positivfall gesehen**, mit dem eigenen Einbau: eine Kommentarzeile an die Vault-`main.js` (gültiges JS, das Plugin lief weiter) → Abbruch mit Byte- und sha1-Vergleich, **kein Prüfpunkt lief**. 101 Bytes reichten. Danach deployt → wieder still, 27/27. Damit ist sein Schweigen ein Messwert: „Build ist echt“, nicht „Guard tot“ |
 | 2026-09-02 | 1.13.7 (Catalyst), ohne Bildlauf (`--kein-bild`) | **27/27** | ✅ zwei Sabotagen **einzeln** gefahren, je genau ein Punkt rot und kein zweiter mit: `aliases` entfernt → F6 rot (26/27), Maskierung entfernt → F7 rot (26/27). **F6 war dabei zuerst blind** (s. o.) — der Fehler fiel nur auf, weil der Punkt trotz Sabotage grün BLIEB. Herkunft belegt: Drei-Datei-Hash vor jedem Lauf + Guard still. Staging-Vault `yijing-oracle`, nicht Pallas |
