@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.17.0] — 2026-10-25
+
 ### Added
 - A model row at the top of the panel, above the question field, shows which model the interpretation uses and switches it without opening the settings: a dropdown with the models of the active endpoint ("Automatic" leaves the choice to the endpoint), a reload button, "Other endpoint …" (opens the LLM Endpoint Manager when it is installed) and the thinking toggle in the same line. A model chosen there is written to the active endpoint row, like in the settings; with the LLM Endpoint Manager the manager decides which endpoint is used. The row is locked while an interpretation starts or runs, and it follows changes you make in the settings or in the manager without a new cast.
 - Link protection for the AI interpretation: the finished interpretation is rendered behind the kit's guard (obsidian-kit 0.70.0). A link in the answer that points to `file:` or `app:` loses its target, always; an `obsidian://` link loses it too unless you switch on **Allow obsidian:// links**, because an answer should not be able to trigger an Obsidian action such as opening another vault; `http`, `https` and `mailto` links and links to notes keep working. A local image from your vault is only shown with **Show local images from the vault**; remote images stay blocked. Both switches are under **Settings → Yijing Oracle → Links and images in answers** and are off by default. A link that lost its target still looks like a link (colour, underline) but does nothing.
