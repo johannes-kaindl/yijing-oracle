@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.18.0] — 2026-10-26
+
 ### Changed
 - Vendored `obsidian-kit` 0.72.0 (was 0.70.0; 0.70.1 was never released) and `code-kit` 0.38.0 (was 0.37.5). What you may notice:
 - A link in the AI interpretation that the link protection has stripped (`file:` and `app:` always, `obsidian://` while the switch is off) now looks like plain text: no link colour, no underline, no pointer and no arrow icon. Until now it still looked like a link and did nothing (obsidian-kit 0.72.0, `STREAM_AREA_CSS`). A link with a target is unchanged.
