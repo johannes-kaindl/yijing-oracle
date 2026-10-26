@@ -7,7 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 
 ### Changed
-- Vendored `obsidian-kit` 0.70.1 (was 0.70.0), `code-kit` stays at 0.37.5. A patch of the kit: its lint now also checks the vendored `code-kit` copy, `resolve()` called synchronously from `onResolved` no longer loops, and the thinking control gains an optional `locked` state. This plugin uses none of that (no `onResolved`, no `locked`), so nothing changes on screen or in the settings.
+- Vendored `obsidian-kit` 0.72.0 (was 0.70.0; 0.70.1 was never released) and `code-kit` 0.38.0 (was 0.37.5). What you may notice:
+- A link in the AI interpretation that the link protection has stripped (`file:` and `app:` always, `obsidian://` while the switch is off) now looks like plain text: no link colour, no underline, no pointer and no arrow icon. Until now it still looked like a link and did nothing (obsidian-kit 0.72.0, `STREAM_AREA_CSS`). A link with a target is unchanged.
+- The explanatory texts of the Claude sampling profile read differently (code-kit 0.38.0, source texts only, no value changed).
+- Everything else in these kit releases does not touch this plugin or changes nothing on screen: the thinking control's hint and locked state (`hint`, `locked`; this plugin sets neither), the model row's `onRefreshed` callback (not used), `anthropic-wire` moving into `code-kit` (logic unchanged; the file still comes from obsidian-kit here until 0.73.0), `detectEol` and the live indexer (not vendored), and a comment-only change in the link guard.
 
 ## [0.17.0] — 2026-10-25
 

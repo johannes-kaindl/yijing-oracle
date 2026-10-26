@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.1, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.72.0, src/obsidian/thinking-control.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 import { DropdownComponent, setIcon } from "obsidian";
 import { THINKING_LEVELS, familyThinking, type BackendId, type FamilyId, type ThinkingLevel } from "../kit/sampling-profiles";
 
@@ -44,6 +44,16 @@ export function thinkingLockedTexts(lang: string): ThinkingOffTexts {
   return lang.toLowerCase().startsWith("de") ? THINKING_LOCKED_TEXTS_DE : THINKING_LOCKED_TEXTS_EN;
 }
 
+/** Kit-Text für den Hinweis „denkt vermutlich immer“ (`ThinkingControlOptions.hint`), seit 0.71.0: die Namens-Heuristik von code-kit (`thinkToggleState(model, suppress).hint === "alwaysGuess"`,
+ *  deepseek-r1, qwq, magistral, glm-z1 …) rät, dass das Modell immer denkt, ohne dass die Anfrage das Abschalten verwehrt; der Knopf bleibt bedienbar, der Hinweis sagt, dass „aus“ dort
+ *  wahrscheinlich nichts bewirkt. Wortlaut von koda-agent (`view.thinkingHintAlways`). Die Entscheidung („rät der Name?“) liegt in code-kit, der Text hier (Muster `thinkingLockedTexts`). */
+export const THINKING_ALWAYS_GUESS_HINT_EN = "This model probably always thinks — turning it off likely has no effect";
+export const THINKING_ALWAYS_GUESS_HINT_DE = "Dieses Modell denkt vermutlich immer — Abschalten wirkt wahrscheinlich nicht";
+/** Die Kit-Fassung für `ThinkingControlOptions.hint`; `lang` beginnt mit `de` → Deutsch, sonst Englisch. */
+export function thinkingAlwaysGuessHint(lang: string): string {
+  return lang.toLowerCase().startsWith("de") ? THINKING_ALWAYS_GUESS_HINT_DE : THINKING_ALWAYS_GUESS_HINT_EN;
+}
+
 export interface ThinkingControlOptions {
   containerEl: HTMLElement;
   family(): FamilyId | null;
@@ -60,6 +70,12 @@ export interface ThinkingControlOptions {
    *  und trägt den Grund im `aria-label`. Gilt unabhängig von `current()` und gewinnt gegen `strings.offNotPossible`. Wird bei jedem Zeichnen gelesen (`refresh()` nach einem
    *  Modellwechsel). Der Wirt liefert den Grund (gpt-oss, anderes Backend); der Kit-Text ist `thinkingLockedTexts(lang)`. Ohne das Feld ändert sich nichts. */
   locked?(): ThinkingOffTexts | undefined;
+  /** Seit 0.71.0, optional: ein Hinweis am **bedienbaren** Knopf, im Zustand an wie aus (Tooltip und `aria-label`, hinter der Beschriftung), zum Beispiel „Dieses Modell denkt vermutlich immer“
+   *  (`thinkingAlwaysGuessHint(lang)`, die Entscheidung trifft der Wirt mit `thinkToggleState` aus code-kit). Der Knopf bleibt bedienbar und schreibt wie bisher. Der Name trägt höchstens einen
+   *  Grund (seit 0.72.0): trägt er schon einen (`locked`, oder „aus nicht möglich“ mit gesetztem `strings.offNotPossible`: Claude im Zustand aus), entfällt der Hinweis, denn das Modell denkt dann
+   *  sicher oder der Name sagt schon, warum „aus“ nichts bewirkt. Fehlt `strings.offNotPossible`, bleibt der Hinweis (sonst stünde gar kein Grund im Namen). Mit `levelPicker()` steht er im
+   *  `aria-label` des Dropdowns (es zeigt `offNotPossible` nicht). Leer oder `undefined`: kein Hinweis. Wird bei jedem Zeichnen gelesen. Ohne das Feld ändert sich nichts. */
+  hint?(): string | undefined;
 }
 
 export function buildThinkingControl(opts: ThinkingControlOptions): { refresh(): void } {
@@ -70,9 +86,12 @@ export function buildThinkingControl(opts: ThinkingControlOptions): { refresh():
     const fam = opts.family();
     const offNotPossible = level === "off" && fam !== null && !familyThinking(fam, opts.backend?.()).canTurnOff;
     const locked = opts.locked?.();
+    // Mit `levelPicker()` zeigt das Dropdown „aus nicht möglich“ nicht: der Hinweis ist dort der einzige Grund und bleibt. Am Knopf entfällt er, sobald der Name selbst einen Grund trägt.
+    const offText = locked ?? (offNotPossible && !opts.levelPicker() ? opts.strings.offNotPossible : undefined);
+    const hintText = offText === undefined ? (opts.hint?.() ?? "") : "";
     if (opts.levelPicker()) {
       const dd = new DropdownComponent(root);
-      dd.selectEl.setAttribute("aria-label", locked !== undefined ? `${opts.strings.pickerLabel}. ${locked.label}. ${locked.hint}` : opts.strings.pickerLabel);
+      dd.selectEl.setAttribute("aria-label", locked !== undefined ? `${opts.strings.pickerLabel}. ${locked.label}. ${locked.hint}` : hintText !== "" ? `${opts.strings.pickerLabel}. ${hintText}` : opts.strings.pickerLabel);
       if (locked !== undefined) dd.setDisabled(true);
       for (const l of THINKING_LEVELS) dd.addOption(l, opts.strings.level(l));
       dd.setValue(level).onChange((v) => { void opts.setLevel(v as ThinkingLevel).then(render); });
@@ -80,15 +99,17 @@ export function buildThinkingControl(opts: ThinkingControlOptions): { refresh():
     }
     const on = locked !== undefined || level !== "off";
     const btn = root.createEl("button", { cls: "clickable-icon okit-thinking-toggle" });
-    if (locked !== undefined) btn.disabled = true;
+    if (locked !== undefined) { btn.disabled = true; btn.addClass("is-locked"); }
     btn.setAttribute("aria-pressed", String(on));
     btn.toggleClass("is-off", !on);
     const icon = btn.createSpan();
     setIcon(icon, on ? "brain-cog" : "brain");
-    const offText = locked ?? (offNotPossible ? opts.strings.offNotPossible : undefined);
-    btn.createSpan({ text: offText !== undefined ? offText.label : opts.strings.button(level, offNotPossible) });
-    // Der Grund steht im Namen des Knopfs (Obsidian zeigt `aria-label` als Tooltip); die sichtbare Beschriftung bleibt sein Anfang.
-    if (offText !== undefined) btn.setAttribute("aria-label", `${offText.label}. ${offText.hint}`);
+    const label = offText !== undefined ? offText.label : opts.strings.button(level, offNotPossible);
+    btn.createSpan({ text: label });
+    // Der Grund steht im Namen des Knopfs (Obsidian zeigt `aria-label` als Tooltip); die sichtbare Beschriftung bleibt sein Anfang. Es ist immer höchstens EIN Grund: der von
+    // `offText` (gesperrt, „aus nicht möglich“) oder der Hinweis des Wirts, nie beide (zwei Sätze, die dasselbe sagen, und ein doppelter Punkt am Ende des ersten).
+    const reason = offText?.hint ?? hintText;
+    if (reason !== "") btn.setAttribute("aria-label", `${label}. ${reason}`);
     if (locked === undefined) btn.addEventListener("click", () => { void opts.setLevel(on ? "off" : opts.onLevel()).then(render); });
   };
   render();
@@ -121,6 +142,8 @@ export const THINKING_CONTROL_CSS = `
 }
 .okit-thinking-toggle.is-off { color: var(--text-muted); }
 .okit-thinking-toggle:disabled { opacity: 0.4; cursor: not-allowed; }
+/* Gesperrt „immer an“ (Option locked): lesbarer als ein gewöhnlich deaktivierter Knopf, denn die Beschriftung trägt die Aussage, aber erkennbar nicht bedienbar (kein Zeiger, kein Hover). */
+.okit-thinking-toggle.is-locked:disabled { opacity: 0.85; cursor: default; }
 .okit-thinking-toggle svg { width: var(--icon-xs); height: var(--icon-xs); }
 .okit-thinking-control select { font-size: var(--font-ui-small); }
 `;

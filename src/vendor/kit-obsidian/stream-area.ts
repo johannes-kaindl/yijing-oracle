@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.70.1, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.72.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -427,6 +427,10 @@ export const STREAM_AREA_CSS = `
 .okit-stream--host-scroll .okit-stream-body { flex: 0 0 auto; min-height: auto; overflow-y: visible; }
 .okit-stream-block > :first-child { margin-top: 0; }
 .okit-stream-block > :last-child { margin-bottom: 0; }
+/* Ein gekappter Link (der Wächter hat das href entfernt, Klasse und Pfeil-Icon blieben) sieht nicht mehr nach Link aus: Textfarbe, kein Unterstrich, kein Zeiger, kein Icon. Beide Selektoren
+   tragen :not([href]), ein Link mit href ändert sich nicht (gemessen in Welle 28, Pilot link-schutz P13: berechnete Werte mit und ohne die Regel, ohne !important). */
+.okit-stream-body a:not([href]) { color: inherit; text-decoration: none; cursor: inherit; }
+.okit-stream-body a.external-link:not([href]) { background-image: none; padding-right: 0; }
 /* overflow-wrap: eine lange Zeile ohne Leerzeichen (JSON im Antwort-Tail) lief rechts aus dem Panel (3d-codeblocks, Welle 23). */
 .okit-stream-tail { white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text-muted); }
 .okit-stream-status {
