@@ -201,6 +201,7 @@ const PUNKTE = [
   "K-a Linkschutz im Default: obsidian://-, file:- und app:-Links der Deutung verlieren ihr Ziel, ein https-Link behaelt es",
   "K-b Mit dem Schalter bleibt der obsidian://-Link, file: und app: gehen weiter",
   "K-c Die zwei Zeilen stehen im Einstellungen-Tab, ein Klick auf den Schalter schreibt sein Feld",
+  "K-d Ein gekappter Link der fertigen Deutung sieht aus wie Text (Farbe der Umgebung, kein Unterstrich, kein Zeiger, kein Icon), ein Link mit Ziel bleibt Link",
 ] as const;
 
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -1867,6 +1868,21 @@ async function pruefeLinkschutz(cdp: Cdp, port: number): Promise<void> {
     const a = await hrefs();
     const aOk = lief && a["OB"] === null && a["FI"] === null && a["AP"] === null && (a["HT"] ?? "").startsWith("https://example.com/");
     record(NAMEN[0]!, aOk, lief ? `href: ${JSON.stringify(a)}` : "Deutungslauf lieferte kein Ergebnis");
+
+    // K-d — die Darstellung (obsidian-kit 0.72.0): das Fake-DOM der Tests sieht keine Kaskade, hier gilt der berechnete Stil im Renderer. Der gekappte Link (OB) traegt kein href mehr, sein
+    // Stil muss dem Text der Umgebung gleichen; der https-Link (HT) ist die Gegenprobe und bleibt unterstrichen mit Zeiger.
+    const stil = await cdp.evaluate<Record<string, { deco: string; zeiger: string; farbe: string; eltern: string; bild: string } | null>>(`
+      const out = {};
+      for (const name of ["OB", "HT"]) {
+        const a = [...document.querySelectorAll(".yijing-interpretation-body a")].find((x) => (x.textContent || "").trim() === name);
+        if (!a) { out[name] = null; continue; }
+        const cs = getComputedStyle(a); const ps = getComputedStyle(a.parentElement);
+        out[name] = { deco: cs.textDecorationLine, zeiger: cs.cursor, farbe: cs.color, eltern: ps.color, bild: cs.backgroundImage };
+      }
+      return out;`);
+    const ob = stil["OB"]; const ht = stil["HT"];
+    record(NAMEN[3]!, lief && ob !== null && ht !== null && ob.deco === "none" && ob.zeiger !== "pointer" && ob.farbe === ob.eltern && ob.bild === "none" && ht.deco.includes("underline") && ht.zeiger === "pointer",
+      `gekappter Link: ${JSON.stringify(ob)} · Link mit Ziel: ${JSON.stringify(ht)}`);
 
     // K-b — Schalter an (Wert direkt gesetzt, das Panel liest ihn je Antwort): obsidian:// bleibt, file: und app: nie.
     await cdp.evaluate(`${P}.settings.allowObsidianLinks = true; await ${P}.saveSettings(); return true;`);
