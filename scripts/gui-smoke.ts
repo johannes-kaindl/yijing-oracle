@@ -195,6 +195,9 @@ const PUNKTE = [
   "Z-g Modell- und Denkstufen-Wechsel ausserhalb der Zeile erscheinen in ihr, ohne dass das Panel neu zeichnet",
   "Z-h Nach Wurf, Deutung und Neuzeichnen bleibt es bei einer Zeile",
   "Z-i Nach einem Start ohne Endpunkt (Fruehausstieg, kein Neuzeichnen) ist die Zeile wieder frei",
+  "Z-j Mit Manager steht neben den Modellen und Automatisch der Eintrag „Anderer Endpunkt“, seine Wahl oeffnet den Tab des Managers",
+  "Z-k Mit Manager schreibt der Wechsel nur choice.model (endpoints unberuehrt), die naechste Deutung geht mit dem gewaehlten Modell an den Draht, Automatisch loescht die Wahl",
+  "Z-l Kommt der Manager nach dem Plugin (layout-change), laedt die Zeile seine Liste neu, ohne dass das Panel neu zeichnet",
   "K-a Linkschutz im Default: obsidian://-, file:- und app:-Links der Deutung verlieren ihr Ziel, ein https-Link behaelt es",
   "K-b Mit dem Schalter bleibt der obsidian://-Link, file: und app: gehen weiter",
   "K-c Die zwei Zeilen stehen im Einstellungen-Tab, ein Klick auf den Schalter schreibt sein Feld",
@@ -1541,7 +1544,7 @@ const ZEILE = ".yijing-oracle .okit-model-bar";
 
 async function pruefeModellzeile(cdp: Cdp): Promise<void> {
   console.log("\nZ · Modellzeile im Panel (Kit buildModelBar, Aufgabe „Deutung“)");
-  const NAMEN = PUNKTE.filter((n) => n.startsWith("Z-"));
+  const NAMEN = PUNKTE.filter((n) => n.startsWith("Z-") && !Z_MANAGER_PUNKT.test(n));
   const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
   const MODELLE = ["zeile-a", "zeile-b", "zeile-c"];
   let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
@@ -1700,6 +1703,135 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
         return true;`).catch(() => null);
     }
   }
+}
+
+/** Z-j bis Z-l: die Zeile mit dem LLM Endpoint Manager (zentrale Fake-Brücke mit zwei Modellen). Was `setModel` mit Manager tut, steht im Kit
+ *  (`endpoint-plumbing.ts`, `applyModel`): nur `choice.model` wird geschrieben, `endpoints` bleibt. Der Fake meldet nie „changed“ (`api.on` ist ein
+ *  Nichts): Z-l misst deshalb den Install-Weg des Echtbetriebs (Manager kommt nach dem Plugin, Abo wartet auf `layout-change`), nicht das Ereignis. */
+const Z_MANAGER_PUNKT = /^Z-[jkl] /;
+const MGR_EP_ID = "zeile-mgr-ep";
+
+async function pruefeModellzeileMitManager(cdp: Cdp): Promise<void> {
+  console.log("\nZ · Modellzeile mit dem Endpunkt-Manager (Z-j bis Z-l)");
+  const NAMEN = PUNKTE.filter((n) => Z_MANAGER_PUNKT.test(n));
+  const P = `app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}]`;
+  const [A, B, C] = ["mgr-zeile-a", "mgr-zeile-b", "mgr-zeile-c"] as [string, string, string];
+  let stub: Awaited<ReturnType<typeof startLlmStub>> | null = null;
+  let vorher: unknown = null;
+  let hatHuelle = false;
+  const draht = (): string | null => ((stub?.letzte("chat")?.json as { model?: string } | null)?.model) ?? null;
+  const zeile = (js: string): Promise<unknown> => cdp.evaluate(`const r = document.querySelector(${JSON.stringify(ZEILE)}); const sel = r?.querySelector(".okit-model-bar-select"); ${js}`);
+  const optionen = (): Promise<{ value: string; text: string }[]> => cdp.evaluate(`return [...document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")})].map((o) => ({ value: o.value, text: o.textContent ?? "" }));`);
+  const installiere = async (modelle: string[], invalidiere: string[]): Promise<void> => { await installZentralFakeManager(cdp, {
+    pluginId: MANAGER_PLUGIN_ID,
+    endpunkte: [{ id: MGR_EP_ID, label: "Zeile Manager Endpoint", url: stub!.url, models: modelle, defaultModel: modelle[0]!, configModel: "default" }],
+    invalidiere,
+  }); };
+  const setze = (): Promise<unknown> => cdp.evaluate(`
+    const p = ${P};
+    p.settings.llm.endpoints = [{ url: ${JSON.stringify(stub!.url)}, model: ${JSON.stringify(A)} }]; p.settings.llm.choice = {};
+    p.settings.request = { overrides: {}, thinking: {}, lastOnLevel: {}, levelPickerInChat: false };
+    p.llm.invalidate(); await p.saveSettings();
+    return true;`);
+  try {
+    stub = await startLlmStub({ models: [A, B], standard: { text: "Wort ".repeat(40), laenge: 5, takt: 120, model: A } });
+    vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null, request: ${P}.settings.request };`);
+    await removeFakeManager(cdp);
+    await setze();
+    await installiere([A, B], [PLUGIN_ID]);
+    console.log(`  Stub: ${stub.url}, Fake-Manager mit ${A}, ${B}`);
+    if (!(await neuesPanelMitWurf(cdp))) { for (const n of NAMEN) unmeasured(n, "Panel liess sich nicht oeffnen"); return; }
+    const geladen = await pollUntil<boolean>(cdp, `return document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")}).length >= 4 ? true : null;`, 6000, 200);
+
+    // Z-j — „Anderer Endpunkt“ (Wert mit Steuerzeichen, kein Modellname) neben den Modellen und Automatisch; die Wahl ruft `app.setting.openTabById(manager)`.
+    // Der Fake hat keinen Einstellungen-Tab: gemessen wird der AUFRUF (die Huelle ersetzt `open` und `openTabById`, es oeffnet sich kein Fenster).
+    const opts = await optionen();
+    const other = opts.find((o) => o.value.charCodeAt(0) === 1);
+    await cdp.evaluate(`
+      const s = app.setting;
+      window.__zjVorher = { open: Object.prototype.hasOwnProperty.call(s, "open") ? s.open : null, tab: Object.prototype.hasOwnProperty.call(s, "openTabById") ? s.openTabById : null };
+      window.__zjAufrufe = [];
+      s.open = function () { window.__zjAufrufe.push("open"); };
+      s.openTabById = function (id) { window.__zjAufrufe.push("tab:" + id); };
+      return true;`);
+    hatHuelle = true;
+    if (other) await zeile(`sel.value = ${JSON.stringify(other.value)}; sel.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
+    const aufrufe = await cdp.evaluate<string[]>(`return window.__zjAufrufe ?? [];`);
+    await huelleAb(cdp);
+    hatHuelle = false;
+    const text = other?.text ?? "";
+    record(NAMEN[0]!, geladen === true && opts.length === 4 && opts.some((o) => o.value === "") && [A, B].every((m) => opts.some((o) => o.value === m))
+      && ["Other endpoint …", "Anderer Endpunkt …"].includes(text) && aufrufe.includes(`tab:${MANAGER_PLUGIN_ID}`),
+      `Optionen: ${JSON.stringify(opts.map((o) => (o.value.charCodeAt(0) === 1 ? "<Aktion>" : o.value)))}, Aktionstext ${JSON.stringify(text)}, Aufrufe nach der Wahl: ${JSON.stringify(aufrufe)}`);
+
+    // Z-k — Wechsel auf das zweite Modell: choice.model = B, endpoints unveraendert, Draht nennt B; Automatisch loescht die Wahl, der Draht nennt wieder das Default A.
+    const eps0 = await cdp.evaluate<string>(`return JSON.stringify(${P}.settings.llm.endpoints);`);
+    await zeile(`sel.value = ${JSON.stringify(B)}; sel.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
+    const gewaehlt = await pollUntil<string>(cdp, `return ${P}.settings.llm.choice?.model === ${JSON.stringify(B)} ? ${P}.settings.llm.choice.model : null;`, 4000, 200);
+    const eps1 = await cdp.evaluate<string>(`return JSON.stringify(${P}.settings.llm.endpoints);`);
+    stub.loescheMitschnitt();
+    const lief1 = await laufeDeutung(cdp, 20000, "Smoke Z: Modellzeile mit Manager", 15);
+    await schlaf(300);
+    const drahtB = draht();
+    await zeile(`sel.value = ""; sel.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
+    const geloescht = await pollUntil<boolean>(cdp, `return ${P}.settings.llm.choice?.model ? null : true;`, 4000, 200);
+    stub.loescheMitschnitt();
+    const lief2 = await laufeDeutung(cdp, 20000, "Smoke Z: Modellzeile mit Manager, Automatisch", 15);
+    await schlaf(300);
+    const drahtA = draht();
+    const mgrDefault = await cdp.evaluate<string | null>(`return app.plugins.plugins[${JSON.stringify(MANAGER_PLUGIN_ID)}]?.api?.get(${JSON.stringify(MGR_EP_ID)})?.defaultModel ?? null;`);
+    record(NAMEN[1]!, gewaehlt === B && eps0 === eps1 && lief1 && drahtB === B && geloescht === true && lief2 && drahtA === A && mgrDefault === A,
+      `choice.model nach dem Wechsel ${JSON.stringify(gewaehlt)}, endpoints ${eps0 === eps1 ? "unveraendert" : "VERAENDERT"}, Draht ${JSON.stringify(drahtB)} (erwartet ${B}); `
+      + `Automatisch: Wahl ${geloescht ? "geloescht" : "NICHT geloescht"}, Draht ${JSON.stringify(drahtA)} (erwartet ${A}), Default des Managers ${JSON.stringify(mgrDefault)}`);
+
+    // Z-l — Install-Weg: ohne Manager laden (das Abo wartet auf layout-change), Panel mit Marke an der Zeile, dann der Manager mit einem dritten Modell.
+    await removeFakeManager(cdp);
+    await setze();
+    await reloadPlugin(cdp);
+    if (!(await neuesPanelMitWurf(cdp))) { unmeasured(NAMEN[2]!, "Panel nach dem Neuladen liess sich nicht oeffnen"); return; }
+    await pollUntil<boolean>(cdp, `return document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")}).length >= 3 ? true : null;`, 6000, 200);
+    const lokal = await optionen();
+    await zeile(`r.dataset.smokeMarke = "1"; return true;`);
+    await installiere([A, B, C], []);
+    await cdp.evaluate(`app.workspace.trigger("layout-change"); return true;`);
+    const mitManager = await pollUntil<{ value: string; text: string }[]>(cdp, `
+      const o = [...document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-select option")})].map((x) => ({ value: x.value, text: x.textContent ?? "" }));
+      return o.some((x) => x.value === ${JSON.stringify(C)}) ? o : null;`, 5000, 200);
+    const marke = await cdp.evaluate<boolean>(`return document.querySelector(${JSON.stringify(ZEILE)})?.dataset.smokeMarke === "1";`);
+    // Entfernen-Weg als Ist-Zustand: der Fake meldet nichts, das Kit-Abo kennt nur „kam“.
+    await removeFakeManager(cdp);
+    await cdp.evaluate(`app.workspace.trigger("layout-change"); return true;`);
+    await schlaf(1500);
+    const nachEntfernen = await optionen();
+    const bleibt = nachEntfernen.some((o) => o.value === C);
+    record(NAMEN[2]!, lokal.length === 3 && !lokal.some((o) => o.value === C) && mitManager !== null && mitManager.some((o) => o.value.charCodeAt(0) === 1) && marke,
+      `ohne Manager ${lokal.length} Optionen; nach Installation und layout-change ${mitManager ? mitManager.length + " Optionen, " + C + " da" : C + " fehlt"}, Panel nicht neu gezeichnet: ${marke}. `
+      + `Entfernen-Weg nichts gemessen (der Fake meldet nie „changed“); Ist-Zustand ohne Neuladen: Zeile zeigt ${bleibt ? "weiter die Liste des Managers" : "die lokale Liste"}`);
+  } catch (err) {
+    for (const nm of NAMEN) if (!aufgezeichnet(nm)) unmeasured(nm, `Messung abgebrochen: ${(err as Error).message}`);
+  } finally {
+    if (hatHuelle) await huelleAb(cdp).catch(() => undefined);
+    await removeFakeManager(cdp).catch(() => undefined);
+    if (stub) await stub.stop().catch(() => undefined);
+    if (vorher !== null) {
+      await cdp.evaluate(`
+        const v = ${JSON.stringify(vorher)}; const p = ${P};
+        p.settings.llm.endpoints = v.eps;
+        if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice;
+        p.settings.request = v.request;
+        p.llm.invalidate(); await p.saveSettings();
+        return true;`).catch(() => null);
+    }
+  }
+}
+
+/** Nimmt die Huelle um `app.setting.open` und `openTabById` zurueck (Eigenschaft loeschen, wenn sie vorher keine eigene war). */
+async function huelleAb(cdp: Cdp): Promise<void> {
+  await cdp.evaluate(`
+    const s = app.setting; const v = window.__zjVorher;
+    if (v) { if (v.open) s.open = v.open; else delete s.open; if (v.tab) s.openTabById = v.tab; else delete s.openTabById; }
+    delete window.__zjVorher; delete window.__zjAufrufe;
+    return true;`);
 }
 
 /** K — Linkschutz der Deutung (Kit `dom-guard`, seit obsidian-kit 0.70.0): was ein Modell an Link-Zielen in die Antwort schreibt, kommt im Panel
@@ -2414,6 +2546,11 @@ async function main(): Promise<void> {
     }
     await pruefeAnfrage(cdp, port);
     await pruefeModellzeile(cdp);
+    if (args.has("--kein-manager")) {
+      for (const n of PUNKTE.filter((x) => Z_MANAGER_PUNKT.test(x))) skipped(n, "--kein-manager gesetzt");
+    } else {
+      await pruefeModellzeileMitManager(cdp);
+    }
     await pruefeLinkschutz(cdp, port);
     await pruefeSchutz(cdp, aufraeumen);
     await pruefeDenkblockLive(cdp);
