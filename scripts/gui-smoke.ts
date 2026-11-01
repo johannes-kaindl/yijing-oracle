@@ -195,6 +195,7 @@ const PUNKTE = [
   "Z-g Modell- und Denkstufen-Wechsel ausserhalb der Zeile erscheinen in ihr, ohne dass das Panel neu zeichnet",
   "Z-h Nach Wurf, Deutung und Neuzeichnen bleibt es bei einer Zeile",
   "Z-i Nach einem Start ohne Endpunkt (Fruehausstieg, kein Neuzeichnen) ist die Zeile wieder frei",
+  "Z-m Die Zeile hat keine sichtbare Beschriftung (der Name steht im aria-label), das Dropdown traegt den vollen Modellnamen als Tooltip",
   "Z-j Mit Manager steht neben den Modellen und Automatisch der Eintrag „Anderer Endpunkt“, seine Wahl oeffnet den Tab des Managers",
   "Z-k Mit Manager schreibt der Wechsel nur choice.model (endpoints unberuehrt), die naechste Deutung geht mit dem gewaehlten Modell an den Draht, Automatisch loescht die Wahl",
   "Z-l Kommt der Manager nach dem Plugin (layout-change), laedt die Zeile seine Liste neu, ohne dass das Panel neu zeichnet",
@@ -1558,7 +1559,8 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
     return { da: Boolean(r), select: Boolean(r?.querySelector(".okit-model-bar-select")?.disabled), neuLaden: Boolean(r?.querySelector(".okit-model-bar-refresh")?.disabled), stream: Boolean(document.querySelector(".yijing-stream, .okit-stream")) };`);
   try {
     await removeFakeManager(cdp);
-    stub = await startLlmStub({ models: MODELLE, standard: { text: "Wort ".repeat(40), laenge: 5, takt: 120, model: MODELLE[0] } });
+    // `kontext` schaltet `/api/v0/models` ein: Das Kit erkennt den Stub als LM Studio und bietet die Stufen (ohne erkanntes Backend und ohne Familie gibt es seit Kit 0.73.0 kein Denk-Element).
+    stub = await startLlmStub({ models: MODELLE, kontext: { geladen: 8192 }, standard: { text: "Wort ".repeat(40), laenge: 5, takt: 120, model: MODELLE[0] } });
     vorher = await cdp.evaluate(`const l = ${P}.settings.llm; return { eps: l.endpoints, choice: l.choice ?? null, request: ${P}.settings.request };`);
     await cdp.evaluate(`
       const p = ${P};
@@ -1591,6 +1593,14 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
     record(NAMEN[5]!, e.inZeile === 1 && e.imPanel >= 1 && (await cdp.evaluate<number>(`return document.querySelectorAll(".yijing-oracle .okit-thinking-control").length;`)) === 1,
       `Denk-Steuerung in der Zeile: ${e.inZeile}, im ganzen Panel: ${e.imPanel}`);
 
+    // Z-m — Kit 0.73.0: keine sichtbare Beschriftung (Breite fuer den Modellnamen, Johannes' Befund am Beispiel „Koda“); der Name der Aufgabe bleibt im
+    // aria-label des Dropdowns, der volle Modellname steht als Tooltip (Kit 0.74.0), weil ein langer Name im schmalen Dropdown gekuerzt wird.
+    const m = await cdp.evaluate<{ label: number; aria: string | null; title: string | null; modell: string | null }>(`
+      const s = document.querySelector(${JSON.stringify(ZEILE + " .okit-model-bar-select")});
+      return { label: document.querySelectorAll(${JSON.stringify(ZEILE + " .okit-model-bar-label")}).length, aria: s?.getAttribute("aria-label") ?? null, title: s?.getAttribute("title") ?? null, modell: s?.options[s.selectedIndex]?.text ?? null };`);
+    record(NAMEN[10]!, m.label === 0 && Boolean(m.aria?.includes("Interpretation")) && m.title !== null && m.title !== "" && m.title === m.modell,
+      `${m.label} sichtbare Beschriftung(en), aria-label ${JSON.stringify(m.aria)}, Tooltip ${JSON.stringify(m.title)}, gewaehlt ${JSON.stringify(m.modell)}`);
+
     // Z-c — Wechsel auf zeile-b, dann eine Deutung: der Draht nennt zeile-b.
     await zeile(`sel.value = ${JSON.stringify(MODELLE[1])}; sel.dispatchEvent(new Event("change", { bubbles: true })); return true;`);
     const gewechselt = await pollUntil<boolean>(cdp, `return ${P}.llm.modelInUse() === ${JSON.stringify(MODELLE[1])} ? true : null;`, 4000, 200);
@@ -1615,7 +1625,8 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
 
     // Z-g — Aenderungen ausserhalb der Zeile: das Panel zeichnet NICHT neu (Marke an der Zeile bleibt), die Zeile zieht nach.
     await zeile(`r.dataset.smokeMarke = "1"; return true;`);
-    const toggleAn = await cdp.evaluate<string | null>(`return document.querySelector(${JSON.stringify(ZEILE + " .okit-thinking-toggle")})?.getAttribute("aria-pressed") ?? null;`);
+    // Seit Kit 0.73.0 ist die Denkstufe in der Zeile ein Dropdown (`.okit-thinking-control select`), kein Zustands-Knopf mehr: gemessen wird sein Wert.
+    const stufeVorher = await cdp.evaluate<string | null>(`return document.querySelector(${JSON.stringify(ZEILE + " .okit-thinking-control select")})?.value ?? null;`);
     await cdp.evaluate(`
       const p = ${P};
       await p.llm.setModel(${JSON.stringify(MODELLE[2])});
@@ -1625,10 +1636,10 @@ async function pruefeModellzeile(cdp: Cdp): Promise<void> {
     const nach = await pollUntil<{ marke: boolean; modell: string | null; an: string | null }>(cdp, `
       const r = document.querySelector(${JSON.stringify(ZEILE)});
       const modell = r?.querySelector(".okit-model-bar-select")?.value ?? null;
-      const an = r?.querySelector(".okit-thinking-toggle")?.getAttribute("aria-pressed") ?? null;
-      return modell === ${JSON.stringify(MODELLE[2])} && an === "false" ? { marke: r?.dataset.smokeMarke === "1", modell, an } : null;`, 4000, 200);
-    record(NAMEN[7]!, nach !== null && nach.marke && toggleAn === "true",
-      nach ? `Zeile zeigt ${JSON.stringify(nach.modell)}, Denken aria-pressed ${String(toggleAn)} → ${String(nach.an)}, Panel neu gezeichnet: ${nach.marke ? "nein" : "JA"}` : "Zeile zog nicht nach (Modell oder Denkstufe)");
+      const an = r?.querySelector(".okit-thinking-control select")?.value ?? null;
+      return modell === ${JSON.stringify(MODELLE[2])} && an === "off" ? { marke: r?.dataset.smokeMarke === "1", modell, an } : null;`, 4000, 200);
+    record(NAMEN[7]!, nach !== null && nach.marke && stufeVorher !== null && stufeVorher !== "off",
+      nach ? `Zeile zeigt ${JSON.stringify(nach.modell)}, Denkstufe ${String(stufeVorher)} → ${String(nach.an)}, Panel neu gezeichnet: ${nach.marke ? "nein" : "JA"}` : "Zeile zog nicht nach (Modell oder Denkstufe)");
 
     // Z-f — 260 px Panelbreite: nichts laeuft ueber den Rand; ein Bild der Zeile fuer die Sichtung.
     await cdp.evaluate(`app.workspace.rightSplit?.setSize?.(260); await new Promise((r) => setTimeout(r, 700)); return true;`);
