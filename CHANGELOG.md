@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.19.0] — 2026-11-01
+
 ### Changed
 - Vendored `obsidian-kit` 0.74.0 (was 0.72.0) and `code-kit` 0.40.0 (was 0.38.0). What you may notice:
 - The model row at the top of the panel is one line without a caption: the word "Interpretation" is gone, and the model name gets its width (obsidian-kit 0.73.0). A long name is shortened ("google/g…" on a phone), the full name appears as a tooltip of the dropdown (0.74.0); the task is still named for screen readers. The reload button is 44 × 44 px on a phone (0.74.0).
