@@ -6,6 +6,16 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Vendored `obsidian-kit` 0.74.0 (was 0.72.0) and `code-kit` 0.40.0 (was 0.38.0). What you may notice:
+- The model row at the top of the panel is one line without a caption: the word "Interpretation" is gone, and the model name gets its width (obsidian-kit 0.73.0). A long name is shortened ("google/g…" on a phone), the full name appears as a tooltip of the dropdown (0.74.0); the task is still named for screen readers. The reload button is 44 × 44 px on a phone (0.74.0).
+- The thinking control in that row is a dropdown with the levels the model offers, with a brain icon in front, instead of the two-state toggle "Thinking: medium" (obsidian-kit 0.73.0, code-kit 0.39.0). Local models list off (where the model can be switched off), low, medium and high; Claude models on the Anthropic API list the levels of their own line (low to max, depending on the model). `xhigh` and `max` are new levels and carry a note about long answers and higher cost; the German names are "sehr hoch" and "maximal".
+- **No thinking dropdown without a recognised server or model family.** On an OpenAI-compatible server that is neither LM Studio nor Open WebUI (llama.cpp, Ollama) and whose model name carries no recognisable family, the row shows no thinking control at all; before, the two-state toggle stood there. The level you stored is still sent (obsidian-kit 0.73.0, code-kit 0.39.0).
+- **Claude:** a stored "off" now sends the model's own default level instead of "low" (more thinking, time and cost per answer until you lower the level yourself, code-kit 0.39.0). Opus 4.6, Sonnet 4.6 and Opus 4.5 count as the family Claude and no longer receive `temperature`, `top_p` and `top_k`, on every backend (also on Open WebUI, where Anthropic's compatibility layer accepts them).
+- **gpt-oss on LM Studio:** a stored "off" sends `reasoning_effort: low` instead of `minimal`, because the model's list has no "off" (code-kit 0.39.0).
+- The switch **Level picker in chat** under Settings → Request no longer does anything: the model row always shows the levels as a dropdown. It appears only if you had switched it on in an older version; the stored value stays in your data.
+- Everything else in these kit releases does not touch this plugin: the chat window (compact composer at low window height, history of past chats, new-chat icon), `chat-archive` and the 44 × 44 px buttons of the chat window are not used here, and `anthropic-wire` moved into `code-kit` (logic unchanged).
+
 ## [0.18.0] — 2026-10-26
 
 ### Changed

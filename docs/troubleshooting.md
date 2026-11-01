@@ -30,11 +30,11 @@ Local servers almost always need a port, for example `http://127.0.0.1:1234`. Wi
 
 ## The model row is greyed out
 
-> The model dropdown, the reload button and the thinking toggle at the top of the panel cannot be used.
+> The model dropdown, the thinking-level dropdown and the reload button at the top of the panel cannot be used.
 
 **Cause:** an interpretation is starting or running; the row is locked until it ends. A start that stops early (no endpoint, no model) frees it again at once.
 
-**Fix:** wait for the interpretation or press **Cancel**. For a Claude entry the thinking toggle offers no "off" and reads "Thinking: low" or higher: Claude models always think, so the plugin cannot switch it off.
+**Fix:** wait for the interpretation or press **Cancel**. For a Claude entry the thinking-level dropdown has no "off" and starts at "low": Claude models always think, so the plugin cannot switch it off. A model the plugin cannot place on a server it cannot identify (no LM Studio, no Open WebUI, no recognisable family in the name) gets no thinking-level dropdown at all.
 
 ## The interpretation appears all at once instead of streaming
 

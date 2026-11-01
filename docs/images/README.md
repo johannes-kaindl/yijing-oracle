@@ -11,7 +11,7 @@ hier **nicht** wiederholt: `_docs/readme/readme-spec.json`, Block `images`.
 | Datei | Klasse | referenziert von | muss zeigen |
 |---|---|---|---|
 | `hero.png` | hero | `README.md`, `README.de.md` | Das ganze Fenster: eine gespeicherte Befragung als Notiz im Lesemodus, rechts das Orakel-Panel mit demselben Wurf und der Modellzeile. Die Aussage ist die Verbindung — Orakel **und** Vault-Notiz, nicht nur ein Panel. |
-| `panel.png` | detail | `README.md`, `README.de.md` | Das Panel allein: die Modellzeile (Modell-Dropdown des Endpunkts und Denk-Schalter) unter dem Titel, Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien, Name und Zeichen, die Weissagungs-Vorschau, Speichern-Knöpfe. Hoch und schmal — als Vorschaubild eingebettet. |
+| `panel.png` | detail | `README.md`, `README.de.md` | Das Panel allein: die Modellzeile (Modell-Dropdown des Endpunkts, Denkstufen-Dropdown, Neu laden; ohne Beschriftung) unter dem Titel, Frage-Feld, Wurf-Knopf, das Hexagramm als sechs Linien, Name und Zeichen, die Weissagungs-Vorschau, Speichern-Knöpfe. Hoch und schmal — als Vorschaubild eingebettet. |
 | `reading-note.png` | feature | `README.md`, `README.de.md` | Die erzeugte Notiz im Lesemodus, so weit sichtbar, dass die Gliederung erkennbar ist: Frage, Überblick, Wandlung, die Callouts für Ursprung und wandelnde Linien. |
 | `interpretation.png` | feature | `README.md`, `README.de.md` | Den Deutungs-Kasten im Panel mit einer **fertigen** Antwort eines lokalen Modells, darüber die aufklappbare Denkspur. Belegt, dass die Deutung im Panel lebt und nicht in einem Modal. |
 | `artwork.png` | feature | `README.md`, `README.de.md` | Den Bildmeditations-Kasten mit einem **echt erzeugten** Bild, darunter den Szenen-Satz und den Knopf zum Neu-Generieren. |
