@@ -19,12 +19,12 @@ const flush = async (): Promise<void> => { await tick(); await tick(); };
 
 function setup() {
   const settings: PluginSettings = structuredClone(DEFAULT_SETTINGS);
-  const state = { model: "m1", list: ["m1", "m2", "m3"], family: null as string | null };
+  const state = { model: "m1", list: ["m1", "m2", "m3"], family: null as string | null, backend: "lmstudio" };
   const llm = {
     models: vi.fn(async () => ({ models: [...state.list], reachable: true })),
     setModel: vi.fn(async (m: string) => { state.model = m; }),
     modelInUse: () => state.model,
-    source: () => ({ family: state.family, familySource: "none", backend: "unknown", backendSource: "none", model: state.model, sentModel: state.model }),
+    source: () => ({ family: state.family, familySource: "none", backend: state.backend, backendSource: "none", model: state.model, sentModel: state.model }),
   };
   const saveSettings = vi.fn(async () => undefined);
   const host = { settings, llm, saveSettings } as unknown as ModelRowHost;
@@ -96,21 +96,23 @@ describe("ModelRowSlot", () => {
     expect(bars(s.parent)[0]?.querySelectorAll(".okit-thinking-control")).toHaveLength(1);
   });
 
-  it("(d) der Denk-Knopf schreibt die Stufe in den Modus creative, merkt die letzte Einschalt-Stufe und speichert je Klick einmal", async () => {
+  it("(d) die Stufenwahl der Zeile schreibt die Stufe in den Modus creative, merkt die letzte Einschalt-Stufe und speichert je Wahl einmal", async () => {
     const s = setup();
     s.slot.mount(s.parent);
     await flush();
     const before = thinkingFor(s.settings.request, MODE);
     expect(before).not.toBe("off");   // Profilvorgabe des Modus: Denken an
-    const toggle = (): FakeEl => s.parent.querySelector(".okit-thinking-toggle") as FakeEl;
-    toggle().dispatchEvent({ type: "click" });
-    await flush();
+    // Seit Kit 0.73.0 ist die Denkstufe in der Zeile immer eine Auswahl (Symbol, dann das Dropdown), kein Zustands-Knopf mehr.
+    const picker = (): { getValue(): string; onChangeCB: ((v: string) => unknown) | null } =>
+      (s.parent.querySelector(".okit-thinking-control") as unknown as { children: { __component?: never }[] }).children.map((c) => c.__component).find((c) => c !== undefined) as never;
+    expect(s.parent.querySelector(".okit-thinking-toggle")).toBeNull();
+    const choose = async (v: string): Promise<void> => { await picker().onChangeCB?.(v); await flush(); };
+    await choose("off");
     expect(thinkingFor(s.settings.request, MODE)).toBe("off");
     expect(onLevelFor(s.settings.request, MODE)).toBe(before);   // „aus“ lässt die Einschalt-Stufe stehen
     expect(s.saveSettings).toHaveBeenCalledTimes(1);
-    toggle().dispatchEvent({ type: "click" });
-    await flush();
-    expect(thinkingFor(s.settings.request, MODE)).toBe(before);   // wieder an: die gemerkte Stufe
+    await choose(before);
+    expect(thinkingFor(s.settings.request, MODE)).toBe(before);   // wieder an: die gewählte Stufe
     expect(s.saveSettings).toHaveBeenCalledTimes(2);
     // andere Modi bleiben unberührt
     expect(Object.keys(s.settings.request.thinking).filter((m) => m !== MODE)).toEqual(Object.keys(DEFAULT_SETTINGS.request.thinking).filter((m) => m !== MODE));

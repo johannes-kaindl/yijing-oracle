@@ -63,7 +63,7 @@ const EXPECTED: Row[] = [
   ["gemma4", "lmstudio", "medium", {"temperature":0.7,"top_p":0.95,"top_k":64,"reasoning_effort":"medium"}],
   ["gemma4", "unknown", "off", {"temperature":0.7,"top_p":0.95,"reasoning_effort":"none"}],
   ["gpt-oss", "lmstudio", "medium", {"temperature":0.7,"top_p":1,"reasoning_effort":"medium"}],
-  ["gpt-oss", "lmstudio", "off", {"temperature":0.7,"top_p":1,"reasoning_effort":"minimal"}],
+  ["gpt-oss", "lmstudio", "off", {"temperature":0.7,"top_p":1,"reasoning_effort":"low"}],
   [null, "lmstudio", "medium", {"temperature":0.7,"reasoning_effort":"medium"}],
   [null, "unknown", "off", {"temperature":0.7}],
 ];
