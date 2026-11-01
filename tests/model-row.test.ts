@@ -3,6 +3,7 @@ import { makeFakeEl } from "./vendor/kit/obsidian-mock";
 import { ModelRowSlot, type ModelRowHost } from "../src/obsidian/model-row";
 import { DEFAULT_SETTINGS, type PluginSettings } from "../src/core/settings";
 import { MODE } from "../src/core/llm/request-settings";
+import { t } from "../src/vendor/kit/i18n";
 import { onLevelFor, thinkingFor } from "../src/vendor/kit/sampling-profiles";
 
 // Die Zeile ist die des Kits; geprüft wird, was dieses Plugin dazu sagt: genau EINE Zeile trotz Voll-Neuzeichnen, die Sperre während
@@ -116,6 +117,14 @@ describe("ModelRowSlot", () => {
     expect(s.saveSettings).toHaveBeenCalledTimes(2);
     // andere Modi bleiben unberührt
     expect(Object.keys(s.settings.request.thinking).filter((m) => m !== MODE)).toEqual(Object.keys(DEFAULT_SETTINGS.request.thinking).filter((m) => m !== MODE));
+  });
+
+  it("(f) die Zeile hat keine sichtbare Beschriftung; der Name der Aufgabe steht im aria-label des Dropdowns", async () => {
+    const s = setup();
+    s.slot.mount(s.parent);
+    await flush();
+    expect(s.parent.querySelectorAll(".okit-model-bar-label")).toHaveLength(0);
+    expect(select(s.parent).getAttribute("aria-label")).toContain(t("view.modelLabel"));
   });
 
   it("(e) sync() zeichnet ein außerhalb geändertes Modell in die Zeile, ohne Neubau", async () => {

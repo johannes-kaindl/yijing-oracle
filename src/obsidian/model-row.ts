@@ -7,7 +7,7 @@ import type { App } from "obsidian";
 import { getLang, t } from "../vendor/kit/i18n";
 import { onLevelFor, thinkingFor, withThinkingLevel, type ThinkingLevel } from "../vendor/kit/sampling-profiles";
 import { buildModelBar, type ModelBar } from "../vendor/kit-obsidian/model-bar";
-import { thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
+import { thinkingLevelTexts, thinkingOffTexts } from "../vendor/kit-obsidian/thinking-control";
 import type { LlmConnection } from "../vendor/kit-obsidian/llm-connection";
 import { MODE } from "../core/llm/request-settings";
 import type { PluginSettings } from "../core/settings";
@@ -26,6 +26,10 @@ function thinkingStrings() {
     offNotPossible: thinkingOffTexts(getLang()),
     level: (l: ThinkingLevel): string => t(`request.level.${l}`),
     pickerLabel: t("request.thinkingLevel"),
+    // Seit Kit 0.73.0 trägt das Dropdown den Namen mit Stufe und Modellstandard, den Kostenhinweis bei „xhigh“ und „max“ und den Eintrag „Immer an“ (gesperrt).
+    name: thinkingLevelTexts(getLang()).name,
+    costNote: thinkingLevelTexts(getLang()).costNote,
+    lockedLevel: thinkingLevelTexts(getLang()).lockedLevel,
   };
 }
 
@@ -53,6 +57,8 @@ export class ModelRowSlot {
       containerEl: parent,
       llm: host.llm,
       label: t("view.modelLabel"),
+      // Ohne sichtbare Beschriftung (Kit-Vorgabe seit 0.73.0): die Zeile gibt dem Modellnamen die Breite, die Aufgabe steht im aria-label des Dropdowns.
+      showLabel: false,
       strings: { lang: getLang() },
       thinking: {
         family: () => host.llm.source().family,
