@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.19.1] — 2026-11-03
+
 ### Changed
 - Vendored `obsidian-kit` 0.77.1 (was 0.74.0; 0.75.0 to 0.77.0 were skipped). What you may notice:
 - The thinking dropdown in the model row starts every entry with a block character that shows the level (`▄ Medium`); the closed dropdown keeps the word next to it. Below 340 px of row width it shrinks to the character alone, the brain icon stays (obsidian-kit 0.76.0, threshold raised from 260 px in 0.77.1). On a phone the 390 px panel is about 300 px wide, so the row now shows the character only and leaves the room to the model name.
