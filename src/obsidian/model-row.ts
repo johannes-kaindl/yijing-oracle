@@ -69,7 +69,8 @@ export class ModelRowSlot {
           host.settings.request = withThinkingLevel(host.settings.request, MODE, level);
           await host.saveSettings();
         },
-        levelPicker: () => host.settings.request.levelPickerInChat,
+        // Pflichtfeld des Kit-Typs, ohne Wirkung: die Zeile zeigt die Stufen immer als Dropdown (`inModelBar`). Der gespeicherte Schalter `levelPickerInChat` steuert nichts mehr (Kit 0.76.0).
+        levelPicker: () => false,
         strings: thinkingStrings(),
       },
       disabled: () => this.busy(),

@@ -1,6 +1,6 @@
 {
   "sources": {
-    "obsidian-kit": { "ref": "0.74.0" },
+    "obsidian-kit": { "ref": "0.76.1" },
     "code-kit": { "ref": "0.40.0" }
   },
   "targets": [
@@ -28,7 +28,7 @@
       "dir": "src/vendor/kit-obsidian",
       "source": "obsidian-kit",
       "from": "src/obsidian",
-      "modules": ["anthropic-transport", "backend-probe", "capability-apis", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", "dom-guard", "embedding-connection", "endpoint-list", "endpoint-plumbing", "endpoint-secrets", "endpoint-source", "endpoint-status-text", "folder-suggest", "help-setting", "link-settings", "llm-connection", "llm-connection-strings", "model-bar", "model-bar-strings", "model-picker", "plugin-api", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "stream-area", "thinking-control"],
+      "modules": ["anthropic-transport", "backend-probe", "capability-apis", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", "dom-guard", "embedding-connection", "endpoint-list", "endpoint-plumbing", "endpoint-secrets", "endpoint-source", "endpoint-status-text", "folder-suggest", "help-setting", "link-settings", "llm-connection", "llm-connection-strings", "model-bar", "model-bar-strings", "model-picker", "plugin-api", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "status-indicator", "stream-area", "thinking-control"],
       "rewrite": [["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"], ["../pure/", "../kit/"]]
     },
     {

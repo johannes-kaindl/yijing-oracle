@@ -133,6 +133,7 @@ const PUNKTE = [
   "F9 die Hilfe-Zeile steht als erste Zeile oben im Settings-Tab",
   "F4 Einstellungen erscheinen in Obsidians Einstellungs-Suche",
   "F5 Fallback-Pfad (< 1.13) zeichnet dieselbe Struktur",
+  "F10 die Zeile „Stufenwahl im Chat“ fehlt im Abschnitt Anfrage, auch bei gespeichertem levelPickerInChat: true (Modellzeile, Kit 0.76.0)",
   "F6 maskierte Zeile bleibt ueber Aliase auffindbar",
   "F7 API-Schluessel-Feld der Endpunkt-Zeile ist maskiert (nach „aendern“)",
   "F8 Eingabe im Feld landet im Schluesselbund (Eintrag der Zeile), nicht in data.json",
@@ -747,6 +748,39 @@ async function abschnittDeklarativ(cdp: Cdp, port: number): Promise<void> {
     "F5 Fallback-Pfad (< 1.13) zeichnet dieselbe Struktur",
     fallbackZeilen === nativZeilen,
     `nativ ${nativZeilen} Zeilen, display()-Fallback ${fallbackZeilen}`,
+  );
+
+  // F10 — Kit 0.76.0: die Zeile „Stufenwahl im Chat“ folgt allein der Option des Plugins. Dieses Plugin hat eine Modellzeile und meldet sie nie an;
+  // ein frueher eingeschalteter Wert (`levelPickerInChat: true`) darf sie nicht am Leben halten. Gemessen am gezeichneten Tab (display() zeichnet mit dem
+  // gesetzten Wert neu). Gegenprobe im selben Lauf: die Nachbarzeile „Letzte Anfrage“ desselben Abschnitts ist da, der Abschnitt ist also gezeichnet.
+  const stufeVorher = await cdp.evaluate<boolean>(`
+    const p = app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}];
+    const v = p.settings.request.levelPickerInChat;
+    p.settings.request.levelPickerInChat = true;
+    app.setting.activeTab.display();
+    await new Promise((r) => setTimeout(r, 700));
+    return v;
+  `);
+  // Das DOM liegt im Fenster der Einstellungen (`ui.cdp`), Plugin und Tab im Hauptfenster (`cdp`).
+  const stufenwahl = await ui.cdp.evaluate<{ stufenwahl: number; nachbar: number; alle: number }>(`
+    const wurzel = ${wurzelAusdruck(ui)};
+    const namen = wurzel ? [...wurzel.querySelectorAll(".setting-item-name")].map((n) => (n.textContent || "").trim()) : [];
+    return {
+      stufenwahl: namen.filter((n) => n === "Level picker in chat" || n === "Stufenwahl im Chat").length,
+      nachbar: namen.filter((n) => n === "Last request" || n === "Letzte Anfrage").length,
+      alle: namen.length,
+    };
+  `);
+  await cdp.evaluate(`
+    app.plugins.plugins[${JSON.stringify(PLUGIN_ID)}].settings.request.levelPickerInChat = ${JSON.stringify(stufeVorher)};
+    app.setting.activeTab.display();
+    await new Promise((r) => setTimeout(r, 400));
+    return true;
+  `);
+  record(
+    "F10 die Zeile „Stufenwahl im Chat“ fehlt im Abschnitt Anfrage, auch bei gespeichertem levelPickerInChat: true (Modellzeile, Kit 0.76.0)",
+    stufenwahl.stufenwahl === 0 && stufenwahl.nachbar === 1,
+    `Zeile „Stufenwahl im Chat“: ${stufenwahl.stufenwahl}× (erwartet 0) · Nachbarzeile „Letzte Anfrage“: ${stufenwahl.nachbar}× (erwartet 1, Abschnitt gezeichnet) · ${stufenwahl.alle} Zeilennamen im Tab`,
   );
 
   // F6/F7 messen die API-Schluessel-Zeile. Sie ist der einzige Fall, in dem eine Zeile

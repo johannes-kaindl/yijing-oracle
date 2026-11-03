@@ -6,6 +6,13 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+- Vendored `obsidian-kit` 0.76.1 (was 0.74.0; 0.75.0 and 0.76.0 were skipped). What you may notice:
+- The thinking dropdown in the model row starts every entry with a block character that shows the level (`▄ Medium`); the closed dropdown keeps the word next to it. Below 260 px of row width it shrinks to the character alone, the brain icon stays (obsidian-kit 0.76.0). On a phone the 390 px panel is about 300 px wide, so the row keeps the word and the model name is still shortened there ("google…").
+- The reload button of the model row is 44 × 44 px on a phone and the dropdown's tooltip carries the full model name (these came with 0.74.0 and need the new `MODEL_BAR_CSS`, which is now in `styles.css`).
+- Settings → Request: the row **Level picker in chat** is gone for good, also if you had switched it on in an older version (obsidian-kit 0.76.0). The earlier note under 0.19.0 that it appears only if you had switched it on no longer holds; the stored value stays in your data and does nothing.
+- Everything else in these kit releases does not touch this plugin: the chat window fixes (history button hidden at retention 0, larger touch area for the copy buttons, no empty gap above the keyboard), the choice dialog `askChoice`, the status indicator (the request section now draws its status line with it; same look, `STATUS_INDICATOR_CSS` added to `styles.css`), `block-writer` and `markChatHost`.
+
 ## [0.19.0] — 2026-11-01
 
 ### Changed
