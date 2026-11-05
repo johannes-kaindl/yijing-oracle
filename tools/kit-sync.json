@@ -8,7 +8,7 @@
       "dir": "src/vendor/kit",
       "source": "code-kit",
       "from": "src/ts/pure",
-      "modules": ["anthropic-wire", "backend-probe", "capabilities", "endpoint", "endpoint_config", "embeddings-client", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "local-stamp", "marker-zone", "model-choice", "model-context", "model-list-cache", "reasoning", "redact", "safe-markdown", "sampling-profiles", "secrets", "settings", "sse", "think-splitter", "timeout"]
+      "modules": ["anthropic-wire", "backend-probe", "capabilities", "endpoint", "endpoint_config", "embeddings-client", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "local-stamp", "marker-zone", "model-choice", "model-context", "model-list-cache", "reasoning", { "name": "redact", "ref": "0.60.0" }, "safe-markdown", "sampling-profiles", "secrets", "settings", "sse", "think-splitter", "timeout"]
     },
     {
       "dir": "src/vendor/kit",

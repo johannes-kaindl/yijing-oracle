@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **The plugin no longer carries a regular expression that Safari before 16.4 cannot parse.** The e-mail redaction rule (`redact`, code-kit 0.60.0) matches the same addresses without a lookbehind, so the plugin loads on older iPhones and iPads.
+
 ## [0.19.1] — 2026-11-03
 
 ### Changed
