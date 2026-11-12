@@ -124,13 +124,16 @@ async function main(): Promise<void> {
       if (zurueck && vorher !== null) {
         await zurueck.evaluate(`const v = ${JSON.stringify(vorher)}; const p = ${P}; p.settings.llm.endpoints = v.eps; if (v.choice === null) delete p.settings.llm.choice; else p.settings.llm.choice = v.choice; p.llm.invalidate(); await p.saveSettings(); return true;`).catch(() => undefined);
       }
-      (zurueck ?? cdp).close();
+      // Beide Verbindungen schliessen: `cdp` (nach dem Neuladen angehaengt) bleibt sonst offen, wenn `zurueck` verbunden hat, und haelt den Prozess am Leben.
+      try { cdp.close(); } catch { /* Kontext schon weg */ }
+      try { zurueck?.close(); } catch { /* wie oben */ }
     }
     await stub.stop();
   }
 }
 
-main().catch((err: Error) => {
+// Ausdruecklich beenden: ein Rest-Handle (Socket, Stub) darf den Lauf nicht offenhalten (Welle 33: der Treiber lief nach der Messung weiter).
+main().then(() => exit(0), (err: Error) => {
   console.error(err.message);
   exit(1);
 });
