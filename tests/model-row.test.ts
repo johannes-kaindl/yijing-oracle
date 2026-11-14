@@ -26,6 +26,13 @@ function setup() {
     setModel: vi.fn(async (m: string) => { state.model = m; }),
     modelInUse: () => state.model,
     source: () => ({ family: state.family, familySource: "none", backend: state.backend, backendSource: "none", model: state.model, sentModel: state.model }),
+    // Seit Kit 0.87.0 gehören diese sechs zum Vertrag der Zeile (Gruppen je Endpunkt, verwaiste Wahl, Selbst-Abo). Ohne Manager gibt es keine Endpunkte: flache Liste.
+    endpoints: () => [] as { id: string; label: string }[],
+    activeEndpointId: () => undefined as string | undefined,
+    modelsOf: vi.fn(async () => ({ models: [...state.list], reachable: true })),
+    choice: () => ({}) as { endpointId?: string; model?: string },
+    setChoice: vi.fn(async () => undefined),
+    subscribe: (_cb: () => void) => () => undefined,
   };
   const saveSettings = vi.fn(async () => undefined);
   const host = { settings, llm, saveSettings } as unknown as ModelRowHost;

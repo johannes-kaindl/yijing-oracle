@@ -12,4 +12,8 @@ describe("Kit-CSS in styles.css", () => {
   it("jede steht wortgleich in styles.css", () => {
     expect(missingKitCss(vendorDir, readFileSync("styles.css", "utf8"))).toEqual([]);
   });
+  // Seit obsidian-kit 0.89.0 setzen die Kit-CSS-Konstanten einander ein (`${COPY_BUTTON_CSS}`): ein Einsetzungs-Rest in styles.css wäre ungültiges CSS.
+  it("styles.css enthält keine ${…}-Einsetzung", () => {
+    expect(readFileSync("styles.css", "utf8")).not.toContain("${");
+  });
 });
