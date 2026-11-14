@@ -8,13 +8,13 @@
       "dir": "src/vendor/kit",
       "source": "code-kit",
       "from": "src/ts/pure",
-      "modules": ["anthropic-wire", "backend-probe", "capabilities", "endpoint", "endpoint_config", "embeddings-client", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "local-stamp", "marker-zone", "model-choice", "model-context", "model-list-cache", "reasoning", { "name": "redact", "ref": "0.60.0" }, "safe-markdown", "sampling-profiles", "secrets", "settings", "sse", "think-splitter", "timeout"]
+      "modules": ["anthropic-wire", "backend-probe", "capabilities", "endpoint", "endpoint_config", "embeddings-client", "endpoint_diagnostics", "error_body", "filename-template", "i18n", "local-stamp", "marker-zone", "model-choice", "model-context", "model-list-cache", "reasoning", { "name": "redact", "ref": "0.60.0" }, { "name": "safe-markdown", "ref": "0.68.0" }, "sampling-profiles", "secrets", "settings", "sse", "think-splitter", "timeout"]
     },
     {
       "dir": "src/vendor/kit",
       "source": "code-kit",
       "from": "src/ts/web",
-      "modules": ["clipboard", "link-guard", "remote-resources"],
+      "modules": ["clipboard", { "name": "link-guard", "ref": "0.68.0" }, { "name": "remote-resources", "ref": "0.68.0" }],
       "rewrite": [["../pure/", "./"]]
     },
     {
@@ -28,7 +28,7 @@
       "dir": "src/vendor/kit-obsidian",
       "source": "obsidian-kit",
       "from": "src/obsidian",
-      "modules": ["anthropic-transport", "backend-probe", "capability-apis", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", "dom-guard", "embedding-connection", "endpoint-list", "endpoint-plumbing", "endpoint-secrets", "endpoint-source", "endpoint-status-text", "folder-suggest", "help-setting", "link-settings", "llm-connection", "llm-connection-strings", "model-bar", "model-bar-strings", "model-picker", "plugin-api", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "status-indicator", "stream-area", "thinking-control"],
+      "modules": ["anthropic-transport", "backend-probe", "capability-apis", "chat-client", "chat-transport", "clipboard", "clock", "collapsible", { "name": "dom-guard", "ref": "0.88.0" }, "embedding-connection", "endpoint-list", "endpoint-plumbing", "endpoint-secrets", "endpoint-source", "endpoint-status-text", "folder-suggest", "help-setting", "link-settings", "llm-connection", "llm-connection-strings", "model-bar", "model-bar-strings", "model-picker", "plugin-api", "request-section", "request-session", "secrets", "settings_walker", "shortcuts-bridge", "status-indicator", "stream-area", "thinking-control"],
       "rewrite": [["../vendor/code-kit/pure/", "../kit/"], ["../vendor/code-kit/web/", "../kit/"], ["../pure/", "../kit/"]]
     },
     {

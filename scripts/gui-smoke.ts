@@ -204,6 +204,7 @@ const PUNKTE = [
   "K-b Mit dem Schalter bleibt der obsidian://-Link, file: und app: gehen weiter",
   "K-c Die zwei Zeilen stehen im Einstellungen-Tab, ein Klick auf den Schalter schreibt sein Feld",
   "K-d Ein gekappter Link der fertigen Deutung sieht aus wie Text (Farbe der Umgebung, kein Unterstrich, kein Zeiger, kein Icon), ein Link mit Ziel bleibt Link",
+  "K-e Linkschutz-Haertung (code-kit 0.68.0, dom-guard 0.88.0): rohes HTML mit on*, ping, formaction, form, commandfor, popovertarget und label-for, waehrend des Renderns der Deutung (renderMarkdownGuarded) in deren Koerper gesetzt, verliert diese Marker, der https-Link bleibt; Gegenprobe: dasselbe HTML ausserhalb des Beobachters behaelt alle Marker",
 ] as const;
 
 const bilanz = createBilanz({ punkte: PUNKTE });
@@ -1937,6 +1938,74 @@ async function pruefeLinkschutz(cdp: Cdp, port: number): Promise<void> {
     record(NAMEN[1]!, lief2 && (b["OB"] ?? "").startsWith("obsidian://") && b["FI"] === null && b["AP"] === null && (b["HT"] ?? "").startsWith("https://"),
       lief2 ? `href: ${JSON.stringify(b)}` : "Deutungslauf lieferte kein Ergebnis");
     await cdp.evaluate(`${P}.settings.allowObsidianLinks = false; await ${P}.saveSettings(); return true;`);
+
+    // K-e — Haertung des Linkschutzes (code-kit 0.68.0 `link-guard`, obsidian-kit 0.88.0 `dom-guard`). Das Panel rendert die fertige Deutung ueber `renderMarkdownGuarded` (nicht ueber einen Schreiber): der
+    // Beobachter haengt an `.yijing-interpretation-body`, BEVOR `MarkdownRenderer.render` laeuft, und bleibt bis zum Ende des Renderns plus Schlussdurchgang. Modelltext erreicht ihn im Normalfall nie
+    // (`neutralizeModelMarkdown` maskiert `<`); gemessen wird das Netz am echten Fenster. Das rohe HTML kommt auf dem echten Weg an: ein MutationObserver des Fensters setzt es (`innerHTML`, kein
+    // Sanitizer) in genau dieses Element, sobald das Panel es angelegt hat (Mikroaufgabe nach dem synchronen Anhaengen des Waechters, waehrend das Rendern noch laeuft). Gueltig nur, wenn ein Sentinel-Knoten daneben nach dem Rendern noch im Element steht.
+    // Gegenprobe: dasselbe HTML ausserhalb eines Beobachters behaelt alle Marker.
+    const MARKER_E = "__yjOnMarker";
+    const HTML_E = [
+      `<i>yj-sentinel</i>`,
+      `<a href="https://example.org/ok" onclick="window.${MARKER_E} = 1" ping="https://example.invalid/ping">h-ok</a>`,
+      `<p onmouseover="window.${MARKER_E} = 2">h-p</p>`,
+      '<form action="https://example.invalid/form"><button formaction="https://example.invalid/fa">h-form</button></form>',
+      '<button form="kf" commandfor="kd" popovertarget="kd" command="show-modal" popovertargetaction="show">h-ref</button><label for="kc">h-label</label>',
+    ].join("");
+    type ZahlE = { sentinel: boolean; anker: { h: string | null; attrs: string[] } | null; forms: number; formaction: number; on: number; ping: number; seite: number };
+    const ZAEHLE_E = `
+      const zaehle = (root) => {
+        const all = Array.from(root.querySelectorAll("*"));
+        const anker = all.find((e) => e.localName === "a" && e.textContent === "h-ok");
+        const mit = (...n) => all.filter((e) => n.some((x) => e.hasAttribute(x))).length;
+        return {
+          sentinel: all.some((e) => e.localName === "i" && e.textContent === "yj-sentinel"),
+          anker: anker ? { h: anker.getAttribute("href"), attrs: anker.getAttributeNames().filter((n) => n.startsWith("on") || n === "ping") } : null,
+          forms: all.filter((e) => e.localName === "form").length,
+          formaction: mit("formaction"),
+          on: all.filter((e) => e.getAttributeNames().some((n) => n.startsWith("on"))).length,
+          ping: mit("ping"),
+          seite: all.reduce((n, e) => n + ["form", "commandfor", "command", "popovertarget", "popovertargetaction"].filter((x) => e.hasAttribute(x)).length + (e.localName === "label" && e.hasAttribute("for") ? 1 : 0), 0),
+        };
+      };`;
+    try {
+      // Das Panel haengt den Beobachter synchron nach dem Anlegen des Koerpers an; ein MutationObserver des Fensters auf dem Dokument laeuft als Mikroaufgabe danach, also bei haengendem Waechter und
+      // noch laufendem (asynchronem) Rendern. Er setzt das rohe HTML genau einmal in den Koerper der Deutung.
+      const huelle = await cdp.evaluate<{ ok: boolean }>(`
+        delete window.${MARKER_E}; window.__yjProbeEl = null;
+        window.__yjMo?.disconnect();
+        const alt = document.querySelector(".yijing-interpretation-body");
+        window.__yjMo = new MutationObserver(() => {
+          const el = document.querySelector(".yijing-interpretation-body");
+          if (el && el !== alt && el !== window.__yjProbeEl) { window.__yjProbeEl = el; el.innerHTML = ${JSON.stringify(HTML_E)}; }
+        });
+        window.__yjMo.observe(document.body, { childList: true, subtree: true });
+        return { ok: true };`);
+      if (!huelle.ok) { unmeasured(NAMEN[4]!, "Beobachter im Fenster nicht installiert"); }
+      else {
+        const lief3 = await laufeDeutung(cdp, 20000, "Smoke K-e: Haertung");
+        await schlaf(600);
+        const m = await cdp.evaluate<{ el: boolean; gegen: ZahlE; mess: ZahlE | null; marker: string }>(`
+          ${ZAEHLE_E}
+          const aussen = document.body.createDiv();
+          aussen.innerHTML = ${JSON.stringify(HTML_E)};
+          const gegen = zaehle(aussen); aussen.remove();
+          const el = window.__yjProbeEl;
+          return { el: !!el, gegen, mess: el ? zaehle(el) : null, marker: String(window.${MARKER_E}) };`);
+        const g = m.gegen;
+        const gegenText = `form ${g.forms}, formaction ${g.formaction}, on* ${g.on}, ping ${g.ping}, Seitenbezug-Attribute ${g.seite}, Anker-Attribute [${g.anker?.attrs.join(",")}]`;
+        if (!lief3 || !m.el || m.mess === null) unmeasured(NAMEN[4]!, `die Probe kam nicht in den Koerper der Deutung (Lauf ${String(lief3)}, Element ${String(m.el)})`);
+        else if (!m.mess.sentinel) unmeasured(NAMEN[4]!, "der Renderer hat die Probe aus dem Koerper entfernt (Sentinel fehlt): der Waechter hat sie nie gesehen");
+        else if (!(g.forms >= 1 && g.formaction >= 1 && g.on >= 2 && g.ping >= 1 && g.seite >= 6 && g.anker !== null && g.anker.attrs.length >= 2)) unmeasured(NAMEN[4]!, `die Gegenprobe ausserhalb des Beobachters behielt nicht alle Marker (${gegenText}): „gekappt“ waere ohne sie nichts wert`);
+        else {
+          const e = m.mess;
+          const ok = e.anker !== null && e.anker.h === "https://example.org/ok" && e.anker.attrs.length === 0 && e.forms === 0 && e.formaction === 0 && e.on === 0 && e.ping === 0 && e.seite === 0 && m.marker === "undefined";
+          record(NAMEN[4]!, ok, `im Koerper der Deutung (renderMarkdownGuarded): https-Anker ${e.anker ? `da, href ${String(e.anker.h)}, on*/ping [${e.anker.attrs.join(",")}]` : "FEHLT"} · form ${e.forms} · formaction ${e.formaction} · on* ${e.on} · ping ${e.ping} · Seitenbezug-Attribute ${e.seite} · Marker ${m.marker} (verlangt: undefined) · Gegenprobe ausserhalb: ${gegenText} (alle verlangt: Marker da)`);
+        }
+      }
+    } finally {
+      await cdp.evaluate(`window.__yjMo?.disconnect(); delete window.__yjMo; delete window.__yjProbeEl; return true;`).catch(() => null);
+    }
 
     // K-c — die Zeilen im Tab; ein Klick auf den Schalter der Links-Zeile schreibt allowObsidianLinks.
     ui = await openSettingsTab(cdp, port);
