@@ -6,6 +6,12 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Changed
+
+- **The model row follows the endpoint manager more closely** (shared library obsidian-kit 0.93.0): when the manager is switched off or comes back, the model row notices within about two seconds and redraws, without a restart.
+- **A removed `iframe`, `frame`, `object` or `embed` in a model answer stays in the page for another 250 ms as a hidden, empty shell** (link guard of code-kit 0.73.0). The error box "A JavaScript error occurred in the main process" that Obsidian could show for an `iframe` with an `app:`, relative or `file:` target no longer appears.
+- **The copy button of the reasoning block has its own style rule** (`COPY_BUTTON_CSS` of the shared library); it looks the same.
+
 ## [0.20.0] — 2026-11-14
 
 ### Changed

@@ -1,4 +1,4 @@
-// vendored from obsidian-kit@0.77.1, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
+// vendored from obsidian-kit@0.93.0, src/obsidian/stream-area.ts — do not hand-edit; re-vendor via tools/sync-kit.sh
 /**
  * Streaming-Antwortbereich (UI-STANDARD §8): der Bereich, in dem eine laufende
  * LLM-Antwort sichtbar wird — Gedankenblock, fertiger Text, laufender Absatz,
@@ -57,7 +57,7 @@
  ## Fallen beim Übernehmen
  *
  * 1. **Das Kit injiziert kein CSS.** `STREAM_AREA_CSS` gehört in die `styles.css` des
- *    Consumers (Muster von `COLLAPSIBLE_CSS`/`HUB_CSS`/`ENDPOINT_LIST_CSS`).
+ *    Consumers, mit `COPY_BUTTON_CSS` daneben (seit 0.89.0 nicht mehr in `STREAM_AREA_CSS` enthalten; Muster von `COLLAPSIBLE_CSS`/`HUB_CSS`/`ENDPOINT_LIST_CSS`).
  * 2. **Der Body beansprucht den freien Platz — alles andere in derselben Flex-Spalte muss
  *    sich dagegen wehren.** `.okit-stream-body` trägt `flex: 1 1 auto` und `min-height: 0`,
  *    ist also das Einzige, was wachsen UND unter seinen Inhalt schrumpfen darf. Innerhalb
@@ -74,12 +74,10 @@
  *    schlicht unerreichbar. *Nicht selbst reproduziert; die Zahlen stammen aus deren Sweep.*
  */
 
-import { setIcon } from "obsidian";
-import { copyToClipboard } from "./clipboard";
+import { createCopyButton, type CopyButton } from "./copy-button";
 import { realClock, type ClockPort } from "./clock";
 
 /** Wie lange der Kopier-Knopf nach dem Kopieren das Häkchen zeigt. */
-const COPIED_FLASH_MS = 1500;
 
 /** Sichtbare Texte. Kein Default außer dem Knopf-Label: das Kit schreibt keine Sprache fest (UI-STANDARD §10). */
 export interface StreamAreaStrings {
@@ -209,51 +207,25 @@ function createReasoningBlock(parent: HTMLElement, cfg: ReasoningBlockConfig): {
   const cb = cfg.onToggle;
   if (cb !== undefined) det.addEventListener("toggle", () => { cb(det.open); });
 
-  let copyBtn: HTMLElement | null = null;
-  let copiedTimer: number | null = null;
+  let copyBtn: CopyButton | null = null;
 
-  const clearCopiedTimer = (): void => {
-    if (copiedTimer !== null) { cfg.clock.clearTimeout(copiedTimer); copiedTimer = null; }
-  };
-
-  /** Quittung am Knopf: Häkchen statt Kopier-Symbol, dann zurück. Eine Notice ist optional (`copiedMessage`). */
-  const flashCopied = (btn: HTMLElement): void => {
-    clearCopiedTimer();
-    setIcon(btn, "check");
-    btn.addClass("is-copied");
-    copiedTimer = cfg.clock.setTimeout(() => {
-      copiedTimer = null;
-      setIcon(btn, "copy");
-      btn.removeClass("is-copied");
-    }, COPIED_FLASH_MS);
-  };
-
-  /** Der Kopier-Knopf sitzt in der Zusammenfassung und erscheint erst, wenn der Block Text trägt (und verschwindet, wenn
-   *  ein Snapshot den Text wieder leert). Der Klick klappt den Block nicht auf oder zu: `preventDefault` am `<summary>`-Klick. */
+  /** Der Kopier-Knopf (Baustein `createCopyButton`, 0.86.0) sitzt in der Zusammenfassung und erscheint erst, wenn der Block Text trägt (und verschwindet, wenn
+   *  ein Snapshot den Text wieder leert). Der Klick klappt den Block nicht auf oder zu: `stopClick` (`preventDefault` am `<summary>`-Klick). */
   const syncCopyButton = (hasText: boolean): void => {
     if (!hasText) {
-      copyBtn?.remove();
+      copyBtn?.el.remove();
+      copyBtn?.dispose();
       copyBtn = null;
-      clearCopiedTimer();
       return;
     }
     if (copyBtn !== null) return;
-    const btn = summaryEl.createEl("button", {
-      cls: "clickable-icon okit-stream-reasoning-copy",
-      attr: { type: "button", "aria-label": cfg.copyLabel ?? "Copy thinking" },
+    copyBtn = createCopyButton(summaryEl, {
+      label: cfg.copyLabel ?? "Copy thinking", text: () => cfg.getText(), cls: "okit-stream-reasoning-copy", stopClick: true, clock: cfg.clock,
+      ...(cfg.copiedMessage !== undefined ? { copiedMessage: cfg.copiedMessage } : {}),
     });
-    setIcon(btn, "copy");
-    btn.addEventListener("click", (ev) => {
-      ev.preventDefault();
-      ev.stopPropagation();
-      const copyOpts: Parameters<typeof copyToClipboard>[1] = { onCopied: () => { flashCopied(btn); } };
-      if (cfg.copiedMessage !== undefined) copyOpts.copiedMessage = cfg.copiedMessage;
-      void copyToClipboard(cfg.getText(), copyOpts);
-    });
-    copyBtn = btn;
   };
 
-  return { det, pre, labelEl, syncCopyButton, dispose: clearCopiedTimer };
+  return { det, pre, labelEl, syncCopyButton, dispose: () => { copyBtn?.dispose(); } };
 }
 
 export interface ReasoningBlockOptions {
@@ -443,14 +415,8 @@ export const STREAM_AREA_CSS = `
   font-size: var(--font-ui-smaller); color: var(--text-muted);
 }
 .okit-stream-reasoning > summary { cursor: var(--cursor); color: var(--text-faint); }
-/* Der Kopier-Knopf sitzt IN der Zusammenfassung, bleibt inline und nimmt der Zeile keine Höhe. */
-.okit-stream-reasoning-copy {
-  display: inline-flex; vertical-align: middle; margin-inline-start: var(--size-4-2);
-  height: auto; padding: var(--size-2-1) var(--size-2-2);
-  color: var(--text-faint);
-}
-.okit-stream-reasoning-copy.is-copied { color: var(--text-success); }
-.okit-stream-reasoning-copy .svg-icon { width: var(--icon-xs); height: var(--icon-xs); }
+/* Der Kopier-Knopf sitzt IN der Zusammenfassung, bleibt inline und nimmt der Zeile keine Höhe. Sein Aussehen steht in COPY_BUTTON_CSS (Baustein createCopyButton), die der Konsument einmal selbst kopiert. */
+.okit-stream-reasoning-copy { display: inline-flex; vertical-align: middle; margin-inline-start: var(--size-4-2); }
 .okit-stream-reasoning > pre {
   max-height: 12em; overflow-y: auto; white-space: pre-wrap;
   background: var(--background-secondary); padding: var(--size-4-2);
