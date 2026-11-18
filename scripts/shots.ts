@@ -476,7 +476,6 @@ async function main(): Promise<void> {
   console.log(`Verbunden auf Port ${port}.\n`);
   await cdp.mitschnitt((zeile) => console.log(`      » ${zeile}`));
 
-  await cdp.send("Page.bringToFront");
   await schlaf(3000);
 
   const sprache = await cdp.evaluate<string>(
