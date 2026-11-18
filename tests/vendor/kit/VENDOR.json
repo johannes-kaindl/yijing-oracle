@@ -2,6 +2,6 @@
   "source": "obsidian-kit",
   "version": "0.77.1",
   "sha": "3fc29e1",
-  "vendored": "kit-css.ts (obsidian-kit@0.93.0, 7997447), obsidian-mock.ts, dom-guard-probe.ts (obsidian-kit@0.93.0, 7997447)",
+  "vendored": "kit-css.ts (obsidian-kit@0.93.0, 7997447), obsidian-mock.ts, linear-probe.ts (obsidian-kit@0.95.0, 3853245), dom-guard-probe.ts (obsidian-kit@0.93.0, 7997447)",
   "license": "AGPL-3.0-or-later"
 }

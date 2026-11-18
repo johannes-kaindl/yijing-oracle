@@ -14,6 +14,14 @@ export class BrokenZoneError extends Error {
   }
 }
 
+/** Endet der Text auf genau eine Leerzeile (zwei Zeilenumbrüche)? Gemeint ist `replace(/\n*$/, "\n\n")`; diese Fassung war auf einem langen Lauf von Zeilenumbrüchen
+ *  mitten im Text quadratisch (jede Startposition las den Lauf bis zu seinem Ende, 50 000 Zeichen rund 1 s; Fuzz in `tests/linear-fuzz.test.ts`). */
+function endWithBlankLine(text: string): string {
+  let end = text.length;
+  while (end > 0 && text.charCodeAt(end - 1) === 10) end--;
+  return `${text.slice(0, end)}\n\n`;
+}
+
 /** Setzt/ersetzt den Deutungs-Block zwischen den Markern (Kit `marker-zone`). Wirft `BrokenZoneError` bei einem Start-Marker ohne Ende.
  *  Reihenfolge:
  *  1) Marker vorhanden → Inhalt dazwischen ersetzen.
@@ -27,9 +35,9 @@ export function insertInterpretation(body: string, block: string): string {
   const lines = body.split("\n");
   const idx = lines.findIndex(l => l.startsWith("## "));
   if (idx !== -1) {
-    const before = lines.slice(0, idx).join("\n").replace(/\n*$/, "\n\n");
+    const before = endWithBlankLine(lines.slice(0, idx).join("\n"));
     const after = lines.slice(idx).join("\n");
     return `${before}${wrapped}\n\n${after}`;
   }
-  return body.replace(/\n*$/, "\n\n") + wrapped;
+  return endWithBlankLine(body) + wrapped;
 }

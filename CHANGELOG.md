@@ -6,6 +6,10 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- **Inserting the AI interpretation or the image into a note with a very long run of blank lines no longer freezes Obsidian for seconds.** The note text was read quadratically when it had no interpretation zone yet; a run of 50,000 line breaks took about one second and the time grew with the square of the length. It is now linear.
+
 ## [0.20.1] — 2026-11-15
 
 ### Changed

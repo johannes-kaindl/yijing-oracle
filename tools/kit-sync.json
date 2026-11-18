@@ -204,6 +204,10 @@
         },
         "obsidian-mock",
         {
+          "name": "linear-probe",
+          "ref": "0.95.0"
+        },
+        {
           "name": "dom-guard-probe",
           "ref": "0.93.0"
         }
