@@ -20,24 +20,15 @@
  * ein vergessener Port nie die reguläre Instanz (9222) trifft. Die reguläre Instanz wird weder genutzt
  * noch beendet. Reihenfolge laut obsidian-plugins/AGENTS.md § Staging-Vaults (a)-(c):
  *
- * ```bash
- * echo "$STAGING_VAULTS_DIR"                                    # muss gesetzt sein (~/.zshenv)
- * UD=/tmp/obs-test-yijing-oracle; mkdir -p "$UD"
- * lsof -nP -iTCP:9400 -sTCP:LISTEN && echo "Port belegt — anderen nehmen"
- * pgrep -f "user-data-dir=$UD" && echo "Profil belegt — $UD-w19 nehmen"
- * npm run build && OBSIDIAN_PLUGIN_DIR="$STAGING_VAULTS_DIR/yijing-oracle/.obsidian/plugins/yijing-oracle" npm run deploy
- * # (a) aktuelle Version statt gebuendelter:
- * cp ~/Library/Application\ Support/obsidian/obsidian-<version>.asar "$UD"/
- * # Vault registrieren (Obsidian liest obsidian.json nur beim Start), Oberflaeche Englisch:
- * node -e 'const p=process.env.STAGING_VAULTS_DIR+"/yijing-oracle";require("fs").writeFileSync(process.argv[1]+"/obsidian.json",JSON.stringify({vaults:{yijing01:{path:p,ts:Date.now(),open:true}},language:"en"}))' "$UD"
- * /Applications/Obsidian.app/Contents/MacOS/Obsidian --user-data-dir="$UD" --remote-debugging-port=9400 &
- * # PID merken: beendet wird NUR sie, nie pkill/killall. Je Messlauf frischer Prozess.
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py acquire --label yijing-oracle --intent "GUI-Smoke Zweitinstanz :9400" --exclusive focus --port 9400 --ttl 300
- * npm run smoke:gui -- --port 9400 --vault yijing-oracle    # (b) Restricted Mode, (c) Vertrauensdialog: macht `bereiteInstanzVor`
- * npm run smoke:gui -- --port 9400 --vault yijing-oracle --model <id>     # M4: genau dieses Modell auf :1234; ohne Flag wird nichts angefragt (M4 nichts gemessen)
- * npm run smoke:gui -- --port 9400 --vault yijing-oracle --lig <Ordner>   # D10: gebauter local-image-generator (main.js, manifest.json, styles.css); ohne Flag uebersprungen
- * python3 ~/.claude/hooks/obsidian-cdp-lock.py release
- * ```
+ * Lauf: `tools/obsidian-cdp/messlauf.sh` (Dach, README § Messlauf in einem Aufruf) startet die Zweitinstanz, hält den Lock (`--exclusive focus`, davor, mit `export`)
+ * und räumt auf; das Rezept steht nur dort. Für diesen Treiber: `REPO=yijing-oracle PORT=9400 SMOKE_ARGS="--vault yijing-oracle" OHNE_SETUP=1` (Port als Vorschlag, jeder freie geht).
+ *
+ * Weitere Läufe (als `SMOKE_ARGS`):
+ *   --vault yijing-oracle --model <id>   # M4: genau dieses Modell auf :1234; ohne Flag wird nichts angefragt (M4 nichts gemessen)
+ *   --vault yijing-oracle --lig <Ordner>   # D10: gebauter local-image-generator (main.js, manifest.json, styles.css); ohne Flag uebersprungen
+ *
+ * Besonderheiten dieses Treibers (aus dem früheren Rezept übernommen):
+ *   OBSIDIAN_PLUGIN_DIR="$STAGING_VAULTS_DIR/yijing-oracle/.obsidian/plugins/yijing-oracle" npm run deploy
  *
  * Der erste Lauf nach dem Anlegen eines Profils ist ein Aufwaermlauf und zaehlt nicht.
  *
