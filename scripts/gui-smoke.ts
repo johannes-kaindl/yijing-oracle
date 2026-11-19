@@ -21,7 +21,7 @@
  * noch beendet. Reihenfolge laut obsidian-plugins/AGENTS.md § Staging-Vaults (a)-(c):
  *
  * Lauf: `tools/obsidian-cdp/messlauf.sh` (Dach, README § Messlauf in einem Aufruf) startet die Zweitinstanz, hält den Lock (`--exclusive focus`, davor, mit `export`)
- * und räumt auf; das Rezept steht nur dort. Für diesen Treiber: `REPO=yijing-oracle PORT=9400 SMOKE_ARGS="--vault yijing-oracle" OHNE_SETUP=1` (Port als Vorschlag, jeder freie geht).
+ * und räumt auf; das Rezept steht nur dort. Für diesen Treiber: `REPO=yijing-oracle PORT=9400 SMOKE_ARGS="--vault yijing-oracle" SETUP_BEFEHL='npm run shots -- --setup'` (Port als Vorschlag, jeder freie geht).
  *
  * Weitere Läufe (als `SMOKE_ARGS`):
  *   --vault yijing-oracle --model <id>   # M4: genau dieses Modell auf :1234; ohne Flag wird nichts angefragt (M4 nichts gemessen)
