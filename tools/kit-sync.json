@@ -35,7 +35,7 @@
         "reasoning",
         {
           "name": "redact",
-          "ref": "0.60.0"
+          "ref": "0.87.0"
         },
         {
           "name": "safe-markdown",
@@ -124,7 +124,7 @@
         "collapsible",
         {
           "name": "dom-guard",
-          "ref": "0.93.0"
+          "ref": "0.106.0"
         },
         "embedding-connection",
         "endpoint-list",

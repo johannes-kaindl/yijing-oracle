@@ -6,6 +6,14 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- **A key behind word characters is now blanked before the interpretation request leaves.** A key written as `key_sk-proj-…` in the question used to stay in clear text in the request to the model; the Kit redaction (code-kit 0.87.0, fix 0.79.1) reads it now and sends a placeholder.
+
+### Changed
+
+- **The link guard of the interpretation view (`dom-guard`) is on the current Kit version (obsidian-kit 0.106.0).**
+
 ### Fixed
 
 - **Inserting the AI interpretation or the image into a note with a very long run of blank lines no longer freezes Obsidian for seconds.** The note text was read quadratically when it had no interpretation zone yet; a run of 50,000 line breaks took about one second and the time grew with the square of the length. It is now linear.

@@ -170,3 +170,19 @@ describe("Settings <-> Verbindung", () => {
     expect(s.request.thinking.creative).toBe("high");
   });
 });
+
+// Sicherheitsfix code-kit 0.79.1: ein Schlüssel hinter Wortzeichen (`key_sk-proj-…`) blieb im Klartext. Wirkstelle: die Frage und der Prompt
+// der Deutung gehen über `llm.complete` (view.ts) an das Modell. Die IBAN-Regel (0.82.0) ist `createPiiRedactor`, Opt-in und hier ungenutzt.
+describe("createOracleConnection — Schwärzung vor dem Senden", () => {
+  it("ein Schlüssel hinter Wortzeichen geht nicht im Klartext an das Modell (code-kit 0.79.1)", async () => {
+    const KEY = "sk-proj-AbCdEfGhIjKlMnOpQrSt1234567890";
+    const s = fresh();
+    s.llm.endpoints = [{ url: "http://127.0.0.1:1234", model: "qwen/qwen3.6-35b-a3b" }];
+    const t = setup({ settings: s });
+    const r = await t.conn.complete({ messages: [{ role: "user", content: `Meine Frage steht in key_${KEY} und betrifft die Arbeit.` }] });
+    expect(r.ok).toBe(true);
+    const sent = JSON.stringify(t.seen[0]!.body);
+    expect(sent).not.toContain(KEY);
+    expect(sent).toMatch(/\[redacted-/);
+  });
+});
