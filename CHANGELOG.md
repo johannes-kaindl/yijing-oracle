@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.20.2] — 2026-11-24
+
 ### Security
 
 - **A key behind word characters is now blanked before the interpretation request leaves.** A key written as `key_sk-proj-…` in the question used to stay in clear text in the request to the model; the Kit redaction (code-kit 0.87.0, fix 0.79.1) reads it now and sends a placeholder.
